@@ -216,6 +216,25 @@
     @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium
       text-sky-200/90 bg-sky-500/10 border border-sky-500/20 mb-6;
   }
+
+  /* Header brand: icon mark + Powerbook.ai */
+  .header-brand {
+    @apply inline-flex items-center gap-2 sm:gap-2.5 min-w-0;
+  }
+
+  .header-brand-text {
+    @apply font-semibold text-slate-100 leading-none tracking-tight whitespace-nowrap;
+    font-size: clamp(1.05rem, 4.2vw, 1.35rem);
+    letter-spacing: -0.02em;
+  }
+
+  .header-brand-dot {
+    @apply text-sky-400 font-semibold;
+  }
+
+  .group:hover .header-brand-text {
+    @apply text-white;
+  }
 }
 
 /* Animated mesh background */
