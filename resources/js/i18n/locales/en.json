@@ -1,0 +1,29 @@
+{
+  "tagline": "Describe it. Powerbook finds it.",
+  "search": "Search",
+  "searching": "Searching across marketplaces…",
+  "placeholder": "Describe what you want to buy…",
+  "examples_title": "Try an example",
+  "trending_title": "Trending searches",
+  "results_for": "Results for",
+  "matches": "matches",
+  "match": "match",
+  "buy": "View listing",
+  "why_ai": "Why AI picked this",
+  "filters": "AI Filters",
+  "clear_filters": "Clear filters",
+  "no_results": "No matches found. Try broadening your description.",
+  "sources": "Sources searched",
+  "parsed_intent": "AI understood",
+  "location": "Your region",
+  "affiliate_note": "Buy links may include affiliate partnerships (coming soon).",
+  "footer": "Powerbook.ai — Semantic shopping engine. No accounts. Real-time AI search.",
+  "categories": {
+    "car": "Cars",
+    "book": "Books",
+    "painting": "Art",
+    "electronics": "Electronics",
+    "furniture": "Furniture",
+    "marketplace": "Marketplace"
+  }
+}

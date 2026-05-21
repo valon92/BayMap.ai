@@ -1,0 +1,29 @@
+{
+  "tagline": "Trego çfarë kërkon — Powerbook e gjen.",
+  "search": "Kërko",
+  "searching": "Duke kërkuar në marketplace…",
+  "placeholder": "Përshkruaj çfarë dëshiron të blesh…",
+  "examples_title": "Provo një shembull",
+  "trending_title": "Kërkime në trend",
+  "results_for": "Rezultate për",
+  "matches": "përputhje",
+  "match": "përputhje",
+  "buy": "Shiko listimin",
+  "why_ai": "Pse AI e zgjodhi",
+  "filters": "Filtrat AI",
+  "clear_filters": "Pastro filtrat",
+  "no_results": "Nuk u gjet asgjë. Provo një përshkrim më të gjerë.",
+  "sources": "Burimet e kërkuara",
+  "parsed_intent": "AI kuptoi",
+  "location": "Rajoni juaj",
+  "affiliate_note": "Linqet e blerjes mund të përfshijnë partneritete affiliate (së shpejti).",
+  "footer": "Powerbook.ai — Motor kërkimi semantik. Pa llogari. Kërkim AI në kohë reale.",
+  "categories": {
+    "car": "Makina",
+    "book": "Libra",
+    "painting": "Art",
+    "electronics": "Elektronikë",
+    "furniture": "Mobilje",
+    "marketplace": "Marketplace"
+  }
+}

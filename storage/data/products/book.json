@@ -1,0 +1,36 @@
+[
+  {
+    "id": "book-001",
+    "title": "The Silent Patient — Psychological Thriller",
+    "image": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&q=80",
+    "price": 14.99,
+    "currency": "EUR",
+    "location": "Online — EU",
+    "condition": "new",
+    "url": "https://amazon.com",
+    "tags": ["thriller", "psychological", "unexpected ending", "bestseller"]
+  },
+  {
+    "id": "book-002",
+    "title": "Gone Girl — Short-format psychological suspense",
+    "image": "https://images.unsplash.com/photo-1512820790801-415816956e3f?w=800&q=80",
+    "price": 11.50,
+    "currency": "EUR",
+    "location": "Berlin, Germany",
+    "condition": "used",
+    "url": "https://ebay.com",
+    "tags": ["thriller", "psychological", "twist"]
+  },
+  {
+    "id": "book-003",
+    "title": "Shutter Island — Mind-bending thriller paperback",
+    "image": "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800&q=80",
+    "price": 9.99,
+    "currency": "EUR",
+    "location": "Amazon EU",
+    "condition": "new",
+    "url": "https://amazon.com",
+    "tags": ["thriller", "psychological", "short", "unexpected ending"],
+    "sponsored": true
+  }
+]

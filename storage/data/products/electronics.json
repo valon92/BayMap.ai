@@ -1,0 +1,36 @@
+[
+  {
+    "id": "elec-001",
+    "title": "ASUS ROG Zephyrus G14 — Long Battery Quiet Fans",
+    "image": "https://images.unsplash.com/photo-1496181133176-513caad9d960?w=800&q=80",
+    "price": 1299,
+    "currency": "EUR",
+    "location": "Amazon DE",
+    "condition": "new",
+    "url": "https://amazon.com",
+    "tags": ["laptop", "gaming", "long_battery", "quiet_cooling"]
+  },
+  {
+    "id": "elec-002",
+    "title": "Lenovo Legion Slim 5 — Gaming + 10hr Battery",
+    "image": "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&q=80",
+    "price": 1149,
+    "currency": "EUR",
+    "location": "Google Shopping",
+    "condition": "new",
+    "url": "https://google.com/shopping",
+    "tags": ["laptop", "gaming", "battery", "cooling"],
+    "sponsored": true
+  },
+  {
+    "id": "elec-003",
+    "title": "MacBook Pro 14 M3 Pro — Silent thermals",
+    "image": "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80",
+    "price": 2199,
+    "currency": "EUR",
+    "location": "eBay EU",
+    "condition": "refurbished",
+    "url": "https://ebay.com",
+    "tags": ["laptop", "quiet_cooling", "long_battery"]
+  }
+]

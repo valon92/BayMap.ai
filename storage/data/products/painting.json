@@ -1,0 +1,24 @@
+[
+  {
+    "id": "art-001",
+    "title": "Vintage Floral Oil Painting — Living Room Size",
+    "image": "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=800&q=80",
+    "price": 245,
+    "currency": "EUR",
+    "location": "Paris, France",
+    "condition": "vintage",
+    "url": "https://etsy.com",
+    "tags": ["vintage", "flower", "living room", "oil painting"]
+  },
+  {
+    "id": "art-002",
+    "title": "Abstract Botanical Canvas — Modern Living Space",
+    "image": "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&q=80",
+    "price": 189,
+    "currency": "EUR",
+    "location": "Amsterdam, Netherlands",
+    "condition": "new",
+    "url": "https://etsy.com",
+    "tags": ["flower", "modern", "canvas", "living room"]
+  }
+]

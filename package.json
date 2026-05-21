@@ -1,0 +1,24 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "serve": "php artisan serve --host=0.0.0.0 --port=8765",
+        "serve:lan": "php artisan serve --host=0.0.0.0 --port=8765"
+    },
+    "devDependencies": {
+        "@tailwindcss/forms": "^0.5.11",
+        "autoprefixer": "^10.5.0",
+        "axios": "^1.6.4",
+        "laravel-vite-plugin": "^1.0.0",
+        "postcss": "^8.5.15",
+        "tailwindcss": "^3.4.19",
+        "vite": "^5.0.0"
+    },
+    "dependencies": {
+        "@vitejs/plugin-vue": "^6.0.7",
+        "vue": "^3.5.34",
+        "vue-router": "^4.6.4"
+    }
+}

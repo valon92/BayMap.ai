@@ -1,0 +1,13 @@
+[
+  {
+    "id": "furn-001",
+    "title": "Scandinavian 3-Seat Sofa — Light Grey Modern",
+    "image": "https://images.unsplash.com/photo-1555041469-a587c61e9bc0?w=800&q=80",
+    "price": 649,
+    "currency": "EUR",
+    "location": "IKEA Marketplace via Google",
+    "condition": "new",
+    "url": "https://google.com/shopping",
+    "tags": ["sofa", "scandinavian", "modern", "living room"]
+  }
+]
