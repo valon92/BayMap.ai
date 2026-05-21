@@ -98,18 +98,44 @@ storage/data/
 └── trending.json
 ```
 
-## OpenAI parser (optional)
+## AI parsing & vision (Gemini or OpenAI)
 
-Add your key to `.env` (never commit this file):
+Keys stay **server-side only** in `.env` (never commit). Choose provider:
+
+```env
+AI_PROVIDER=auto
+```
+
+| `AI_PROVIDER` | Behavior |
+|---------------|----------|
+| `auto` | Gemini if `GEMINI_API_KEY` is set, else OpenAI, else rule-based |
+| `gemini` | Google Gemini only |
+| `openai` | OpenAI only |
+
+### Google Gemini (recommended)
+
+Create a key in [Google AI Studio](https://aistudio.google.com/app/apikey). Restrict it to **Generative Language API** for production.
+
+```env
+GEMINI_API_KEY=your-key
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_VISION_MODEL=gemini-2.0-flash
+GEMINI_ENABLED=true
+```
+
+You may use `GOOGLE_API_KEY` instead of `GEMINI_API_KEY` (same as Google’s docs).
+
+### OpenAI (fallback)
 
 ```env
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_VISION_MODEL=gpt-4o-mini
 OPENAI_ENABLED=true
 ```
 
 Get keys at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).  
-If the key is missing or the API fails, the app falls back to the rule-based parser automatically.
+If all AI providers fail, the app falls back to the rule-based parser automatically.
 
 ## eBay Browse API (real listings)
 

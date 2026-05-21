@@ -1,5 +1,6 @@
 {
   "tagline": "Describe it. Powerbook finds it.",
+  "hero_ai_badge": "AI semantic search",
   "top": "Top",
   "back_to_top": "Back to top",
   "search": "Search",
@@ -40,6 +41,7 @@
   "scope_region": "Region",
   "scope_world": "Worldwide",
   "search_area": "Search area",
+  "search_near_landmark": "Search area (near landmark)",
   "affiliate_note": "Buy links may include affiliate partnerships (coming soon).",
   "footer": "Powerbook.ai — Semantic shopping engine. No accounts. Real-time AI search.",
   "categories": {

@@ -1,5 +1,6 @@
 {
   "tagline": "Trego çfarë kërkon — Powerbook e gjen.",
+  "hero_ai_badge": "Kërkim semantik me AI",
   "top": "Lart",
   "back_to_top": "Kthehu lart",
   "search": "Kërko",
@@ -40,6 +41,7 @@
   "scope_region": "Rajoni",
   "scope_world": "Botë (universal)",
   "search_area": "Zona e kërkimit",
+  "search_near_landmark": "Zona e kërkimit (afër pikës referuese)",
   "affiliate_note": "Linqet e blerjes mund të përfshijnë partneritete affiliate (së shpejti).",
   "footer": "Powerbook.ai — Motor kërkimi semantik. Pa llogari. Kërkim AI në kohë reale.",
   "categories": {

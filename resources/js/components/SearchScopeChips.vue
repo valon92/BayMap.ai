@@ -1,8 +1,15 @@
 <template>
-  <div class="mt-3 text-left">
-    <p class="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
-      {{ t('location_scope_title') }}
-    </p>
+  <div class="search-scope" :class="variant === 'embedded' ? 'search-scope--embedded' : ''">
+    <div class="search-scope-header">
+      <span class="search-scope-icon" aria-hidden="true">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </span>
+      <span class="search-scope-label">{{ t('location_scope_title') }}</span>
+    </div>
+
     <div class="scope-scroll" role="group" :aria-label="t('location_scope_title')">
       <div class="scope-scroll-track">
         <button
@@ -14,6 +21,7 @@
           :disabled="disabled"
           @click="$emit('update:modelValue', opt.value)"
         >
+          <span v-if="modelValue === opt.value" class="scope-chip-dot" aria-hidden="true" />
           {{ opt.label }}
         </button>
       </div>
@@ -28,6 +36,7 @@ import api from '../services/api';
 defineProps({
   modelValue: { type: String, default: 'auto' },
   disabled: { type: Boolean, default: false },
+  variant: { type: String, default: 'default' },
 });
 
 defineEmits(['update:modelValue']);
@@ -52,34 +61,3 @@ const options = computed(() => [
   { value: 'world', label: t('scope_world') },
 ]);
 </script>
-
-<style scoped>
-/* Mobile: swipe left ↔ right; desktop: wrap if needed */
-.scope-scroll {
-  @apply -mx-4 px-4 sm:mx-0 sm:px-0;
-}
-
-.scope-scroll-track {
-  @apply flex flex-nowrap gap-1.5 overflow-x-auto overflow-y-hidden pb-1
-    scroll-smooth snap-x snap-mandatory
-    sm:flex-wrap sm:overflow-visible sm:snap-none;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-}
-
-.scope-scroll-track::-webkit-scrollbar {
-  display: none;
-}
-
-.scope-chip {
-  @apply shrink-0 snap-start whitespace-nowrap px-2.5 py-1 rounded-lg text-[11px] font-medium
-    text-slate-400 bg-white/5 border border-white/10
-    hover:bg-white/10 hover:text-slate-200 transition-colors
-    disabled:opacity-50 disabled:pointer-events-none;
-}
-
-.scope-chip--active {
-  @apply text-sky-200 bg-sky-500/15 border-sky-500/30;
-}
-</style>

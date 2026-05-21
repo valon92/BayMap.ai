@@ -6,7 +6,10 @@
         v-for="(ex, i) in examples"
         :key="i"
         type="button"
-        class="glass px-4 py-2 rounded-full text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+        class="px-4 py-2.5 rounded-full text-sm text-slate-300
+          bg-slate-800/40 border border-white/[0.06] backdrop-blur-sm
+          hover:text-white hover:bg-white/[0.08] hover:border-white/12
+          active:scale-[0.98] transition-all duration-200 text-left"
         @click="$emit('select', localizedExample(ex))"
       >
         {{ localizedExample(ex) }}

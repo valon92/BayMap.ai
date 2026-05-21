@@ -1,11 +1,20 @@
 <template>
   <section class="px-4 pb-20">
-    <div class="max-w-4xl mx-auto text-center pt-8 sm:pt-16 pb-10">
+    <div class="max-w-4xl mx-auto text-center pt-6 sm:pt-14 pb-10">
       <div class="flex justify-center mb-5">
         <BrandLogoIcon size="xl" class="shadow-2xl shadow-violet-500/20" />
       </div>
       <h1 class="sr-only">Powerbook.ai</h1>
-      <p class="tagline-hero text-slate-400 mb-10 max-w-xl mx-auto w-full px-1 sm:px-0 sm:text-xl">
+
+      <p class="hero-badge mx-auto">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-60" />
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
+        </span>
+        {{ t('hero_ai_badge') }}
+      </p>
+
+      <p class="tagline-hero text-slate-300/90 mb-8 max-w-xl mx-auto w-full px-1 sm:px-0 sm:text-xl font-medium">
         {{ tagline }}
       </p>
 
@@ -27,7 +36,7 @@ import ExamplePrompts from '../components/ExamplePrompts.vue';
 import TrendingSearches from '../components/TrendingSearches.vue';
 
 const router = useRouter();
-const { tagline, locale } = inject('i18n');
+const { tagline, locale, t } = inject('i18n');
 const query = ref('');
 const loading = ref(false);
 

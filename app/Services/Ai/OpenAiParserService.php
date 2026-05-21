@@ -2,7 +2,6 @@
 
 namespace App\Services\Ai;
 
-use App\Support\SearchLocale;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -28,8 +27,8 @@ class OpenAiParserService
                 'temperature' => 0.2,
                 'response_format' => ['type' => 'json_object'],
                 'messages' => [
-                    ['role' => 'system', 'content' => $this->systemPrompt($locale)],
-                    ['role' => 'user', 'content' => $this->userPrompt($query, $country, $locale)],
+                    ['role' => 'system', 'content' => ParserPrompts::system($locale)],
+                    ['role' => 'user', 'content' => ParserPrompts::user($query, $country, $locale)],
                 ],
             ]);
 
@@ -56,66 +55,14 @@ class OpenAiParserService
             throw new \RuntimeException('Invalid JSON from OpenAI.');
         }
 
-        return $this->normalize($decoded, $query, $country);
-    }
-
-    private function systemPrompt(?string $locale = 'en'): string
-    {
-        $lang = SearchLocale::descriptionLanguage($locale);
-
-        return <<<PROMPT
-You are Powerbook.ai shopping intent parser. Convert natural language product search queries into structured JSON.
-
-Return ONLY valid JSON with this shape:
-{
-  "category": "car|book|painting|electronics|furniture|collectibles|fashion|real_estate|luxury|gift|marketplace",
-  "description": "one-sentence buyer-facing summary in {$lang}",
-  "keywords": ["word1", "word2"],
-  "language_hint": "en|sq|de|fr|it|es",
-  "brand": null,
-  "model": null,
-  "year": null,
-  "color": null,
-  "max_km": null,
-  "transmission": null,
-  "fuel": null,
-  "genre": null,
-  "product_type": null,
-  "features": [],
-  "max_price": null,
-  "condition": null,
-  "style": null,
-  "room": null,
-  "subject": null,
-  "bedrooms": null,
-  "listing_type": null
-}
-
-Rules:
-- category: best match for intent
-- max_km: integer kilometers for cars (180k km => 180000)
-- year: integer if mentioned
-- keywords: 3-8 relevant terms, lowercase
-- language_hint: detect from query (Albanian => sq)
-- description: always in {$lang} when provided
-- Omit null fields or use null explicitly
-- features: array of strings e.g. long_battery, quiet_cooling, gaming
-PROMPT;
-    }
-
-    private function userPrompt(string $query, ?string $country, ?string $locale = 'en'): string
-    {
-        $ctx = $country ? "User country hint: {$country}." : '';
-        $uiLocale = SearchLocale::normalize($locale);
-
-        return "{$ctx}\nUI locale: {$uiLocale}\nQuery: {$query}";
+        return $this->normalizeDecoded($decoded, $query, $country, 'openai');
     }
 
     /**
      * @param  array<string, mixed>  $decoded
      * @return array<string, mixed>
      */
-    private function normalize(array $decoded, string $query, ?string $country): array
+    public function normalizeDecoded(array $decoded, string $query, ?string $country, string $parser = 'openai'): array
     {
         $allowed = [
             'car', 'book', 'painting', 'electronics', 'furniture',
@@ -133,13 +80,14 @@ PROMPT;
             'keywords' => array_values(array_filter($decoded['keywords'] ?? [], 'is_string')),
             'country' => $country,
             'language_hint' => $decoded['language_hint'] ?? 'en',
-            'parser' => 'openai',
+            'parser' => $parser,
         ];
 
         $optional = [
             'description', 'brand', 'model', 'year', 'color', 'max_km', 'transmission', 'fuel',
             'genre', 'product_type', 'features', 'max_price', 'condition',
             'style', 'room', 'subject', 'bedrooms', 'listing_type', 'length', 'ending', 'item',
+            'city', 'landmark', 'near_landmark', 'property_type', 'min_sqm', 'nearby_streets',
         ];
 
         foreach ($optional as $key) {
@@ -156,6 +104,9 @@ PROMPT;
         }
         if (isset($result['max_price'])) {
             $result['max_price'] = (int) $result['max_price'];
+        }
+        if (isset($result['min_sqm'])) {
+            $result['min_sqm'] = (int) $result['min_sqm'];
         }
 
         return array_filter($result, fn ($v) => $v !== null && $v !== [] && $v !== '');

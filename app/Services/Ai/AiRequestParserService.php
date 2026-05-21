@@ -10,7 +10,11 @@ use Illuminate\Support\Facades\Log;
  */
 class AiRequestParserService
 {
-    public function __construct(private OpenAiParserService $openAi) {}
+    public function __construct(
+        private AiProviderResolver $providers,
+        private OpenAiParserService $openAi,
+        private GeminiParserService $gemini,
+    ) {}
     /** @var array<string, array<string>> */
     private array $categoryKeywords = [
         'car' => ['audi', 'bmw', 'mercedes', 'volkswagen', 'toyota', 'honda', 'ford', 'km', 'mileage', 'sedan', 'suv', 'diesel', 'petrol', 'automatic', 'manual'],
@@ -20,7 +24,10 @@ class AiRequestParserService
         'furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room'],
         'collectibles' => ['collectible', 'vintage', 'rare', 'limited edition', 'coin', 'stamp', 'trading card'],
         'fashion' => ['dress', 'shoes', 'jacket', 'shirt', 'handbag', 'sneakers', 'watch', 'jewelry'],
-        'real_estate' => ['apartment', 'house', 'flat', 'bedroom', 'sqm', 'm²', 'rent', 'mortgage', 'property'],
+        'real_estate' => [
+            'apartment', 'house', 'flat', 'bedroom', 'sqm', 'm²', 'rent', 'mortgage', 'property',
+            'banes', 'banese', 'banesa', 'apartament', 'patundsh', 'gjykata', 'ferizaj', 'qira', 'blerje',
+        ],
         'luxury' => ['rolex', 'louis vuitton', 'gucci', 'chanel', 'luxury', 'designer', 'premium'],
         'gift' => ['gift', 'birthday', 'anniversary', 'present'],
     ];
@@ -30,21 +37,19 @@ class AiRequestParserService
      */
     public function parse(string $query, ?string $country = null, ?string $locale = 'en'): array
     {
-        if ($this->shouldUseOpenAi()) {
+        foreach ($this->providers->fallbackOrder() as $provider) {
             try {
-                return $this->openAi->parse($query, $country, $locale);
+                return match ($provider) {
+                    'gemini' => $this->gemini->parse($query, $country, $locale),
+                    'openai' => $this->openAi->parse($query, $country, $locale),
+                    default => throw new \RuntimeException('Unknown AI provider'),
+                };
             } catch (\Throwable $e) {
-                Log::warning('OpenAI parser fallback to rules', ['error' => $e->getMessage()]);
+                Log::warning("{$provider} parser failed, trying next", ['error' => $e->getMessage()]);
             }
         }
 
         return $this->parseWithRules($query, $country);
-    }
-
-    private function shouldUseOpenAi(): bool
-    {
-        return config('openai.enabled')
-            && ! empty(config('openai.api_key'));
     }
 
     /**
@@ -221,14 +226,32 @@ class AiRequestParserService
      */
     private function parseRealEstateQuery(string $query): array
     {
+        $lower = mb_strtolower($query);
         $data = [];
+
         if (preg_match('/(\d+)\s*(bedroom|br|dhoma)/i', $query, $m)) {
             $data['bedrooms'] = (int) $m[1];
         }
-        if (preg_match('/(\d+)\s*(sqm|m²|m2)/i', $query, $m)) {
+        if (preg_match('/(\d+)\s*(sqm|m²|m2|metra)/i', $query, $m)) {
+            $data['min_sqm'] = (int) $m[1];
+        } elseif (preg_match('/(\d{2,4})\s*m\b/i', $query, $m)) {
             $data['min_sqm'] = (int) $m[1];
         }
-        $data['listing_type'] = str_contains($query, 'rent') ? 'rent' : (str_contains($query, 'buy') ? 'sale' : null);
+
+        if (str_contains($lower, 'ferizaj')) {
+            $data['city'] = 'Ferizaj';
+        }
+        if (str_contains($lower, 'gjykat')) {
+            $data['landmark'] = 'gjykata';
+            $data['near_landmark'] = true;
+        }
+        if (str_contains($lower, 'banes') || str_contains($lower, 'apartament')) {
+            $data['property_type'] = 'apartment';
+        }
+
+        $data['listing_type'] = str_contains($lower, 'qira') || str_contains($lower, 'rent')
+            ? 'rent'
+            : (str_contains($lower, 'blerje') || str_contains($lower, 'buy') ? 'sale' : null);
 
         return array_filter($data);
     }

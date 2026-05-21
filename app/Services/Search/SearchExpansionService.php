@@ -78,6 +78,10 @@ class SearchExpansionService
         } elseif ($category === 'electronics') {
             $filters[] = ['key' => 'product_type', 'type' => 'select', 'label' => 'Type', 'options' => ['laptop', 'phone', 'tablet', 'monitor'], 'value' => $parsed['product_type'] ?? null];
             $filters[] = ['key' => 'price', 'type' => 'range', 'label' => 'Price', 'min' => 200, 'max' => 5000, 'value' => $parsed['max_price'] ?? null];
+        } elseif ($category === 'real_estate') {
+            $filters[] = ['key' => 'min_sqm', 'type' => 'range', 'label' => 'Min area (m²)', 'min' => 40, 'max' => 300, 'value' => $parsed['min_sqm'] ?? null];
+            $filters[] = ['key' => 'listing_type', 'type' => 'select', 'label' => 'Listing', 'options' => ['rent', 'sale'], 'value' => $parsed['listing_type'] ?? null];
+            $filters[] = ['key' => 'price', 'type' => 'range', 'label' => 'Price (€)', 'min' => 200, 'max' => 500000, 'value' => null];
         } else {
             $filters[] = ['key' => 'price', 'type' => 'range', 'label' => 'Price', 'min' => 10, 'max' => 10000, 'value' => $parsed['max_price'] ?? null];
             $filters[] = ['key' => 'condition', 'type' => 'select', 'label' => 'Condition', 'options' => ['new', 'used', 'vintage'], 'value' => null];

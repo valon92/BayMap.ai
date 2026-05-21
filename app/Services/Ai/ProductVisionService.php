@@ -7,10 +7,15 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Analyzes product photos via OpenAI Vision (gpt-4o-mini).
+ * Analyzes product photos via Gemini or OpenAI vision.
  */
 class ProductVisionService
 {
+    public function __construct(
+        private AiProviderResolver $providers,
+        private GeminiApiService $gemini,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -20,6 +25,70 @@ class ProductVisionService
         ?array $geo = null,
         ?string $locale = 'en',
     ): array {
+        $order = $this->providers->fallbackOrder();
+        $lastError = null;
+
+        foreach ($order as $provider) {
+            try {
+                return match ($provider) {
+                    'gemini' => $this->analyzeWithGemini($imageBase64, $userHint, $geo, $locale),
+                    'openai' => $this->analyzeWithOpenAi($imageBase64, $userHint, $geo, $locale),
+                    default => throw new \RuntimeException('Unknown vision provider'),
+                };
+            } catch (\Throwable $e) {
+                $lastError = $e;
+                Log::warning("{$provider} vision failed", ['error' => $e->getMessage()]);
+            }
+        }
+
+        throw $lastError ?? new \RuntimeException('No AI vision provider configured. Set GEMINI_API_KEY or OPENAI_API_KEY.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function analyzeWithGemini(
+        string $imageBase64,
+        ?string $userHint,
+        ?array $geo,
+        ?string $locale,
+    ): array {
+        $mime = $this->detectMime($imageBase64);
+        $lang = SearchLocale::descriptionLanguage($locale);
+        $locale = SearchLocale::normalize($locale);
+        $locCtx = $this->locationContext($geo);
+        $hint = $userHint ? "User note: {$userHint}" : 'No extra text from user.';
+
+        $decoded = $this->gemini->generateJson(
+            'You are Powerbook.ai visual product expert. Analyze shopping product photos and return JSON only.',
+            [
+                ['text' => ParserPrompts::visionUser($lang, $locCtx, $hint)],
+                [
+                    'inlineData' => [
+                        'mimeType' => $mime,
+                        'data' => $imageBase64,
+                    ],
+                ],
+            ],
+            config('gemini.vision_model')
+        );
+
+        $decoded['vision'] = true;
+        $decoded['parser'] = 'gemini-vision';
+        $decoded['locale'] = $locale;
+
+        return $decoded;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function analyzeWithOpenAi(
+        string $imageBase64,
+        ?string $userHint,
+        ?array $geo,
+        ?string $locale,
+    ): array {
         $apiKey = config('openai.api_key');
         if (! $apiKey) {
             throw new \RuntimeException('OPENAI_API_KEY required for image search.');
@@ -27,16 +96,10 @@ class ProductVisionService
 
         $mime = $this->detectMime($imageBase64);
         $dataUri = "data:{$mime};base64,{$imageBase64}";
-
-        $location = '';
-        if ($geo) {
-            $location = trim(($geo['city'] ?? '').', '.($geo['country'] ?? ''));
-        }
-
-        $hint = $userHint ? "User note: {$userHint}" : 'No extra text from user.';
-        $locCtx = $location ? "Buyer location: {$location}. Prefer local/regional availability." : '';
         $lang = SearchLocale::descriptionLanguage($locale);
         $locale = SearchLocale::normalize($locale);
+        $locCtx = $this->locationContext($geo);
+        $hint = $userHint ? "User note: {$userHint}" : 'No extra text from user.';
 
         $response = Http::withToken($apiKey)
             ->timeout(30)
@@ -54,25 +117,7 @@ class ProductVisionService
                         'content' => [
                             [
                                 'type' => 'text',
-                                'text' => <<<PROMPT
-Analyze this product image for a semantic shopping search engine.
-{$locCtx}
-{$hint}
-
-Return JSON:
-{
-  "description": "detailed product description for the buyer UI in {$lang}",
-  "search_query": "optimized short search phrase in English for eBay/Google (brand, model, color, product type)",
-  "category": "car|book|painting|electronics|furniture|fashion|luxury|collectibles|gift|marketplace",
-  "brand": null,
-  "model": null,
-  "color": null,
-  "style": null,
-  "materials": [],
-  "keywords": [],
-  "condition_guess": "new|used|unknown"
-}
-PROMPT,
+                                'text' => ParserPrompts::visionUser($lang, $locCtx, $hint),
                             ],
                             [
                                 'type' => 'image_url',
@@ -100,6 +145,20 @@ PROMPT,
         $decoded['locale'] = $locale;
 
         return $decoded;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $geo
+     */
+    private function locationContext(?array $geo): string
+    {
+        if (! $geo) {
+            return '';
+        }
+
+        $location = trim(($geo['city'] ?? '').', '.($geo['country'] ?? ''));
+
+        return $location ? "Buyer location: {$location}. Prefer local/regional availability." : '';
     }
 
     private function detectMime(string $base64): string

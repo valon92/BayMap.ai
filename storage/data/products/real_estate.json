@@ -1,0 +1,98 @@
+[
+  {
+    "id": "re-fer-001",
+    "title": "Banesë 118 m² — Rr. Adem Jashari, afër Gjykatës, Ferizaj",
+    "price": 95000,
+    "currency": "EUR",
+    "sqm": 118,
+    "location": "Ferizaj",
+    "tags": ["banes", "ferizaj", "adem jashari", "gjykata", "apartment"],
+    "image": "https://images.unsplash.com/photo-1502672260266-1c1ef10d9363?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-002",
+    "title": "Apartament 125 m² me qira — Rr. Gjon Serreqi, Ferizaj (qendra)",
+    "price": 450,
+    "currency": "EUR",
+    "sqm": 125,
+    "location": "Ferizaj",
+    "tags": ["apartament", "qira", "gjon serreqi", "ferizaj", "gjykata"],
+    "image": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-003",
+    "title": "Banesë 120 m² — Rr. Ismail Qemaili, pranë Gjykatës Themelore",
+    "price": 102000,
+    "currency": "EUR",
+    "sqm": 120,
+    "location": "Ferizaj",
+    "tags": ["banes", "120m2", "ismail qemaili", "ferizaj", "court"],
+    "image": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-004",
+    "title": "Apartament 115 m² — Rr. Xhorxh Bush, Ferizaj, zonë qendrore",
+    "price": 88000,
+    "currency": "EUR",
+    "sqm": 115,
+    "location": "Ferizaj",
+    "tags": ["apartment", "xhorxh bush", "ferizaj", "qendra"],
+    "image": "https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-005",
+    "title": "Banesë 122 m² shitje — Rr. Skënderbeu, afër Gjykatës Ferizaj",
+    "price": 99000,
+    "currency": "EUR",
+    "sqm": 122,
+    "location": "Ferizaj",
+    "tags": ["banes", "skenderbeu", "ferizaj", "gjykata"],
+    "image": "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-006",
+    "title": "Apartament 130 m² — Rr. Enver Maloku, lagjja Varosh, Ferizaj",
+    "price": 480,
+    "currency": "EUR",
+    "sqm": 130,
+    "location": "Ferizaj",
+    "tags": ["apartament", "enver maloku", "varosh", "ferizaj"],
+    "image": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-007",
+    "title": "Banesë 95 m² — Rr. Ibrahim Rugova, Ferizaj (qendër)",
+    "price": 72000,
+    "currency": "EUR",
+    "sqm": 95,
+    "location": "Ferizaj",
+    "tags": ["banes", "ibrahim rugova", "ferizaj"],
+    "image": "https://images.unsplash.com/photo-1560185127-6ed189bf02f4?w=400",
+    "url": "#",
+    "condition": "used"
+  },
+  {
+    "id": "re-fer-008",
+    "title": "Shtëpi 200 m² — lagjja Dardania, Ferizaj (jo afër gjykatës)",
+    "price": 145000,
+    "currency": "EUR",
+    "sqm": 200,
+    "location": "Ferizaj",
+    "tags": ["shtepi", "dardania", "ferizaj", "house"],
+    "image": "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400",
+    "url": "#",
+    "condition": "used"
+  }
+]

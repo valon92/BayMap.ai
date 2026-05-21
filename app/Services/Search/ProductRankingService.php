@@ -57,6 +57,10 @@ class ProductRankingService
             $score += 12;
         }
 
+        if (($parsed['category'] ?? '') === 'real_estate') {
+            $score += $this->scoreRealEstate($product, $parsed, $title, $tags);
+        }
+
         foreach ($parsed['keywords'] ?? [] as $keyword) {
             if (strlen($keyword) > 3 && (str_contains($title, $keyword) || in_array($keyword, $tags, true))) {
                 $score += 3;
@@ -68,6 +72,54 @@ class ProductRankingService
         }
 
         return min(99, max(60, $score + random_int(-3, 5)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     * @param  array<int, string>  $tags
+     */
+    private function scoreRealEstate(array $product, array $parsed, string $title, array $tags): int
+    {
+        $bonus = 0;
+
+        if (! empty($parsed['city']) && (str_contains($title, mb_strtolower($parsed['city'])) || in_array(mb_strtolower($parsed['city']), $tags, true))) {
+            $bonus += 12;
+        }
+
+        if (! empty($parsed['landmark_label']) && str_contains($title, mb_strtolower($parsed['landmark_label']))) {
+            $bonus += 15;
+        }
+        if (! empty($parsed['landmark']) && (str_contains($title, $parsed['landmark']) || str_contains($title, 'gjykat'))) {
+            $bonus += 10;
+        }
+
+        foreach ($parsed['nearby_streets'] ?? [] as $street) {
+            $streetLower = mb_strtolower($street);
+            if (str_contains($title, $streetLower) || in_array($streetLower, $tags, true)) {
+                $bonus += 8;
+                break;
+            }
+        }
+
+        if (! empty($parsed['min_sqm'])) {
+            $target = (int) $parsed['min_sqm'];
+            $productSqm = (int) ($product['sqm'] ?? 0);
+            if ($productSqm > 0 && abs($productSqm - $target) <= 15) {
+                $bonus += 14;
+            } elseif ($productSqm > 0 && abs($productSqm - $target) <= 30) {
+                $bonus += 8;
+            }
+            if (str_contains($title, (string) $target)) {
+                $bonus += 6;
+            }
+        }
+
+        if (! empty($parsed['property_type']) && (str_contains($title, 'banes') || str_contains($title, 'apartament') || str_contains($title, 'apartment'))) {
+            $bonus += 6;
+        }
+
+        return $bonus;
     }
 
     /**
@@ -95,6 +147,12 @@ class ProductRankingService
         }
         if (! empty($parsed['genre'])) {
             $reasons[] = "{$parsed['genre']} genre fit";
+        }
+        if (! empty($parsed['landmark_label']) && str_contains(mb_strtolower($product['title'] ?? ''), mb_strtolower($parsed['landmark_label']))) {
+            $reasons[] = 'near '.$parsed['landmark_label'];
+        }
+        if (! empty($parsed['min_sqm']) && ! empty($product['sqm'])) {
+            $reasons[] = "{$product['sqm']} m² area";
         }
 
         if (empty($reasons)) {

@@ -10,7 +10,7 @@
           <span class="text-sky-400">"{{ displayQuery }}"</span>
         </h1>
         <p v-if="data?.meta" class="text-sm text-slate-500 mt-2">
-          {{ data.meta.total }} {{ t('matches') }} · {{ data.meta.processing_ms }}ms
+          {{ data.meta.total }} {{ t('matches') }}
         </p>
       </div>
 
@@ -22,14 +22,25 @@
         <p class="text-xs text-slate-400">{{ t('searched_by_photo') }}</p>
       </div>
 
-      <SearchPipeline
-        v-if="data?.meta"
-        :pipeline="data.pipeline"
-        :report="data.meta.source_report"
-      />
+      <div
+        v-if="data?.location_context?.summary"
+        class="glass rounded-xl p-4 mb-6 border border-emerald-500/20"
+      >
+        <p class="text-xs uppercase tracking-wider text-emerald-300 mb-2">{{ t('search_near_landmark') }}</p>
+        <p class="text-sm text-slate-300 leading-relaxed">{{ data.location_context.summary }}</p>
+        <div v-if="data.location_context.streets?.length" class="flex flex-wrap gap-1.5 mt-3">
+          <span
+            v-for="street in data.location_context.streets"
+            :key="street"
+            class="px-2 py-0.5 rounded-md text-[11px] bg-white/5 text-slate-400 border border-white/10"
+          >
+            {{ street }}
+          </span>
+        </div>
+      </div>
 
       <div
-        v-if="data?.vision?.description || data?.parsed?.description"
+        v-else-if="data?.vision?.description || data?.parsed?.description"
         class="glass rounded-xl p-4 mb-6 border border-violet-500/20"
       >
         <p class="text-xs uppercase tracking-wider text-violet-300 mb-2">{{ t('ai_product_description') }}</p>
@@ -46,7 +57,10 @@
         <p v-if="scopeSummary" class="text-[11px] text-slate-500 mt-2">{{ scopeSummary }}</p>
       </div>
 
-      <div v-if="data?.parsed" class="glass rounded-xl p-4 mb-6 flex flex-wrap gap-2 items-center">
+      <div
+        v-if="data?.parsed && showParsedTags"
+        class="glass rounded-xl p-4 mb-6 flex flex-wrap gap-2 items-center"
+      >
         <span class="text-xs text-slate-400">{{ t('parsed_intent') }}:</span>
         <span class="px-2 py-1 rounded-lg bg-sky-500/20 text-sky-300 text-xs font-medium">
           {{ categoryLabel(data.parsed.category) }}
@@ -87,18 +101,6 @@
             />
           </div>
 
-          <div v-if="data?.expanded?.marketplaces" class="mt-8 text-center">
-            <p class="text-xs text-slate-500 mb-2">{{ t('sources') }}</p>
-            <div class="flex flex-wrap justify-center gap-2">
-              <span
-                v-for="src in data.expanded.marketplaces"
-                :key="src"
-                class="glass px-3 py-1 rounded-full text-xs text-slate-400"
-              >
-                {{ src }}
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -109,7 +111,6 @@
 import { ref, computed, watch, onMounted, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../services/api';
-import SearchPipeline from '../components/SearchPipeline.vue';
 import ProductCard from '../components/ProductCard.vue';
 import DynamicFilters from '../components/DynamicFilters.vue';
 import ResultsSkeleton from '../components/ResultsSkeleton.vue';
@@ -135,9 +136,18 @@ const uploadedPreview = ref(null);
 
 const activeScope = ref(api.getLocationScope());
 
+const showParsedTags = computed(() => {
+  const cat = data.value?.parsed?.category;
+  return cat && cat !== 'real_estate';
+});
+
 const parsedTags = computed(() => {
   if (!data.value?.parsed) return {};
-  const skip = ['raw_query', 'category', 'keywords', 'country', 'language_hint', 'description', 'vision', 'search_query'];
+  const skip = [
+    'raw_query', 'category', 'keywords', 'country', 'language_hint', 'description', 'vision',
+    'search_query', 'nearby_streets', 'neighborhoods', 'landmark', 'landmark_label', 'area_summary',
+    'near_landmark', 'city',
+  ];
   return Object.fromEntries(
     Object.entries(data.value.parsed).filter(([k, v]) => !skip.includes(k) && v != null && v !== '')
   );

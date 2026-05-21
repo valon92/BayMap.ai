@@ -5,6 +5,7 @@ namespace App\Services\Search;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
 use App\Services\Geo\GeoLocationService;
+use App\Services\Geo\LocalLandmarkResolverService;
 use App\Services\Marketplace\EbayOAuthService;
 use App\Services\Marketplace\MarketplaceAggregator;
 use App\Services\Marketplace\SerpApiShoppingService;
@@ -18,6 +19,7 @@ class SearchOrchestratorService
         private AiRequestParserService $parser,
         private ProductVisionService $vision,
         private GeoLocationService $geo,
+        private LocalLandmarkResolverService $landmarks,
         private SearchExpansionService $expansion,
         private LocalSearchTierService $localTiers,
         private MarketplaceAggregator $aggregator,
@@ -74,6 +76,8 @@ class SearchOrchestratorService
             $parsed['raw_query'] = $visionAnalysis['search_query'] ?? $parsed['raw_query'];
         }
         $parsed['country'] = $parsed['country'] ?? $geo['country'];
+        $parsed = $this->landmarks->enrich($parsed, $parsed['raw_query'] ?? $query, $geo, $locale);
+        $locationContext = $this->landmarks->locationContext($parsed);
 
         $pipeline[] = [
             'step' => 'ai_analyze',
@@ -113,6 +117,7 @@ class SearchOrchestratorService
         return [
             'query' => trim($query),
             'parsed' => $parsed,
+            'location_context' => $locationContext,
             'vision' => $visionAnalysis,
             'expanded' => $expanded,
             'geo' => $geo,
@@ -166,6 +171,9 @@ class SearchOrchestratorService
                 return false;
             }
             if (isset($filters['source']) && ($product['source_key'] ?? '') !== $filters['source']) {
+                return false;
+            }
+            if (isset($filters['min_sqm']) && ($product['sqm'] ?? 0) < (int) $filters['min_sqm']) {
                 return false;
             }
 
