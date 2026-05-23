@@ -76,8 +76,9 @@ class MarketplaceAggregator
             );
         }
 
-        $countryCode = strtoupper((string) ($geo['country_code'] ?? ''));
+        $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? $geo['country_code'] ?? ''));
         $category = $parsedQuery['category'] ?? 'marketplace';
+        $searchCountry = $parsedQuery['search_country'] ?? $geo['country'] ?? '';
 
         if ($countryCode === 'XK' && in_array($category, ['fashion', 'luxury', 'marketplace'], true)) {
             $driloni = new MockMarketplaceService('driloni');
@@ -88,7 +89,10 @@ class MarketplaceAggregator
         }
 
         $skipMocks = $liveResultCount >= 8;
-        $mockSources = ['amazon', 'mobile.de', 'autoscout24', 'etsy', 'facebook_marketplace'];
+        $mockSources = match (true) {
+            $countryCode === 'CH' && $category === 'car' => ['autoscout24', 'tutti', 'ricardo', 'facebook_marketplace', 'mobile.de'],
+            default => ['amazon', 'mobile.de', 'autoscout24', 'etsy', 'facebook_marketplace'],
+        };
 
         foreach ($mockSources as $source) {
             if ($skipMocks) {
@@ -102,7 +106,7 @@ class MarketplaceAggregator
             }
 
             $mock = new MockMarketplaceService($source);
-            $expandedFilters['location_suffix'] = $geo['city'] ?? $geo['country'] ?? '';
+            $expandedFilters['location_suffix'] = $searchCountry ?: ($geo['city'] ?? $geo['country'] ?? '');
             $items = $mock->search($parsedQuery, $expandedFilters);
             $results = array_merge($results, $items);
             $report[] = $this->reportRow($source, 'demo', count($items), 'mock_data', $geo['city'] ?? '');

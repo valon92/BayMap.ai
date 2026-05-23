@@ -164,6 +164,9 @@
     "genre": "Genre",
     "condition": "Condition",
     "max_price": "Max price",
+    "currency": "Currency",
+    "search_country": "Buy in",
+    "search_country_code": "Country code",
     "size": "Size (EU)"
   }
 }

@@ -12,8 +12,20 @@ class SearchExpansionService
         'XK' => ['AL', 'MK', 'RS', 'ME', 'DE', 'IT'],
         'AL' => ['XK', 'MK', 'IT', 'GR', 'DE'],
         'DE' => ['AT', 'CH', 'FR', 'NL', 'PL', 'IT'],
+        'CH' => ['DE', 'FR', 'IT', 'AT'],
         'US' => ['CA', 'MX'],
         'GB' => ['IE', 'FR', 'DE'],
+    ];
+
+    /** @var array<string, array<string, string>> */
+    private array $countryLabels = [
+        'CH' => 'Switzerland',
+        'XK' => 'Kosovo',
+        'AL' => 'Albania',
+        'DE' => 'Germany',
+        'IT' => 'Italy',
+        'FR' => 'France',
+        'AT' => 'Austria',
     ];
 
     /** @var array<string, array<string>> */
@@ -28,15 +40,16 @@ class SearchExpansionService
      * @param  array<string, mixed>  $geo
      * @return array<string, mixed>
      */
-    public function expand(array $parsed, array $geo): array
+    public function expand(array $parsed, array $geo, ?string $locale = 'en'): array
     {
-        $countryCode = strtoupper((string) ($geo['country_code'] ?? 'XK'));
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? $geo['country_code'] ?? 'XK'));
 
         $expanded = [
             'original' => $parsed,
-            'nearby_countries' => $this->nearbyCountries[$countryCode] ?? ['DE', 'IT', 'FR'],
+            'search_country_code' => $countryCode,
+            'nearby_countries' => $this->nearbyCountryLabels($countryCode),
             'marketplaces' => $this->marketplacesForCategory($parsed['category'] ?? 'marketplace', $countryCode),
-            'smart_filters' => $this->buildSmartFilters($parsed),
+            'smart_filters' => $this->buildSmartFilters($parsed, $locale),
         ];
 
         if (! empty($parsed['color'])) {
@@ -65,13 +78,34 @@ class SearchExpansionService
         $sq = $locale === 'sq';
 
         if ($category === 'car') {
-            $filters[] = ['key' => 'year', 'type' => 'range', 'label' => 'Year', 'min' => 1995, 'max' => (int) date('Y'), 'value' => $parsed['year'] ?? null];
-            $filters[] = ['key' => 'max_km', 'type' => 'range', 'label' => 'Max mileage', 'min' => 0, 'max' => 300000, 'value' => $parsed['max_km'] ?? null];
-            $filters[] = ['key' => 'color', 'type' => 'select', 'label' => 'Color', 'options' => ['white', 'black', 'silver', 'grey', 'red', 'blue'], 'value' => $parsed['color'] ?? null];
-            $filters[] = ['key' => 'transmission', 'type' => 'select', 'label' => 'Transmission', 'options' => ['automatic', 'manual'], 'value' => $parsed['transmission'] ?? null];
-            $filters[] = ['key' => 'fuel', 'type' => 'select', 'label' => 'Fuel', 'options' => ['petrol', 'diesel', 'electric', 'hybrid'], 'value' => $parsed['fuel'] ?? null];
-            $filters[] = ['key' => 'price', 'type' => 'range', 'label' => 'Price (€)', 'min' => 1000, 'max' => 150000, 'value' => null];
-            $filters[] = ['key' => 'country', 'type' => 'select', 'label' => 'Country', 'options' => ['Kosovo', 'Albania', 'Germany', 'Italy', 'Austria'], 'value' => $parsed['country'] ?? null];
+            $currency = $parsed['currency'] ?? 'EUR';
+            $priceMax = $parsed['max_price'] ?? null;
+            $targetCountry = $parsed['search_country'] ?? $parsed['country'] ?? null;
+            $countryOptions = array_values(array_unique(array_filter([
+                $targetCountry,
+                'Switzerland', 'Germany', 'Kosovo', 'Albania', 'Italy', 'Austria', 'France',
+            ])));
+
+            $filters[] = ['key' => 'year', 'type' => 'range', 'label' => $sq ? 'Viti' : 'Year', 'min' => 1995, 'max' => (int) date('Y'), 'value' => $parsed['year'] ?? null];
+            $filters[] = ['key' => 'max_km', 'type' => 'range', 'label' => $sq ? 'Km max' : 'Max mileage', 'min' => 0, 'max' => 300000, 'value' => $parsed['max_km'] ?? null];
+            $filters[] = ['key' => 'color', 'type' => 'select', 'label' => $sq ? 'Ngjyra' : 'Color', 'options' => ['white', 'black', 'silver', 'grey', 'red', 'blue'], 'value' => $parsed['color'] ?? null];
+            $filters[] = ['key' => 'transmission', 'type' => 'select', 'label' => $sq ? 'Transmisioni' : 'Transmission', 'options' => ['automatic', 'manual'], 'value' => $parsed['transmission'] ?? null];
+            $filters[] = ['key' => 'fuel', 'type' => 'select', 'label' => $sq ? 'Karburanti' : 'Fuel', 'options' => ['petrol', 'diesel', 'electric', 'hybrid'], 'value' => $parsed['fuel'] ?? null];
+            $filters[] = [
+                'key' => 'price',
+                'type' => 'range',
+                'label' => ($sq ? 'Çmimi max' : 'Max price').' ('.$currency.')',
+                'min' => 1000,
+                'max' => $currency === 'CHF' ? 80000 : 150000,
+                'value' => $priceMax,
+            ];
+            $filters[] = [
+                'key' => 'country',
+                'type' => 'select',
+                'label' => $sq ? 'Vendi' : 'Country',
+                'options' => $countryOptions,
+                'value' => $targetCountry,
+            ];
             $filters[] = ['key' => 'condition', 'type' => 'select', 'label' => 'Condition', 'options' => ['new', 'used', 'certified'], 'value' => 'used'];
             $filters[] = ['key' => 'seller_type', 'type' => 'select', 'label' => 'Seller', 'options' => ['dealer', 'private'], 'value' => null];
         } elseif ($category === 'book') {
@@ -137,6 +171,10 @@ class SearchExpansionService
      */
     private function marketplacesForCategory(string $category, string $countryCode = 'XK'): array
     {
+        if ($countryCode === 'CH' && $category === 'car') {
+            return ['autoscout24', 'tutti', 'ricardo', 'facebook_marketplace', 'mobile.de', 'ebay'];
+        }
+
         if ($countryCode === 'XK' && in_array($category, ['fashion', 'luxury', 'marketplace'], true)) {
             return ['driloni', 'ebay', 'google_shopping', 'etsy', 'facebook_marketplace'];
         }
@@ -176,11 +214,26 @@ class SearchExpansionService
         }
 
         $map = [
+            'Q5' => ['Q3', 'Q7'],
             'A6' => ['A7', 'A5', 'A4'],
             'A4' => ['A3', 'A5', 'A6'],
             '3 SERIES' => ['5 Series', '4 Series'],
         ];
 
         return $map[strtoupper($model)] ?? [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function nearbyCountryLabels(string $countryCode): array
+    {
+        $code = strtoupper($countryCode);
+        $labels = [];
+        foreach ($this->nearbyCountries[$code] ?? ['DE', 'IT', 'FR'] as $nearCode) {
+            $labels[] = $this->countryLabels[$nearCode] ?? $nearCode;
+        }
+
+        return $labels;
     }
 }

@@ -49,6 +49,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         }
 
         $dataset = $this->filterForSource($dataset);
+        $dataset = $this->filterForIntent($dataset, $parsedQuery);
 
         return array_map(function (array $item) {
             $item['source'] = $this->displaySourceName();
@@ -95,6 +96,67 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         ));
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $items
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, array<string, mixed>>
+     */
+    private function filterForIntent(array $items, array $parsed): array
+    {
+        if (($parsed['category'] ?? '') !== 'car') {
+            return $items;
+        }
+
+        return array_values(array_filter($items, function (array $item) use ($parsed) {
+            if (! empty($parsed['search_country_code']) && ! $this->locationMatchesCountry($item, (string) $parsed['search_country_code'])) {
+                return false;
+            }
+
+            if (! empty($parsed['model'])) {
+                $wanted = mb_strtolower((string) $parsed['model']);
+                $title = mb_strtolower($item['title'] ?? '');
+                $tags = array_map('mb_strtolower', $item['tags'] ?? []);
+                if (! str_contains(str_replace(' ', '', $title), str_replace(' ', '', $wanted))
+                    && ! in_array($wanted, $tags, true)) {
+                    return false;
+                }
+            }
+
+            if (! empty($parsed['year']) && ! empty($item['year']) && (int) $item['year'] !== (int) $parsed['year']) {
+                return false;
+            }
+
+            if (! empty($parsed['max_price']) && ! empty($item['price'])) {
+                $limit = (float) $parsed['max_price'];
+                $price = (float) $item['price'];
+                $itemCurrency = $item['currency'] ?? 'EUR';
+                $queryCurrency = $parsed['currency'] ?? $itemCurrency;
+                if ($itemCurrency === $queryCurrency && $price > $limit) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function locationMatchesCountry(array $item, string $code): bool
+    {
+        $loc = mb_strtolower($item['location'] ?? '');
+
+        return match (strtoupper($code)) {
+            'CH' => (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/', $loc),
+            'XK' => str_contains($loc, 'kosovo') || str_contains($loc, 'pristina') || str_contains($loc, 'ferizaj'),
+            'DE' => str_contains($loc, 'germany') || str_contains($loc, 'munich') || str_contains($loc, 'berlin') || str_contains($loc, 'stuttgart'),
+            'AL' => str_contains($loc, 'albania') || str_contains($loc, 'tirana'),
+            'AT' => str_contains($loc, 'austria') || str_contains($loc, 'vienna'),
+            default => str_contains($loc, mb_strtolower($code)),
+        };
+    }
+
     private function mapSourceToKey(): string
     {
         return str_replace('.', '_', $this->source);
@@ -111,6 +173,8 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             'google_shopping' => 'Google Shopping',
             'facebook_marketplace' => 'Facebook Marketplace',
             'driloni' => 'Driloni Sportswear',
+            'tutti' => 'tutti.ch',
+            'ricardo' => 'Ricardo',
             default => ucfirst($this->source),
         };
     }

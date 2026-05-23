@@ -54,6 +54,46 @@ class LocalSearchTierService
      * @param  array<string, mixed>  $geo
      * @return array<int, array<string, string>>
      */
+    /**
+     * Location tiers for search — uses query target country when buyer specifies one (e.g. Switzerland).
+     *
+     * @param  array<string, mixed>  $visitorGeo
+     * @param  array<string, mixed>  $parsed
+     */
+    public function tiersForSearch(array $visitorGeo, array $parsed, string $scope = 'auto'): array
+    {
+        $code = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+        if ($code !== '') {
+            $country = (string) ($parsed['search_country'] ?? $this->countryLabel($code));
+
+            return $this->tiersForCountryScope($code, $country, $scope);
+        }
+
+        return $this->tiersForScope($visitorGeo, $scope);
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    public function tiersForCountryScope(string $countryCode, string $countryName, string $scope = 'auto'): array
+    {
+        $all = $this->tiers([
+            'city' => null,
+            'country' => $countryName,
+            'country_code' => $countryCode,
+        ]);
+
+        if ($scope === 'auto' || $scope === '') {
+            return $all;
+        }
+
+        return $this->tiersForScope([
+            'city' => null,
+            'country' => $countryName,
+            'country_code' => $countryCode,
+        ], $scope);
+    }
+
     public function tiersForScope(array $geo, string $scope = 'auto'): array
     {
         $all = $this->tiers($geo);
@@ -104,10 +144,26 @@ class LocalSearchTierService
     private function nearbyCountries(string $code): array
     {
         return match (strtoupper($code)) {
+            'CH' => ['Germany', 'France', 'Italy', 'Austria'],
             'XK' => ['Albania', 'North Macedonia', 'Germany'],
             'AL' => ['Kosovo', 'Italy', 'Greece'],
-            'DE' => ['Austria', 'Netherlands', 'France'],
+            'DE' => ['Austria', 'Switzerland', 'France', 'Netherlands'],
+            'IT' => ['Switzerland', 'Austria', 'France'],
+            'FR' => ['Germany', 'Switzerland', 'Belgium'],
             default => ['Germany', 'United Kingdom', 'United States'],
+        };
+    }
+
+    private function countryLabel(string $code): string
+    {
+        return match (strtoupper($code)) {
+            'CH' => 'Switzerland',
+            'XK' => 'Kosovo',
+            'AL' => 'Albania',
+            'DE' => 'Germany',
+            'IT' => 'Italy',
+            'FR' => 'France',
+            default => $code,
         };
     }
 }

@@ -89,6 +89,7 @@ class OpenAiParserService
             'genre', 'product_type', 'features', 'max_price', 'condition',
             'style', 'size', 'shoe_size', 'room', 'subject', 'bedrooms', 'listing_type', 'length', 'ending', 'item',
             'city', 'landmark', 'near_landmark', 'property_type', 'min_sqm', 'nearby_streets',
+            'currency', 'search_country', 'search_country_code',
         ];
 
         foreach ($optional as $key) {

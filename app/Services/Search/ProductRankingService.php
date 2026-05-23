@@ -33,19 +33,20 @@ class ProductRankingService
      */
     private function calculateScore(array $product, array $parsed): int
     {
-        $score = 50;
+        $score = 40;
         $title = mb_strtolower($product['title'] ?? '');
         $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+        $location = mb_strtolower($product['location'] ?? '');
 
         if (! empty($parsed['brand']) && (str_contains($title, mb_strtolower($parsed['brand'])) || in_array(mb_strtolower($parsed['brand']), $tags, true))) {
-            $score += 15;
-        }
-        if (! empty($parsed['model']) && (str_contains($title, mb_strtolower($parsed['model'])) || in_array(mb_strtolower($parsed['model']), $tags, true))) {
             $score += 12;
         }
-        if (! empty($parsed['year']) && str_contains($title, (string) $parsed['year'])) {
-            $score += 10;
-        }
+
+        $score += $this->scoreModel($product, $parsed, $title, $tags);
+        $score += $this->scoreYear($parsed, $product, $title);
+        $score += $this->scoreTargetCountry($parsed, $location);
+        $score += $this->scorePrice($parsed, $product);
+
         if (! empty($parsed['color']) && (str_contains($title, $parsed['color']) || in_array($parsed['color'], $tags, true))) {
             $score += 8;
         }
@@ -61,17 +62,8 @@ class ProductRankingService
         if (! empty($parsed['size'])) {
             if (ShoeSize::productHasSize($product, (string) $parsed['size'])) {
                 $score += 18;
-            } elseif (($product['store'] ?? '') === 'driloni' && in_array($parsed['category'] ?? '', ['fashion', 'luxury'], true)) {
+            } elseif (($product['store'] ?? '') === 'driloni') {
                 $score += 8;
-            }
-        }
-        if (($product['store'] ?? '') === 'driloni' && ($parsed['country'] ?? '') && str_contains(mb_strtolower($product['location'] ?? ''), 'kosovo')) {
-            $score += 12;
-        }
-        if (! empty($parsed['color']) && (str_contains($title, $parsed['color']) || in_array($parsed['color'], $tags, true))) {
-            // already scored above — boost driloni local match for sneakers
-            if (str_contains($title, 'sneaker') || str_contains($title, 'patika')) {
-                $score += 4;
             }
         }
 
@@ -86,10 +78,117 @@ class ProductRankingService
         }
 
         if (! empty($product['sponsored'])) {
-            $score += 5;
+            $score += 3;
         }
 
-        return min(99, max(60, $score + random_int(-3, 5)));
+        return min(99, max(35, $score));
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     * @param  array<int, string>  $tags
+     */
+    private function scoreModel(array $product, array $parsed, string $title, array $tags): int
+    {
+        if (empty($parsed['model']) || ($parsed['category'] ?? '') !== 'car') {
+            if (! empty($parsed['model']) && (str_contains($title, mb_strtolower($parsed['model'])) || in_array(mb_strtolower($parsed['model']), $tags, true))) {
+                return 12;
+            }
+
+            return 0;
+        }
+
+        $wanted = mb_strtolower(str_replace(' ', '', $parsed['model']));
+        $normalizedTitle = str_replace(' ', '', $title);
+
+        if (str_contains($normalizedTitle, $wanted) || in_array($wanted, $tags, true)) {
+            return 28;
+        }
+
+        if (preg_match('/\b([aqx]\d{1,2})\b/i', $title, $found)) {
+            $foundModel = mb_strtolower($found[1]);
+            if ($foundModel !== $wanted && ! str_contains($wanted, $foundModel)) {
+                return -30;
+            }
+        }
+
+        return -8;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function scoreYear(array $parsed, array $product, string $title): int
+    {
+        if (empty($parsed['year'])) {
+            return 0;
+        }
+
+        $wanted = (int) $parsed['year'];
+        if (! empty($product['year'])) {
+            $diff = abs((int) $product['year'] - $wanted);
+            if ($diff === 0) {
+                return 14;
+            }
+            if ($diff <= 1) {
+                return 6;
+            }
+
+            return -12;
+        }
+
+        return str_contains($title, (string) $wanted) ? 10 : -5;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function scoreTargetCountry(array $parsed, string $location): int
+    {
+        if (empty($parsed['search_country'])) {
+            return 0;
+        }
+
+        $target = mb_strtolower($parsed['search_country']);
+        if (str_contains($location, $target)) {
+            return 22;
+        }
+
+        if (! empty($parsed['search_country_code']) && strtoupper($parsed['search_country_code']) === 'CH') {
+            if (str_contains($location, 'switzerland') || str_contains($location, 'schweiz') || str_contains($location, 'zürich') || str_contains($location, 'zurich') || str_contains($location, 'bern') || str_contains($location, 'geneva')) {
+                return 22;
+            }
+        }
+
+        return -10;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $product
+     */
+    private function scorePrice(array $parsed, array $product): int
+    {
+        if (empty($parsed['max_price'])) {
+            return 0;
+        }
+
+        $limit = (float) $parsed['max_price'];
+        $price = (float) ($product['price'] ?? 0);
+        if ($price <= 0) {
+            return 0;
+        }
+
+        if ($price <= $limit) {
+            return 12;
+        }
+
+        if ($price <= $limit * 1.08) {
+            return 4;
+        }
+
+        return -25;
     }
 
     /**
@@ -147,43 +246,45 @@ class ProductRankingService
     private function buildExplanation(array $product, array $parsed, int $score): string
     {
         $reasons = [];
+        $title = mb_strtolower($product['title'] ?? '');
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
 
-        if (! empty($parsed['brand']) && str_contains(mb_strtolower($product['title'] ?? ''), mb_strtolower($parsed['brand']))) {
+        if (! empty($parsed['brand']) && str_contains($title, mb_strtolower($parsed['brand']))) {
             $reasons[] = "matches brand {$parsed['brand']}";
         }
+
         if (! empty($parsed['model'])) {
-            $reasons[] = "includes model {$parsed['model']}";
+            $wanted = mb_strtolower($parsed['model']);
+            if (str_contains(str_replace(' ', '', $title), str_replace(' ', '', $wanted)) || in_array($wanted, $tags, true)) {
+                $reasons[] = "matches model {$parsed['model']}";
+            } else {
+                $reasons[] = "similar {$parsed['brand']} listing (check model)";
+            }
         }
+
         if (! empty($parsed['year'])) {
-            $reasons[] = "year {$parsed['year']} aligned";
+            if (! empty($product['year']) && (int) $product['year'] === (int) $parsed['year']) {
+                $reasons[] = "year {$parsed['year']}";
+            } elseif (str_contains($title, (string) $parsed['year'])) {
+                $reasons[] = "year {$parsed['year']} in listing";
+            }
         }
+
+        if (! empty($parsed['search_country']) && str_contains(mb_strtolower($product['location'] ?? ''), mb_strtolower($parsed['search_country']))) {
+            $reasons[] = 'in '.$parsed['search_country'];
+        }
+
+        if (! empty($parsed['max_price']) && ! empty($product['price']) && (float) $product['price'] <= (float) $parsed['max_price']) {
+            $cur = $product['currency'] ?? $parsed['currency'] ?? 'EUR';
+            $reasons[] = 'within budget ('.number_format((float) $product['price'], 0).' '.$cur.')';
+        }
+
         if (! empty($parsed['color'])) {
             $reasons[] = "{$parsed['color']} color match";
         }
-        if (! empty($parsed['size'])) {
-            if (ShoeSize::productHasSize($product, (string) $parsed['size'])) {
-                $reasons[] = "size EU {$parsed['size']} available";
-            } elseif (($product['store'] ?? '') === 'driloni') {
-                $reasons[] = 'local Kosovo store — check sizes on listing';
-            } else {
-                $reasons[] = "closest match for size {$parsed['size']}";
-            }
-        }
-        if (! empty($parsed['max_km']) && ! empty($product['mileage']) && $product['mileage'] <= $parsed['max_km']) {
-            $reasons[] = 'within your mileage limit';
-        }
-        if (! empty($parsed['genre'])) {
-            $reasons[] = "{$parsed['genre']} genre fit";
-        }
-        if (! empty($parsed['landmark_label']) && str_contains(mb_strtolower($product['title'] ?? ''), mb_strtolower($parsed['landmark_label']))) {
-            $reasons[] = 'near '.$parsed['landmark_label'];
-        }
-        if (! empty($parsed['min_sqm']) && ! empty($product['sqm'])) {
-            $reasons[] = "{$product['sqm']} m² area";
-        }
 
         if (empty($reasons)) {
-            $reasons[] = 'strong semantic match to your description';
+            $reasons[] = 'semantic match to your search';
         }
 
         $source = $product['source'] ?? 'marketplace';

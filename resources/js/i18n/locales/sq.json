@@ -164,6 +164,9 @@
     "genre": "Zhanri",
     "condition": "Gjendja",
     "max_price": "Çmimi max",
+    "currency": "Monedha",
+    "search_country": "Bli në",
+    "search_country_code": "Kodi i vendit",
     "size": "Numri (EU)"
   }
 }

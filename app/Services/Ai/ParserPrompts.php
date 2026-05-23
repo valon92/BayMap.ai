@@ -33,6 +33,9 @@ Return ONLY valid JSON with this shape:
   "product_type": null,
   "features": [],
   "max_price": null,
+  "currency": "EUR|CHF|USD",
+  "search_country": null,
+  "search_country_code": null,
   "condition": null,
   "style": null,
   "size": null,
@@ -62,6 +65,10 @@ Rules:
 - min_sqm: integer area (120m => 120)
 - Albanian: banes=apartment, gjykata=courthouse, Ferizaj=city
 - fashion/shoes: size or shoe_size as EU number string (e.g. 42, 42.5, 43) when mentioned
+- cars: model must match query exactly (Q5 not A6). year as integer.
+- search_country / search_country_code: where the buyer wants to BUY (not their IP). "ne zvicerr", "in Switzerland" => search_country Switzerland, search_country_code CH
+- max_price + currency: "deri 17500 franga" => max_price 17500, currency CHF. "under 20k euro" => EUR
+- Do NOT set country to visitor hint when query names another country
 PROMPT;
     }
 

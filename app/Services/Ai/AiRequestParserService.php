@@ -126,12 +126,15 @@ class AiRequestParserService
             }
         }
 
-        if (preg_match('/\ba\s?(\d)\b/i', $query, $m)) {
-            $data['model'] = 'A' . $m[1];
-        } elseif ($data['brand'] && preg_match('/\b(a\d|q\d|x\d|serie \d|class)\b/i', $query, $m)) {
-            $data['model'] = strtoupper($m[0]);
+        if (preg_match('/\b(q\d|x\d|a\d)\b/i', $query, $m)) {
+            $data['model'] = strtoupper($m[1]);
+        } elseif (preg_match('/\bserie\s+(\d)\b/i', $query, $m)) {
+            $data['model'] = $m[1].' Series';
         } elseif (preg_match('/\b([a-z]{1,3}\s?\d{1,2})\b/i', $query, $m) && $data['brand']) {
-            $data['model'] = strtoupper(trim($m[1]));
+            $candidate = strtoupper(str_replace(' ', '', trim($m[1])));
+            if (preg_match('/^[AQX]\d$/', $candidate)) {
+                $data['model'] = $candidate;
+            }
         }
 
         if (preg_match('/\b(20\d{2}|19\d{2})\b/', $query, $m)) {

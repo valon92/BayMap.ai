@@ -27,6 +27,7 @@ class SearchOrchestratorService
         private ProductRankingService $ranking,
         private EbayOAuthService $ebayOAuth,
         private SerpApiShoppingService $serpApi,
+        private QueryIntentEnricher $intentEnricher,
     ) {}
 
     /**
@@ -82,8 +83,10 @@ class SearchOrchestratorService
             ]));
             $parsed['raw_query'] = $visionAnalysis['search_query'] ?? $parsed['raw_query'];
         }
-        $parsed['country'] = $parsed['country'] ?? $geo['country'];
-        $parsed = $this->landmarks->enrich($parsed, $parsed['raw_query'] ?? $query, $geo, $locale);
+        $parsed = $this->intentEnricher->enrich($parsed, $query);
+        $searchGeo = $this->intentEnricher->searchGeo($geo, $parsed);
+        $parsed['country'] = $parsed['search_country'] ?? $parsed['country'] ?? $geo['country'];
+        $parsed = $this->landmarks->enrich($parsed, $parsed['raw_query'] ?? $query, $searchGeo, $locale);
         $locationContext = $this->landmarks->locationContext($parsed);
 
         $pipeline[] = [
@@ -92,22 +95,22 @@ class SearchOrchestratorService
             'label' => 'AI understood product attributes',
         ];
 
-        // Step 2: Location tiers (scope: city → country → region → world, or auto progressive)
-        $locationTiers = $this->localTiers->tiersForScope($geo, $locationScope);
-        $expanded = $this->expansion->expand($parsed, $geo);
+        // Step 2: Location tiers — buyer's target country overrides visitor IP when specified
+        $locationTiers = $this->localTiers->tiersForSearch($searchGeo, $parsed, $locationScope);
+        $expanded = $this->expansion->expand($parsed, $searchGeo, $locale);
         $expanded['location_tiers'] = $locationTiers;
         $expanded['location_scope'] = $locationScope;
         $dynamicFilters = $this->expansion->buildDynamicFilters($parsed, $locale);
 
-        // Step 3: Internet search (local first, then broader)
-        $search = $this->aggregator->searchAll($parsed, $expanded, $geo);
+        // Step 3: Internet search (target country first, then broader)
+        $search = $this->aggregator->searchAll($parsed, $expanded, $searchGeo);
         $products = $search['results'];
         $sourceReport = $search['report'];
 
         $pipeline[] = [
             'step' => 'internet_search',
             'status' => 'completed',
-            'label' => 'Searched web: '.($geo['city'] ?? 'local').' → '.($geo['country'] ?? 'wider'),
+            'label' => 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional',
         ];
 
         $products = $this->applyClientFilters($products, $filters);
@@ -176,6 +179,17 @@ class SearchOrchestratorService
             }
             if (isset($filters['color']) && ! str_contains(mb_strtolower($product['title'] ?? ''), mb_strtolower($filters['color']))) {
                 return false;
+            }
+            if (isset($filters['country']) && $filters['country'] !== '') {
+                $needle = mb_strtolower((string) $filters['country']);
+                $loc = mb_strtolower($product['location'] ?? '');
+                $matches = str_contains($loc, $needle);
+                if (str_contains($needle, 'switzerland') || $needle === 'ch') {
+                    $matches = $matches || (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/', $loc);
+                }
+                if (! $matches) {
+                    return false;
+                }
             }
             if (isset($filters['source']) && ($product['source_key'] ?? '') !== $filters['source']) {
                 return false;
