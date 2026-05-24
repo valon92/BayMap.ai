@@ -43,6 +43,7 @@ class ProductRankingService
 
         $score += $this->exactMatch->exactMatchBonus($product, $parsed);
         $score += $this->exactMatch->locationPriorityBonus($product, $parsed);
+        $score += $this->scoreBrand($product, $parsed, $title, $tags);
 
         $score += $this->scoreModel($product, $parsed, $title, $tags);
         $score += $this->scoreYear($parsed, $product, $title);
@@ -107,6 +108,33 @@ class ProductRankingService
      * @param  array<string, mixed>  $parsed
      * @param  array<int, string>  $tags
      */
+    private function scoreBrand(array $product, array $parsed, string $title, array $tags): int
+    {
+        if (empty($parsed['brand'])) {
+            return 0;
+        }
+
+        $brand = mb_strtolower((string) $parsed['brand']);
+        $needles = match (true) {
+            str_contains($brand, 'mercedes') => ['mercedes', 'mercedes-benz', 'benz'],
+            str_contains($brand, 'volkswagen') => ['volkswagen', 'vw'],
+            default => [mb_strtolower((string) $parsed['brand'])],
+        };
+
+        foreach ($needles as $needle) {
+            if (str_contains($title, $needle) || in_array($needle, $tags, true)) {
+                return 14;
+            }
+        }
+
+        return CategoryCatalog::isAutomotive($parsed['category'] ?? '') ? -35 : -12;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     * @param  array<int, string>  $tags
+     */
     private function scoreModel(array $product, array $parsed, string $title, array $tags): int
     {
         if (empty($parsed['model']) || ! CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
@@ -124,7 +152,7 @@ class ProductRankingService
             return 28;
         }
 
-        if (preg_match('/\b([aqx]\d{1,2})\b/i', $title, $found)) {
+        if (preg_match('/\b(gle|glc|gla|gls|glb|q\d|x\d|a\d)\b/i', $title, $found)) {
             $foundModel = mb_strtolower($found[1]);
             if ($foundModel !== $wanted && ! str_contains($wanted, $foundModel)) {
                 return -30;

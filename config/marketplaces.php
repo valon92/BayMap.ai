@@ -65,7 +65,7 @@ return [
             'label' => 'Facebook Marketplace',
             'mode' => 'demo',
             'priority' => 70,
-            'categories' => ['fashion', 'sports_outdoor', 'marketplace'],
+            'categories' => ['fashion', 'sports_outdoor', 'automotive', 'marketplace'],
         ],
         'driloni' => [
             'adapter' => 'mock',

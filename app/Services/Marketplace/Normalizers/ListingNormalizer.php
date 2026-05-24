@@ -26,7 +26,9 @@ class ListingNormalizer
         $listing = SearchListing::fromArray($raw);
         $priceEur = $this->toEur($listing->price, $listing->currency);
         $brand = $listing->brand ?? $this->extractBrand($listing->title, $listing->tags);
+        $model = $listing->model ?? $this->extractModel($listing->title, $listing->tags);
         $storage = $listing->storage ?? $this->extractStorage($listing->title, $listing->tags);
+        $year = $listing->year ?? $this->extractYear($listing->title, $listing->tags);
         $fingerprint = $this->fingerprint($listing->title, $brand, $storage);
 
         return new SearchListing(
@@ -45,8 +47,12 @@ class ListingNormalizer
             sponsored: $listing->sponsored,
             tags: $listing->tags,
             brand: $brand,
-            model: $listing->model,
+            model: $model,
             storage: $storage,
+            year: $year,
+            mileage: $listing->mileage,
+            sellerType: $listing->sellerType,
+            store: $listing->store,
             priceEur: $priceEur,
             fingerprint: $fingerprint,
         );
@@ -122,6 +128,32 @@ class ListingNormalizer
         }
         if (preg_match('/(\d+)\s*TB/', $haystack, $m)) {
             return $m[1].'TB';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    private function extractModel(string $title, array $tags): ?string
+    {
+        $haystack = strtoupper($title.' '.implode(' ', $tags));
+        if (preg_match('/\b(GLE|GLC|GLA|GLS|GLB|EQC|EQE|EQS|CLS|ML|SL|AMG|Q[3578]|X[13567]|A[34678])\b/', $haystack, $m)) {
+            return strtoupper($m[1]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    private function extractYear(string $title, array $tags): ?int
+    {
+        $haystack = $title.' '.implode(' ', $tags);
+        if (preg_match('/\b(20\d{2}|19\d{2})\b/', $haystack, $m)) {
+            return (int) $m[1];
         }
 
         return null;

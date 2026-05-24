@@ -3,6 +3,8 @@
 namespace App\Services\Search;
 
 use App\Support\CategoryCatalog;
+use App\Support\DutchCarMarketplaces;
+use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
 /**
@@ -16,6 +18,7 @@ class SearchExpansionService
         'AL' => ['XK', 'MK', 'IT', 'GR', 'DE'],
         'DE' => ['AT', 'CH', 'FR', 'NL', 'PL', 'IT'],
         'CH' => ['DE', 'FR', 'IT', 'AT'],
+        'NL' => ['DE', 'BE', 'FR', 'GB'],
         'US' => ['CA', 'MX'],
         'GB' => ['IE', 'FR', 'DE'],
     ];
@@ -29,6 +32,7 @@ class SearchExpansionService
         'IT' => 'Italy',
         'FR' => 'France',
         'AT' => 'Austria',
+        'NL' => 'Netherlands',
     ];
 
     /** @var array<string, array<string>> */
@@ -97,12 +101,16 @@ class SearchExpansionService
             return SwissCarMarketplaces::keys();
         }
 
-        if ($countryCode === 'XK' && (CategoryCatalog::isLocalFashion($category) || $category === 'marketplace')) {
-            return ['driloni', 'ebay', 'google_shopping', 'etsy', 'facebook_marketplace'];
+        if ($countryCode === 'NL' && CategoryCatalog::isAutomotive($category)) {
+            return DutchCarMarketplaces::keys();
+        }
+
+        if ($countryCode === 'XK') {
+            return KosovoMarketplaces::keysForCategory($category);
         }
 
         return match ($category) {
-            'automotive' => ['mobile.de', 'autoscout24', 'facebook_marketplace'],
+            'automotive' => ['ebay', 'mobile.de', 'autoscout24', 'facebook_marketplace'],
             'online_education' => ['amazon', 'ebay', 'google_shopping'],
             'luxury_collectibles' => ['etsy', 'ebay', 'facebook_marketplace', 'google_shopping'],
             'fashion', 'sports_outdoor' => ['driloni', 'ebay', 'etsy', 'facebook_marketplace', 'google_shopping'],
@@ -169,6 +177,22 @@ class SearchExpansionService
     {
         if ($searchTarget && $countryCode === 'CH' && CategoryCatalog::isAutomotive($category)) {
             return SwissCarMarketplaces::labels();
+        }
+
+        if ($searchTarget && $countryCode === 'NL' && CategoryCatalog::isAutomotive($category)) {
+            return DutchCarMarketplaces::labels();
+        }
+
+        if ($countryCode === 'XK') {
+            $labels = [];
+            foreach ($marketplaces as $key) {
+                $label = KosovoMarketplaces::label($key);
+                if ($label !== '') {
+                    $labels[] = $label;
+                }
+            }
+
+            return $labels;
         }
 
         return [];

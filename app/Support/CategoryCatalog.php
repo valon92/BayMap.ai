@@ -177,10 +177,13 @@ class CategoryCatalog
         $sq = $locale === 'sq';
 
         if ($category === 'marketplace') {
-            return self::commonFilters($parsed, $sq, 10, 10000);
+            return array_merge(
+                self::commonFilters($parsed, $sq, 10, 10000),
+                self::sortFilter($sq),
+            );
         }
 
-        return match ($category) {
+        $filters = match ($category) {
             'electronics_tech' => array_merge(
                 self::select('product_type', $sq ? 'Lloji' : 'Type', ['phone', 'laptop', 'tablet', 'headphones', 'smartwatch', 'monitor'], $parsed['product_type'] ?? null),
                 self::select('brand', $sq ? 'Marka' : 'Brand', ['apple', 'samsung', 'sony', 'dell', 'hp', 'lenovo'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
@@ -312,6 +315,8 @@ class CategoryCatalog
             ),
             default => self::commonFilters($parsed, $sq, 10, 10000),
         };
+
+        return array_merge($filters, self::sortFilter($sq));
     }
 
     /**
@@ -320,8 +325,15 @@ class CategoryCatalog
     private static function automotiveFilters(array $parsed, bool $sq): array
     {
         $currency = $parsed['currency'] ?? 'EUR';
-        $targetCountry = $parsed['search_country'] ?? $parsed['country'] ?? null;
+        $targetCountry = ! empty($parsed['search_target'])
+            ? ($parsed['search_country'] ?? null)
+            : null;
         $priceLabel = ($sq ? 'Çmimi max' : 'Max price').' ('.$currency.')';
+        $countryOptions = array_values(array_unique(array_filter([
+            $targetCountry,
+            $sq ? 'Botë (universal)' : 'Worldwide',
+            'Kosovo', 'Germany', 'Switzerland', 'Netherlands', 'Albania', 'Italy', 'Austria', 'France', 'United Kingdom', 'United States', 'UAE',
+        ])));
 
         return array_merge(
             self::rangeFilter('year', $sq ? 'Viti' : 'Year', 1995, (int) date('Y'), $parsed['year'] ?? null),
@@ -337,12 +349,28 @@ class CategoryCatalog
                 'max' => $currency === 'CHF' ? 80000 : 150000,
                 'value' => $parsed['max_price'] ?? null,
             ]],
-            self::select('country', $sq ? 'Vendi' : 'Country', array_values(array_filter([
-                $targetCountry, 'Switzerland', 'Germany', 'Kosovo', 'Albania', 'Italy', 'Austria', 'France',
-            ])), $targetCountry),
+            self::select('country', $sq ? 'Vendi' : 'Country', $countryOptions, $targetCountry),
             self::select('condition', $sq ? 'Gjendja' : 'Condition', ['new', 'used', 'certified'], $parsed['condition'] ?? 'used'),
             self::select('seller_type', $sq ? 'Shitësi' : 'Seller', ['dealer', 'private'], $parsed['seller_type'] ?? null),
         );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function sortFilter(bool $sq): array
+    {
+        return [[
+            'key' => 'sort',
+            'type' => 'sort',
+            'label' => $sq ? 'Rendit sipas çmimit' : 'Sort by price',
+            'options' => [
+                ['value' => 'relevance', 'label' => $sq ? 'Relevancë AI (default)' : 'AI relevance (default)'],
+                ['value' => 'price_asc', 'label' => $sq ? 'Më i lirë → më i shtrenjtë' : 'Lowest to highest'],
+                ['value' => 'price_desc', 'label' => $sq ? 'Më i shtrenjtë → më i lirë' : 'Highest to lowest'],
+            ],
+            'value' => 'relevance',
+        ]];
     }
 
     /**

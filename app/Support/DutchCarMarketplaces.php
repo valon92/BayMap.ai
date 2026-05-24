@@ -3,71 +3,55 @@
 namespace App\Support;
 
 /**
- * Swiss car marketplace catalog for targeted CH vehicle searches.
+ * Dutch car marketplace catalog for targeted NL vehicle searches.
  */
-class SwissCarMarketplaces
+class DutchCarMarketplaces
 {
     /** @var array<string, array{label: string, url: string}> */
     private const CATALOG = [
-        'autoscout24_ch' => [
-            'label' => 'AutoScout24 Switzerland',
-            'url' => 'https://www.autoscout24.ch',
+        'marktplaats' => [
+            'label' => 'Marktplaats',
+            'url' => 'https://www.marktplaats.nl',
         ],
-        'autolina' => [
-            'label' => 'Autolina',
-            'url' => 'https://www.autolina.ch',
+        'autoscout24_nl' => [
+            'label' => 'AutoScout24 Netherlands',
+            'url' => 'https://www.autoscout24.nl',
         ],
-        'amag' => [
-            'label' => 'AMAG',
-            'url' => 'https://www.amag.ch',
+        'autotrack_nl' => [
+            'label' => 'Autotrack.nl',
+            'url' => 'https://www.autotrack.nl',
         ],
-        'carlando' => [
-            'label' => 'Carlando',
-            'url' => 'https://www.carlando.ch',
+        'gaspedaal' => [
+            'label' => 'Gaspedaal.com',
+            'url' => 'https://www.gaspedaal.com',
         ],
-        'carindex' => [
-            'label' => 'Carindex',
-            'url' => 'https://www.carindex.ch',
+        'autowereld' => [
+            'label' => 'Autowereld.nl',
+            'url' => 'https://www.autowereld.nl',
         ],
-        'troovo' => [
-            'label' => 'Troovo Auto',
-            'url' => 'https://www.troovo.ch',
+        'vakgarage' => [
+            'label' => 'Vakgarage',
+            'url' => 'https://www.vakgarage.nl',
         ],
-        'car_trade24' => [
-            'label' => 'Car Trade24',
-            'url' => 'https://www.cartrade24.ch',
+        'occasion_nl' => [
+            'label' => 'Occasion.nl',
+            'url' => 'https://www.occasion.nl',
         ],
-        'motoauto_ch' => [
-            'label' => 'MotoAuto Switzerland',
-            'url' => 'https://www.motoauto.ch',
+        'autodealers_nl' => [
+            'label' => 'Autodealers.nl',
+            'url' => 'https://www.autodealers.nl',
         ],
-        'autogrid_ch' => [
-            'label' => 'Autogrid Switzerland',
-            'url' => 'https://www.autogrid.ch',
-        ],
-        'ricardo' => [
-            'label' => 'Ricardo.ch',
-            'url' => 'https://www.ricardo.ch',
-        ],
-        'tutti' => [
-            'label' => 'Tutti.ch',
-            'url' => 'https://www.tutti.ch',
-        ],
-        'facebook_marketplace' => [
-            'label' => 'Facebook Marketplace',
+        'facebook_marketplace_nl' => [
+            'label' => 'Facebook Marketplace NL',
             'url' => 'https://www.facebook.com/marketplace',
         ],
     ];
 
     /** @var array<string, string> */
     private const ALIASES = [
-        'autoscout24' => 'autoscout24_ch',
-        'autoscout24ch' => 'autoscout24_ch',
-        'ricardoch' => 'ricardo',
-        'tuttich' => 'tutti',
-        'motoauto' => 'motoauto_ch',
-        'autogrid' => 'autogrid_ch',
-        'cartrade24' => 'car_trade24',
+        'autoscout24' => 'autoscout24_nl',
+        'autoscout24nl' => 'autoscout24_nl',
+        'facebook_marketplace' => 'facebook_marketplace_nl',
     ];
 
     /**
@@ -110,7 +94,7 @@ class SwissCarMarketplaces
             return $meta['label'];
         }
 
-        return ucfirst(str_replace('_', ' ', $source));
+        return '';
     }
 
     public static function url(string $source): ?string

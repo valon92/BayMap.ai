@@ -3,6 +3,8 @@
 namespace App\Services\Search;
 
 use App\Support\CategoryCatalog;
+use App\Support\DutchCarMarketplaces;
+use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
 /**
@@ -115,6 +117,13 @@ class SearchResultPoolService
 
         if (! empty($base['mileage'])) {
             $item['mileage'] = max(5_000, (int) $base['mileage'] + (($index % 11) - 5) * 3_200);
+            if (! empty($parsed['max_km']) && $item['mileage'] > (int) $parsed['max_km']) {
+                $item['mileage'] = max(5_000, (int) $parsed['max_km'] - ($index % 7) * 500);
+            }
+        }
+
+        if (! empty($base['year'])) {
+            $item['year'] = (int) $base['year'];
         }
 
         $cities = $this->citiesFor($parsed);
@@ -149,6 +158,10 @@ class SearchResultPoolService
                 'Geneva, Switzerland', 'Lausanne, Switzerland', 'Lucerne, Switzerland',
                 'St. Gallen, Switzerland', 'Winterthur, Switzerland',
             ],
+            'NL' => [
+                'Amsterdam, Netherlands', 'Rotterdam, Netherlands', 'Utrecht, Netherlands',
+                'Den Haag, Netherlands', 'Eindhoven, Netherlands', 'Groningen, Netherlands',
+            ],
             'DE' => ['Munich, Germany', 'Berlin, Germany', 'Stuttgart, Germany', 'Hamburg, Germany'],
             'XK' => ['Pristina, Kosovo', 'Ferizaj, Kosovo', 'Prizren, Kosovo', 'Gjakova, Kosovo'],
             default => [],
@@ -164,6 +177,15 @@ class SearchResultPoolService
         if (strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH'
             && CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
             return SwissCarMarketplaces::labels();
+        }
+
+        if (strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'NL'
+            && CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
+            return DutchCarMarketplaces::labels();
+        }
+
+        if (strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'XK') {
+            return KosovoMarketplaces::labels();
         }
 
         return ['eBay', 'Google Shopping', 'Facebook Marketplace', 'Amazon'];

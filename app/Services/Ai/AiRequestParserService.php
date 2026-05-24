@@ -121,6 +121,8 @@ class AiRequestParserService
 
         if (preg_match('/\b(q\d|x\d|a\d)\b/i', $query, $m)) {
             $data['model'] = strtoupper($m[1]);
+        } elseif (preg_match('/\b(gle|glc|gla|gls|glb|eqc|eqe|eqs|cls|ml|sl|amg)\b/i', $query, $m)) {
+            $data['model'] = strtoupper($m[1]);
         } elseif (preg_match('/\bserie\s+(\d)\b/i', $query, $m)) {
             $data['model'] = $m[1].' Series';
         } elseif (preg_match('/\b([a-z]{1,3}\s?\d{1,2})\b/i', $query, $m) && $data['brand']) {

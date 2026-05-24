@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Support\AutomotiveIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
@@ -49,8 +50,33 @@ class QueryIntentEnricher
 
         $parsed = self::mergeFashionIntent($parsed, $rawQuery);
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
+        $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
 
         return array_filter($parsed, fn ($v) => $v !== null && $v !== '' && $v !== []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    private static function mergeAutomotiveIntent(array $parsed, string $rawQuery): array
+    {
+        $auto = AutomotiveIntentParser::fromQuery($rawQuery);
+        if ($auto === []) {
+            return $parsed;
+        }
+
+        foreach ($auto as $key => $value) {
+            if (empty($parsed[$key])) {
+                $parsed[$key] = $value;
+            }
+        }
+
+        if (CategoryCatalog::normalize($parsed['category'] ?? 'marketplace') === 'marketplace') {
+            $parsed['category'] = 'automotive';
+        }
+
+        return $parsed;
     }
 
     /**

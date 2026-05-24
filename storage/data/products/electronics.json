@@ -84,8 +84,9 @@
     "price": 420,
     "currency": "EUR",
     "location": "Pristina, Kosovo",
+    "store": "merrjep",
     "condition": "used",
-    "url": "https://facebook.com/marketplace",
+    "url": "https://www.merrjep.com",
     "tags": ["phone", "apple", "iphone", "128GB", "black"]
   },
   {
@@ -95,8 +96,81 @@
     "price": 389,
     "currency": "EUR",
     "location": "Ferizaj, Kosovo",
+    "store": "pazar3",
     "condition": "used",
-    "url": "https://ebay.com",
+    "url": "https://www.pazar3.mk",
+    "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "elec-iphone-007",
+    "title": "iPhone 13 Pro Max 128GB Graphite — Gjirafa50 Kosovo",
+    "image": "https://images.unsplash.com/photo-1632661671477-6828aa795b66?w=800&q=80",
+    "price": 499,
+    "currency": "EUR",
+    "location": "Pristina, Kosovo",
+    "store": "gjirafa50",
+    "condition": "new",
+    "url": "https://gjirafa50.com",
+    "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "elec-iphone-008",
+    "title": "Apple iPhone 13 Pro Max 128GB — Neptun Kosovo",
+    "image": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=800&q=80",
+    "price": 529,
+    "currency": "EUR",
+    "location": "Pristina, Kosovo",
+    "store": "neptun",
+    "condition": "new",
+    "url": "https://www.neptun-ks.com",
+    "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "elec-iphone-009",
+    "title": "iPhone 13 Pro Max 128GB Black — Aza Electronics",
+    "image": "https://images.unsplash.com/photo-1678652197831-566ee6530b76?w=800&q=80",
+    "price": 459,
+    "currency": "EUR",
+    "location": "Prizren, Kosovo",
+    "store": "aza_electronics",
+    "condition": "used",
+    "url": "https://aza-ks.com",
+    "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "elec-iphone-010",
+    "title": "Apple iPhone 13 Pro Max 128GB — PC Store Kosovo",
+    "image": "https://images.unsplash.com/photo-1632661671477-6828aa795b66?w=800&q=80",
+    "price": 469,
+    "currency": "EUR",
+    "location": "Gjakova, Kosovo",
+    "store": "pcstore",
+    "condition": "used",
+    "url": "https://pcstore-ks.com",
+    "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "elec-iphone-011",
+    "title": "iPhone 13 Pro Max 128GB — FOCUS Electronics Pristina",
+    "image": "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=800&q=80",
+    "price": 445,
+    "currency": "EUR",
+    "location": "Pristina, Kosovo",
+    "store": "focus_electronics",
+    "condition": "used",
+    "url": "https://focus-ks.com",
+    "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "elec-iphone-012",
+    "title": "Apple iPhone 13 Pro Max 128GB — Dyqani.app",
+    "image": "https://images.unsplash.com/photo-1678652197831-566ee6530b76?w=800&q=80",
+    "price": 410,
+    "currency": "EUR",
+    "location": "Ferizaj, Kosovo",
+    "store": "dyqani",
+    "condition": "used",
+    "url": "https://dyqani.app",
     "tags": ["phone", "apple", "iphone", "128GB", "black"]
   }
 ]

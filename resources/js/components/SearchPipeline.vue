@@ -55,6 +55,9 @@ function stepLabel(step) {
 function badgeClass(mode) {
   if (mode === 'live') return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20';
   if (mode === 'demo') return 'bg-amber-500/10 text-amber-200 border border-amber-500/20';
+  if (mode === 'swiss_car_marketplace' || mode === 'dutch_car_marketplace' || mode === 'kosovo_marketplace') {
+    return 'bg-sky-500/10 text-sky-200 border border-sky-500/25';
+  }
   return 'bg-white/5 text-slate-500 border border-white/10';
 }
 

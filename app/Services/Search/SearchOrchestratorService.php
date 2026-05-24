@@ -145,20 +145,29 @@ class SearchOrchestratorService
 
         $swissCarSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH'
             && CategoryCatalog::isAutomotive($parsed['category'] ?? '');
+        $dutchCarSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'NL'
+            && CategoryCatalog::isAutomotive($parsed['category'] ?? '')
+            && ! empty($parsed['search_target']);
+        $kosovoSearch = strtoupper((string) ($parsed['search_country_code'] ?? $searchGeo['country_code'] ?? '')) === 'XK';
 
         $pipeline[] = [
             'step' => 'internet_search',
             'status' => 'completed',
             'label' => $swissCarSearch
                 ? 'Searched '.count($expanded['marketplaces'] ?? []).' Swiss car marketplaces'
-                : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional',
+                : ($dutchCarSearch
+                    ? 'Searched '.count($expanded['marketplaces'] ?? []).' Dutch car marketplaces'
+                    : ($kosovoSearch
+                        ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
+                        : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional')),
         ];
 
-        $products = $this->applyClientFilters($products, $filters);
+        $products = $this->applyClientFilters($products, $filters, $parsed);
         $products = $this->ranking->rank($products, $this->intentEnricher->rankingContext($parsed, $geo));
         $products = $this->dedupeListings($products);
         $pool = $this->resultPool->expand($products, $parsed);
-        $pool = $this->applyClientFilters($pool, $filters);
+        $pool = $this->applyClientFilters($pool, $filters, $parsed);
+        $pool = $this->applySort($pool, $filters);
         $estimatedTotal = $this->resultPool->estimateTotal($parsed, count($pool));
 
         $page = max(1, $page);
@@ -170,7 +179,7 @@ class SearchOrchestratorService
         $pipeline[] = [
             'step' => 'rank_results',
             'status' => 'completed',
-            'label' => 'Ranked by exact intent match and AI relevance',
+            'label' => $this->rankResultsLabel($filters),
         ];
 
         $processingMs = (int) round((microtime(true) - $started) * 1000);
@@ -215,6 +224,7 @@ class SearchOrchestratorService
                     'ai_semantic_search',
                     'federated_product_discovery',
                     'intelligent_marketplace_aggregator',
+                    'ai_meta_search',
                     'exact_product_discovery',
                 ],
             ],
@@ -227,7 +237,7 @@ class SearchOrchestratorService
      * @param  array<string, mixed>  $filters
      * @return array<int, array<string, mixed>>
      */
-    private function applyClientFilters(array $products, array $filters): array
+    private function applyClientFilters(array $products, array $filters, array $parsed = []): array
     {
         if (empty($filters)) {
             return $products;
@@ -240,21 +250,71 @@ class SearchOrchestratorService
             if (isset($filters['price_max']) && ($product['price'] ?? PHP_INT_MAX) > (float) $filters['price_max']) {
                 return false;
             }
-            if (isset($filters['year']) && ($product['year'] ?? null) != $filters['year']) {
-                return false;
+            if (isset($filters['year']) && $filters['year'] !== '') {
+                $wantedYear = (int) $filters['year'];
+                $productYear = isset($product['year']) ? (int) $product['year'] : null;
+                if ($productYear !== null) {
+                    if ($productYear !== $wantedYear) {
+                        return false;
+                    }
+                } elseif (! str_contains($product['title'] ?? '', (string) $wantedYear)) {
+                    return false;
+                }
             }
-            if (isset($filters['max_km']) && ($product['mileage'] ?? PHP_INT_MAX) > (int) $filters['max_km']) {
-                return false;
+            if (isset($filters['max_km']) && $filters['max_km'] !== '') {
+                $limit = (int) $filters['max_km'];
+                $mileage = isset($product['mileage']) ? (int) $product['mileage'] : null;
+                if ($mileage !== null && $mileage > $limit) {
+                    return false;
+                }
             }
-            if (isset($filters['color']) && ! str_contains(mb_strtolower($product['title'] ?? ''), mb_strtolower($filters['color']))) {
-                return false;
+            if (isset($filters['color']) && $filters['color'] !== '') {
+                if (! $this->productMatchesColor($product, (string) $filters['color'])) {
+                    return false;
+                }
+            }
+            if (isset($filters['fuel']) && $filters['fuel'] !== '') {
+                $fuel = mb_strtolower((string) $filters['fuel']);
+                $title = mb_strtolower($product['title'] ?? '');
+                $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+                $needles = match ($fuel) {
+                    'diesel' => ['diesel', 'tdi', 'dizell'],
+                    'petrol' => ['petrol', 'benzin', 'tfsi', 'gasoline'],
+                    'electric' => ['electric', 'ev', 'elektrik'],
+                    default => [$fuel],
+                };
+                $matchesFuel = false;
+                foreach ($needles as $needle) {
+                    if (str_contains($title, $needle) || in_array($needle, $tags, true)) {
+                        $matchesFuel = true;
+                        break;
+                    }
+                }
+                if (! $matchesFuel) {
+                    return false;
+                }
             }
             if (isset($filters['country']) && $filters['country'] !== '') {
                 $needle = mb_strtolower((string) $filters['country']);
+                if (str_contains($needle, 'world') || str_contains($needle, 'universal') || str_contains($needle, 'bot')) {
+                    return true;
+                }
                 $loc = mb_strtolower($product['location'] ?? '');
                 $matches = str_contains($loc, $needle);
                 if (str_contains($needle, 'switzerland') || $needle === 'ch') {
                     $matches = $matches || (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/', $loc);
+                }
+                if (str_contains($needle, 'netherlands') || str_contains($needle, 'holland') || $needle === 'nl') {
+                    $matches = $matches || (bool) preg_match('/netherlands|holland|nederland|amsterdam|rotterdam|utrecht|den haag|eindhoven|groningen/', $loc);
+                }
+                if (str_contains($needle, 'united states') || $needle === 'us' || str_contains($needle, 'usa')) {
+                    $matches = $matches || (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc);
+                }
+                if (str_contains($needle, 'uae') || str_contains($needle, 'emirates') || str_contains($needle, 'dubai')) {
+                    $matches = $matches || (bool) preg_match('/uae|dubai|abu dhabi|emirates/', $loc);
+                }
+                if (str_contains($needle, 'united kingdom') || $needle === 'uk' || str_contains($needle, 'england')) {
+                    $matches = $matches || (bool) preg_match('/united kingdom|england|london|manchester|uk/', $loc);
                 }
                 if (! $matches) {
                     return false;
@@ -362,6 +422,91 @@ class SearchOrchestratorService
         }
 
         return $unique;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private function productMatchesColor(array $product, string $color): bool
+    {
+        $color = mb_strtolower(trim($color));
+        $title = mb_strtolower($product['title'] ?? '');
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+
+        if ($color === 'multicolor') {
+            $tones = ['black', 'white', 'grey', 'gray', 'blue', 'red', 'green', 'silver', 'graphite', 'pearl', 'ivory'];
+            foreach ($tones as $tone) {
+                if ($this->colorToneInProduct($tone, $title, $tags)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return $this->colorToneInProduct($color, $title, $tags);
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    private function colorToneInProduct(string $color, string $title, array $tags): bool
+    {
+        $aliases = match ($color) {
+            'black' => ['black', 'graphite', 'midnight', 'zez', 'zeze'],
+            'white' => ['white', 'ivory', 'pearl', 'bardh', 'bardhe'],
+            'grey', 'gray' => ['grey', 'gray', 'silver', 'graphite', 'hiri', 'gri'],
+            'blue' => ['blue', 'navy', 'azure', 'kalter', 'kaltër', 'blu'],
+            default => [$color],
+        };
+
+        foreach ($aliases as $alias) {
+            if (str_contains($title, $alias) || in_array($alias, $tags, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $products
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
+     */
+    private function applySort(array $products, array $filters): array
+    {
+        $sort = (string) ($filters['sort'] ?? 'relevance');
+
+        if ($sort === 'price_asc') {
+            usort($products, fn ($a, $b) => $this->sortablePrice($a) <=> $this->sortablePrice($b));
+        } elseif ($sort === 'price_desc') {
+            usort($products, fn ($a, $b) => $this->sortablePrice($b) <=> $this->sortablePrice($a));
+        }
+
+        return $products;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private function sortablePrice(array $product): float
+    {
+        $price = (float) ($product['best_price_eur'] ?? $product['price_eur'] ?? $product['price'] ?? 0);
+
+        return $price > 0 ? $price : PHP_FLOAT_MAX;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function rankResultsLabel(array $filters): string
+    {
+        return match ((string) ($filters['sort'] ?? 'relevance')) {
+            'price_asc' => 'Sorted by price: lowest to highest',
+            'price_desc' => 'Sorted by price: highest to lowest',
+            default => 'Ranked by exact intent match and AI relevance',
+        };
     }
 
     private function normalizeLocationScope(?string $scope): string

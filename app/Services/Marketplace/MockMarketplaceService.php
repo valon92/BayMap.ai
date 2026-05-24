@@ -4,6 +4,8 @@ namespace App\Services\Marketplace;
 
 use App\Contracts\MarketplaceSearchInterface;
 use App\Support\CategoryCatalog;
+use App\Support\DutchCarMarketplaces;
+use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 use Illuminate\Support\Facades\File;
 
@@ -36,7 +38,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         $dataset = $this->loadDataset($category);
         $marketplaces = $expandedFilters['marketplaces'] ?? [];
 
-        if (! empty($marketplaces) && ! SwissCarMarketplaces::isTarget($this->source, $marketplaces)) {
+        if (! empty($marketplaces)
+            && ! SwissCarMarketplaces::isTarget($this->source, $marketplaces)
+            && ! DutchCarMarketplaces::isTarget($this->source, $marketplaces)
+            && ! KosovoMarketplaces::isTarget($this->source, $marketplaces)) {
             $sourceKey = $this->mapSourceToKey();
             $allowed = false;
             foreach ($marketplaces as $mp) {
@@ -87,6 +92,18 @@ class MockMarketplaceService implements MarketplaceSearchInterface
      */
     private function filterForSource(array $items): array
     {
+        if (KosovoMarketplaces::isKosovoPlatform($this->source)) {
+            return array_values(array_filter($items, function (array $item) {
+                if (($item['store'] ?? '') === $this->source) {
+                    return true;
+                }
+
+                $store = $item['store'] ?? 'general';
+
+                return ($store === 'general' || $store === '') && $this->locationMatchesCountry($item, 'XK');
+            }));
+        }
+
         if ($this->source === 'driloni') {
             return array_values(array_filter(
                 $items,
@@ -110,6 +127,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         return array_values(array_filter($items, function (array $item) use ($parsed) {
             if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
                 if (! empty($parsed['search_country_code']) && ! $this->locationMatchesCountry($item, (string) $parsed['search_country_code'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['brand']) && ! $this->matchesAutomotiveBrand($item, (string) $parsed['brand'])) {
                     return false;
                 }
 
@@ -154,9 +175,36 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             'XK' => str_contains($loc, 'kosovo') || str_contains($loc, 'pristina') || str_contains($loc, 'ferizaj'),
             'DE' => str_contains($loc, 'germany') || str_contains($loc, 'munich') || str_contains($loc, 'berlin') || str_contains($loc, 'stuttgart'),
             'AL' => str_contains($loc, 'albania') || str_contains($loc, 'tirana'),
+            'NL' => (bool) preg_match('/netherlands|holland|nederland|amsterdam|rotterdam|utrecht|den haag|eindhoven|groningen|tilburg|breda|almere|haarlem/i', $loc),
+            'US' => (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc),
+            'AE' => (bool) preg_match('/uae|dubai|abu dhabi|emirates/', $loc),
+            'GB' => (bool) preg_match('/united kingdom|england|london|manchester|uk/', $loc),
             'AT' => str_contains($loc, 'austria') || str_contains($loc, 'vienna'),
             default => str_contains($loc, mb_strtolower($code)),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function matchesAutomotiveBrand(array $item, string $brand): bool
+    {
+        $brand = mb_strtolower($brand);
+        $title = mb_strtolower($item['title'] ?? '');
+        $tags = array_map('mb_strtolower', $item['tags'] ?? []);
+        $needles = match (true) {
+            str_contains($brand, 'mercedes') => ['mercedes', 'mercedes-benz', 'benz'],
+            str_contains($brand, 'volkswagen') => ['volkswagen', 'vw'],
+            default => [$brand],
+        };
+
+        foreach ($needles as $needle) {
+            if (str_contains($title, $needle) || in_array($needle, $tags, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function mapSourceToKey(): string
@@ -168,6 +216,14 @@ class MockMarketplaceService implements MarketplaceSearchInterface
     {
         if (SwissCarMarketplaces::url($this->source)) {
             return SwissCarMarketplaces::label($this->source);
+        }
+
+        if (DutchCarMarketplaces::url($this->source)) {
+            return DutchCarMarketplaces::label($this->source);
+        }
+
+        if (KosovoMarketplaces::url($this->source)) {
+            return KosovoMarketplaces::label($this->source);
         }
 
         return match ($this->source) {
@@ -187,7 +243,9 @@ class MockMarketplaceService implements MarketplaceSearchInterface
 
     private function listingUrl(?string $fallback): string
     {
-        $catalogUrl = SwissCarMarketplaces::url($this->source);
+        $catalogUrl = SwissCarMarketplaces::url($this->source)
+            ?? DutchCarMarketplaces::url($this->source)
+            ?? KosovoMarketplaces::url($this->source);
         if ($catalogUrl) {
             return $catalogUrl;
         }

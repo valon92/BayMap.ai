@@ -116,9 +116,33 @@ class ExactMatchScoringService
         }
 
         $color = mb_strtolower((string) $parsed['color']);
+        if ($color === 'multicolor') {
+            $tones = ! empty($parsed['colors']) && is_array($parsed['colors'])
+                ? array_map('mb_strtolower', $parsed['colors'])
+                : ['black', 'white', 'grey', 'gray', 'blue', 'red', 'silver'];
+
+            foreach ($tones as $tone) {
+                if ($this->colorAliasMatch($tone, $title, $tags)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return $this->colorAliasMatch($color, $title, $tags);
+    }
+
+  /**
+     * @param  array<int, string>  $tags
+     */
+    private function colorAliasMatch(string $color, string $title, array $tags): bool
+    {
         $aliases = match ($color) {
             'black' => ['black', 'graphite', 'midnight', 'zez', 'zeze'],
-            'white' => ['white', 'silver', 'starlight', 'bardh'],
+            'white' => ['white', 'silver', 'starlight', 'bardh', 'bardhe', 'ivory', 'pearl'],
+            'grey', 'gray' => ['grey', 'gray', 'silver', 'graphite', 'hiri', 'gri'],
+            'blue' => ['blue', 'navy', 'azure', 'kalter', 'kaltër', 'blu'],
             default => [$color],
         };
 

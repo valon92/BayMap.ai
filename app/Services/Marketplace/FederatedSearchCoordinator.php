@@ -4,6 +4,8 @@ namespace App\Services\Marketplace;
 
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Support\CategoryCatalog;
+use App\Support\DutchCarMarketplaces;
+use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
 /**
@@ -47,11 +49,12 @@ class FederatedSearchCoordinator
 
             $tierHits = 0;
             $mode = $provider->mode() === 'live' ? 'live' : 'demo';
-            $status = $provider->mode() === 'live' ? 'ok' : (
-                CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') && strtoupper((string) ($parsedQuery['search_country_code'] ?? '')) === 'CH'
-                    ? 'swiss_car_marketplace'
-                    : 'mock_data'
-            );
+            $status = $provider->mode() === 'live' ? 'ok' : match (strtoupper((string) ($parsedQuery['search_country_code'] ?? $geo['country_code'] ?? ''))) {
+                'CH' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'swiss_car_marketplace' : 'mock_data',
+                'NL' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'dutch_car_marketplace' : 'mock_data',
+                'XK' => KosovoMarketplaces::isKosovoPlatform($provider->sourceKey()) ? 'kosovo_marketplace' : 'mock_data',
+                default => 'mock_data',
+            };
 
             foreach ($tiers as $tier) {
                 if ($provider->mode() === 'live' && $liveResultCount >= $liveCap) {
@@ -109,7 +112,7 @@ class FederatedSearchCoordinator
 
         return [
             'source' => $key,
-            'label' => SwissCarMarketplaces::label($key) ?: $provider->label(),
+            'label' => KosovoMarketplaces::label($key) ?: DutchCarMarketplaces::label($key) ?: SwissCarMarketplaces::label($key) ?: $provider->label(),
             'mode' => $mode,
             'count' => $count,
             'status' => $status,

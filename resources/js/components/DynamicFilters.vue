@@ -17,13 +17,19 @@
         <label class="text-xs text-slate-400 font-medium">{{ filter.label }}</label>
 
         <select
-          v-if="filter.type === 'select'"
-          :value="active[filter.key] ?? filter.value ?? ''"
+          v-if="filter.type === 'select' || filter.type === 'sort'"
+          :value="active[filter.key] ?? filter.value ?? (filter.type === 'sort' ? 'relevance' : '')"
           class="w-full rounded-lg bg-white/5 border border-white/10 text-sm text-white px-3 py-2 focus:ring-sky-500/40"
           @change="update(filter.key, $event.target.value || null)"
         >
-          <option value="">Any</option>
-          <option v-for="opt in filter.options" :key="opt" :value="opt">{{ opt }}</option>
+          <option v-if="filter.type !== 'sort'" value="">{{ t('filter_any') }}</option>
+          <option
+            v-for="opt in filter.options"
+            :key="optionValue(opt)"
+            :value="optionValue(opt)"
+          >
+            {{ optionLabel(opt) }}
+          </option>
         </select>
 
         <input
@@ -47,8 +53,11 @@
           class="w-full accent-sky-500"
           @input="update(filter.key, Number($event.target.value))"
         />
-        <span v-if="filter.type === 'range'" class="text-xs text-slate-500">
-          {{ active[filter.key] ?? filter.value ?? filter.min }}
+        <span v-if="filter.type === 'range' && (active[filter.key] ?? filter.value)" class="text-xs text-slate-500">
+          {{ active[filter.key] ?? filter.value }}
+        </span>
+        <span v-else-if="filter.type === 'range'" class="text-xs text-slate-600">
+          {{ t('filter_any') }}
         </span>
       </div>
     </div>
@@ -87,5 +96,13 @@ function update(key, value) {
 function clearAll() {
   emit('update:modelValue', {});
   emit('change', {});
+}
+
+function optionValue(opt) {
+  return typeof opt === 'object' && opt !== null ? opt.value : opt;
+}
+
+function optionLabel(opt) {
+  return typeof opt === 'object' && opt !== null ? opt.label : opt;
 }
 </script>

@@ -94,6 +94,54 @@
       </div>
 
       <div
+        v-if="platformCapabilities.length"
+        class="glass rounded-xl p-4 mb-6 border border-violet-500/20"
+      >
+        <p class="text-xs uppercase tracking-wider text-violet-300 mb-3">{{ t('platform_engine') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="cap in platformCapabilities"
+            :key="cap"
+            class="px-2.5 py-1 rounded-lg text-xs bg-violet-500/10 text-violet-200 border border-violet-500/25"
+          >
+            {{ t(`platform_caps.${cap}`) }}
+          </span>
+        </div>
+      </div>
+
+      <div
+        v-if="showKosovoMarketplaces"
+        class="glass rounded-xl p-4 mb-6 border border-emerald-500/20"
+      >
+        <p class="text-xs uppercase tracking-wider text-emerald-300 mb-3">{{ t('kosovo_marketplaces') }}</p>
+        <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+          <span
+            v-for="label in kosovoMarketplaceLabels"
+            :key="label"
+            class="px-2.5 py-1 rounded-lg text-xs bg-emerald-500/10 text-emerald-200 border border-emerald-500/25"
+          >
+            {{ label }}
+          </span>
+        </div>
+      </div>
+
+      <div
+        v-if="showDutchCarMarketplaces"
+        class="glass rounded-xl p-4 mb-6 border border-orange-500/20"
+      >
+        <p class="text-xs uppercase tracking-wider text-orange-300 mb-3">{{ t('dutch_car_marketplaces') }}</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="label in dutchMarketplaceLabels"
+            :key="label"
+            class="px-2.5 py-1 rounded-lg text-xs bg-orange-500/10 text-orange-200 border border-orange-500/25"
+          >
+            {{ label }}
+          </span>
+        </div>
+      </div>
+
+      <div
         v-if="showSwissCarMarketplaces"
         class="glass rounded-xl p-4 mb-6 border border-sky-500/20"
       >
@@ -115,7 +163,7 @@
         :report="data.meta?.source_report || []"
       />
 
-      <div class="lg:grid lg:grid-cols-[240px_1fr] gap-6">
+      <div class="lg:grid lg:grid-cols-[minmax(200px,220px)_1fr] xl:grid-cols-[minmax(200px,240px)_1fr] gap-4 xl:gap-5">
         <DynamicFilters
           v-if="data?.filters?.length"
           :filters="data.filters"
@@ -131,7 +179,7 @@
             {{ t('no_results') }}
           </p>
           <div v-else>
-            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
               <ProductCard
                 v-for="product in results"
                 :key="product.id + (product.source_key || '')"
@@ -181,8 +229,11 @@ const loadingMore = ref(false);
 const currentPage = ref(1);
 const visibleResults = ref([]);
 const activeFilters = ref({});
-const perPage = 12;
+const perPage = 20;
 let debounceTimer = null;
+let lastQueryKey = '';
+
+const platformCapabilities = computed(() => data.value?.platform?.positioning ?? []);
 
 const displayQuery = computed(() => {
   if (route.query.has_image === '1' && data.value?.vision?.search_query) {
@@ -192,6 +243,35 @@ const displayQuery = computed(() => {
 });
 const results = computed(() => visibleResults.value);
 const hasMore = computed(() => Boolean(data.value?.meta?.has_more));
+const showKosovoMarketplaces = computed(() => {
+  const code = String(data.value?.expanded?.search_country_code || data.value?.geo?.country_code || '').toUpperCase();
+  const searchingAbroad = Boolean(
+    data.value?.parsed?.search_target
+    && String(data.value?.parsed?.search_country_code || '').toUpperCase() !== 'XK'
+  );
+
+  return code === 'XK' && ! searchingAbroad && (data.value?.meta?.marketplace_labels?.length > 0);
+});
+
+const kosovoMarketplaceLabels = computed(() => {
+  if (!showKosovoMarketplaces.value) return [];
+  return data.value?.meta?.marketplace_labels ?? [];
+});
+
+const showDutchCarMarketplaces = computed(() => {
+  const p = data.value?.parsed;
+  return Boolean(
+    p?.search_target
+    && String(p?.search_country_code || '').toUpperCase() === 'NL'
+    && (p?.category === 'automotive' || p?.category === 'car')
+  );
+});
+
+const dutchMarketplaceLabels = computed(() => {
+  if (!showDutchCarMarketplaces.value) return [];
+  return data.value?.meta?.marketplace_labels ?? [];
+});
+
 const showSwissCarMarketplaces = computed(() => {
   const p = data.value?.parsed;
   return Boolean(
@@ -316,7 +396,6 @@ async function fetchPage(page, append = false) {
   }
 
   currentPage.value = page;
-  applyFilterDefaults(response?.filters);
   if (!append) {
     api.clearSearchImage();
   }
@@ -324,18 +403,33 @@ async function fetchPage(page, append = false) {
   return response;
 }
 
+async function refreshForLocale() {
+  if (loading.value) return;
+  loading.value = true;
+  currentPage.value = 1;
+  try {
+    await fetchPage(1, false);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    loading.value = false;
+  }
+}
+
 async function runSearch() {
   const q = String(route.query.q || '');
   const imageBase64 = api.loadSearchImage();
   const hasImage = route.query.has_image === '1' && imageBase64;
+  const queryKey = `${q}|${hasImage ? 'img' : ''}`;
 
   if (!hasImage && q.length < 3) {
     router.replace({ name: 'home' });
     return;
   }
 
-  if (route.query.locale) {
-    setLocale(route.query.locale);
+  if (queryKey !== lastQueryKey) {
+    activeFilters.value = {};
+    lastQueryKey = queryKey;
   }
 
   if (route.query.scope) {
@@ -371,21 +465,6 @@ async function loadMore() {
   }
 }
 
-function applyFilterDefaults(filters) {
-  if (!filters?.length) return;
-  const next = { ...activeFilters.value };
-  let changed = false;
-  for (const f of filters) {
-    if (f.value != null && f.value !== '' && next[f.key] === undefined) {
-      next[f.key] = f.value;
-      changed = true;
-    }
-  }
-  if (changed) {
-    activeFilters.value = next;
-  }
-}
-
 function mapFilters(filters) {
   const mapped = { ...filters };
   if (mapped.price != null) {
@@ -394,6 +473,12 @@ function mapFilters(filters) {
   }
   if (mapped.size != null && mapped.size !== '') {
     mapped.size = String(mapped.size);
+  }
+  if (mapped.country != null) {
+    const country = String(mapped.country).toLowerCase();
+    if (country.includes('world') || country.includes('universal') || country.includes('bot')) {
+      delete mapped.country;
+    }
   }
   return mapped;
 }
@@ -404,5 +489,27 @@ function refineSearch() {
 }
 
 watch(() => [route.query.q, route.query.scope], runSearch);
-onMounted(runSearch);
+
+watch(locale, (newLocale) => {
+  if (route.name !== 'search') return;
+  if (String(route.query.locale || '') === newLocale) return;
+  router.replace({ query: { ...route.query, locale: newLocale } });
+  refreshForLocale();
+});
+
+watch(
+  () => route.query.locale,
+  (routeLocale) => {
+    if (!routeLocale || routeLocale === locale.value) return;
+    setLocale(String(routeLocale));
+    refreshForLocale();
+  }
+);
+
+onMounted(() => {
+  if (route.query.locale) {
+    setLocale(String(route.query.locale));
+  }
+  runSearch();
+});
 </script>

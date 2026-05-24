@@ -169,6 +169,7 @@ class LocalSearchTierService
     {
         return match (strtoupper($code)) {
             'CH' => 'Switzerland',
+            'NL' => 'Netherlands',
             'XK' => 'Kosovo',
             'AL' => 'Albania',
             'DE' => 'Germany',

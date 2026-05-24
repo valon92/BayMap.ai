@@ -1,12 +1,12 @@
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-    <div v-for="n in 6" :key="n" class="glass rounded-2xl overflow-hidden">
-      <div class="skeleton aspect-[4/3] rounded-none" />
-      <div class="p-4 space-y-3">
-        <div class="skeleton h-4 w-3/4" />
-        <div class="skeleton h-6 w-1/3" />
-        <div class="skeleton h-16 w-full" />
-        <div class="skeleton h-10 w-full rounded-xl" />
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+    <div v-for="n in 10" :key="n" class="rounded-xl border border-white/[0.06] overflow-hidden bg-slate-900/40">
+      <div class="skeleton aspect-square sm:aspect-[4/3] rounded-none" />
+      <div class="p-2.5 space-y-2">
+        <div class="skeleton h-3 w-full" />
+        <div class="skeleton h-3 w-2/3" />
+        <div class="skeleton h-5 w-1/2" />
+        <div class="skeleton h-7 w-full rounded-lg" />
       </div>
     </div>
   </div>

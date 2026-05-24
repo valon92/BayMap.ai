@@ -29,6 +29,10 @@ final class SearchListing
         public readonly ?string $brand = null,
         public readonly ?string $model = null,
         public readonly ?string $storage = null,
+        public readonly ?int $year = null,
+        public readonly ?int $mileage = null,
+        public readonly ?string $sellerType = null,
+        public readonly ?string $store = null,
         public readonly ?float $priceEur = null,
         public readonly ?string $fingerprint = null,
     ) {}
@@ -56,6 +60,10 @@ final class SearchListing
             brand: isset($data['brand']) ? (string) $data['brand'] : null,
             model: isset($data['model']) ? (string) $data['model'] : null,
             storage: isset($data['storage']) ? (string) $data['storage'] : null,
+            year: isset($data['year']) ? (int) $data['year'] : null,
+            mileage: isset($data['mileage']) ? (int) $data['mileage'] : null,
+            sellerType: isset($data['seller_type']) ? (string) $data['seller_type'] : null,
+            store: isset($data['store']) ? (string) $data['store'] : null,
             priceEur: isset($data['price_eur']) ? (float) $data['price_eur'] : null,
             fingerprint: isset($data['fingerprint']) ? (string) $data['fingerprint'] : null,
         );
@@ -85,6 +93,10 @@ final class SearchListing
             'brand' => $this->brand,
             'model' => $this->model,
             'storage' => $this->storage,
+            'year' => $this->year,
+            'mileage' => $this->mileage,
+            'seller_type' => $this->sellerType,
+            'store' => $this->store,
             'fingerprint' => $this->fingerprint,
         ], fn ($v) => $v !== null && $v !== '');
     }
@@ -109,6 +121,10 @@ final class SearchListing
             brand: $this->brand,
             model: $this->model,
             storage: $this->storage,
+            year: $this->year,
+            mileage: $this->mileage,
+            sellerType: $this->sellerType,
+            store: $this->store,
             priceEur: $this->priceEur,
             fingerprint: $fingerprint,
         );
