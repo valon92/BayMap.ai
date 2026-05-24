@@ -35,11 +35,46 @@
       <p class="text-xl font-bold text-sky-400 mb-1">
         {{ formatPrice(product.price, product.currency) }}
       </p>
-      <p class="text-xs text-slate-400 mb-3 flex items-center gap-1">
+      <p class="text-xs text-slate-400 mb-3 flex items-center gap-1 flex-wrap">
         <span>{{ product.location }}</span>
         <span class="text-slate-600">·</span>
         <span class="text-slate-300">{{ product.source }}</span>
+        <span
+          v-if="product.offer_count > 1"
+          class="ml-1 px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 text-[10px] font-medium"
+        >
+          {{ product.offer_count }} {{ t('offers') }}
+        </span>
       </p>
+
+      <p
+        v-if="product.meta_label"
+        class="text-[11px] text-emerald-300/90 mb-2 leading-snug"
+      >
+        {{ product.meta_label }}
+      </p>
+
+      <div
+        v-if="alternateOffers.length"
+        class="mb-3 p-2.5 rounded-lg bg-white/5 border border-white/10 space-y-1.5"
+      >
+        <p class="text-[10px] uppercase tracking-wider text-slate-400">{{ t('compare_prices') }}</p>
+        <div
+          v-for="(offer, idx) in alternateOffers"
+          :key="idx"
+          class="flex items-center justify-between text-xs gap-2"
+        >
+          <span class="text-slate-300 truncate">{{ offer.source }}</span>
+          <a
+            :href="offer.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sky-400 hover:text-sky-300 whitespace-nowrap font-medium"
+          >
+            {{ formatPrice(offer.price, offer.currency) }} →
+          </a>
+        </div>
+      </div>
 
       <div class="mt-auto space-y-3">
         <div class="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
@@ -74,6 +109,12 @@ const scoreClass = computed(() => {
   if (s >= 90) return 'bg-emerald-500/80 text-white';
   if (s >= 80) return 'bg-sky-500/80 text-white';
   return 'bg-slate-600/80 text-white';
+});
+
+const alternateOffers = computed(() => {
+  const offers = props.product.offers || [];
+  if (offers.length <= 1) return [];
+  return offers.slice(1, 4);
 });
 
 function formatPrice(price, currency = 'EUR') {

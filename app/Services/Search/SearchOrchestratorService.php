@@ -13,7 +13,7 @@ use App\Services\Marketplace\MarketplaceAggregator;
 use App\Services\Marketplace\SerpApiShoppingService;
 
 /**
- * Orchestrates: Vision/Text AI → local→regional→global internet search → rank.
+ * Unified search pipeline: AI intent → federated multi-source search → aggregation → meta compare → exact rank.
  */
 class SearchOrchestratorService
 {
@@ -25,6 +25,8 @@ class SearchOrchestratorService
         private SearchExpansionService $expansion,
         private LocalSearchTierService $localTiers,
         private MarketplaceAggregator $aggregator,
+        private ProductAggregationService $aggregation,
+        private MetaSearchEngine $metaSearch,
         private ProductRankingService $ranking,
         private EbayOAuthService $ebayOAuth,
         private SerpApiShoppingService $serpApi,
@@ -112,10 +114,34 @@ class SearchOrchestratorService
         $expanded['location_scope'] = $locationScope;
         $dynamicFilters = $this->expansion->buildDynamicFilters($parsed, $locale);
 
-        // Step 3: Internet search (target country first, then broader)
+        // Step 3: Federated real-time search (multi-source, no local DB)
         $search = $this->aggregator->searchAll($parsed, $expanded, $searchGeo);
         $products = $search['results'];
         $sourceReport = $search['report'];
+
+        $pipeline[] = [
+            'step' => 'federated_search',
+            'status' => 'completed',
+            'label' => 'Queried '.count($sourceReport).' marketplace connectors in real time',
+        ];
+
+        // Step 4: Product aggregation — normalize, unify attributes, dedupe
+        $products = $this->aggregation->aggregate($products);
+
+        $pipeline[] = [
+            'step' => 'aggregate',
+            'status' => 'completed',
+            'label' => 'Standardized and deduplicated listings from all sources',
+        ];
+
+        // Step 5: Meta search — compare identical products across platforms
+        $products = $this->metaSearch->enrich($products);
+
+        $pipeline[] = [
+            'step' => 'meta_compare',
+            'status' => 'completed',
+            'label' => 'Compared prices and sellers across marketplaces',
+        ];
 
         $swissCarSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH'
             && CategoryCatalog::isAutomotive($parsed['category'] ?? '');
@@ -144,7 +170,7 @@ class SearchOrchestratorService
         $pipeline[] = [
             'step' => 'rank_results',
             'status' => 'completed',
-            'label' => 'Ranked best matches',
+            'label' => 'Ranked by exact intent match and AI relevance',
         ];
 
         $processingMs = (int) round((microtime(true) - $started) * 1000);
@@ -179,6 +205,17 @@ class SearchOrchestratorService
                     'ebay_live' => $this->ebayOAuth->isConfigured(),
                     'google_shopping_live' => $this->serpApi->isConfigured(),
                     'live_sources' => count(array_filter($sourceReport, fn ($r) => ($r['mode'] ?? '') === 'live')),
+                    'federated' => true,
+                    'connectors_queried' => count($sourceReport),
+                ],
+            ],
+            'platform' => [
+                'type' => 'federated_meta_search',
+                'positioning' => [
+                    'ai_semantic_search',
+                    'federated_product_discovery',
+                    'intelligent_marketplace_aggregator',
+                    'exact_product_discovery',
                 ],
             ],
             'pipeline' => $pipeline,

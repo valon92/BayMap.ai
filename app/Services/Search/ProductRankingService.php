@@ -6,10 +6,12 @@ use App\Support\CategoryCatalog;
 use App\Support\ShoeSize;
 
 /**
- * Ranks products by semantic relevance to the parsed AI query.
+ * Ranks products by exact intent match and semantic relevance (AI meta search).
  */
 class ProductRankingService
 {
+    public function __construct(private ExactMatchScoringService $exactMatch) {}
+
     /**
      * @param  array<int, array<string, mixed>>  $products
      * @param  array<string, mixed>  $parsed
@@ -39,9 +41,8 @@ class ProductRankingService
         $tags = array_map('mb_strtolower', $product['tags'] ?? []);
         $location = mb_strtolower($product['location'] ?? '');
 
-        if (! empty($parsed['brand']) && (str_contains($title, mb_strtolower($parsed['brand'])) || in_array(mb_strtolower($parsed['brand']), $tags, true))) {
-            $score += 12;
-        }
+        $score += $this->exactMatch->exactMatchBonus($product, $parsed);
+        $score += $this->exactMatch->locationPriorityBonus($product, $parsed);
 
         $score += $this->scoreModel($product, $parsed, $title, $tags);
         $score += $this->scoreYear($parsed, $product, $title);
@@ -88,6 +89,14 @@ class ProductRankingService
 
         if (! empty($product['sponsored'])) {
             $score += 3;
+        }
+
+        if (! empty($product['offer_count']) && (int) $product['offer_count'] > 1) {
+            $score += min(6, (int) $product['offer_count']);
+        }
+
+        if (! empty($product['price_spread_eur']) && (float) $product['price_spread_eur'] > 20) {
+            $score += 4;
         }
 
         return min(99, max(35, $score));
@@ -290,6 +299,13 @@ class ProductRankingService
         if (! empty($parsed['max_price']) && ! empty($product['price']) && (float) $product['price'] <= (float) $parsed['max_price']) {
             $cur = $product['currency'] ?? $parsed['currency'] ?? 'EUR';
             $reasons[] = 'within budget ('.number_format((float) $product['price'], 0).' '.$cur.')';
+        }
+
+        if (! empty($product['offer_count']) && (int) $product['offer_count'] > 1) {
+            $reasons[] = 'compared across '.(int) $product['offer_count'].' marketplaces';
+            if (! empty($product['price_spread_eur']) && (float) $product['price_spread_eur'] > 0) {
+                $reasons[] = 'save up to €'.number_format((float) $product['price_spread_eur'], 0).' vs other sellers';
+            }
         }
 
         if (! empty($parsed['color'])) {

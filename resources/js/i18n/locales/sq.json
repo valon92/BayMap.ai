@@ -123,6 +123,8 @@
   "location_from_ip": "Fillon pranë :city, :country sipas IP-së. Përmend një vend në kërkim për të filtruar diku tjetër.",
   "match": "përputhje",
   "buy": "Shiko listimin",
+  "offers": "oferta",
+  "compare_prices": "Krahaso çmimet në platforma të tjera",
   "why_ai": "Pse AI e zgjodhi",
   "filters": "Filtrat AI",
   "clear_filters": "Pastro filtrat",

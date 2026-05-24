@@ -123,6 +123,8 @@
   "location_from_ip": "Starting near :city, :country based on your IP. Name a country in your search to filter elsewhere.",
   "match": "match",
   "buy": "View listing",
+  "offers": "offers",
+  "compare_prices": "Compare prices on other platforms",
   "why_ai": "Why AI picked this",
   "filters": "AI Filters",
   "clear_filters": "Clear filters",

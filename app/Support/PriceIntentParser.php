@@ -15,11 +15,15 @@ class PriceIntentParser
         $lower = mb_strtolower($query);
         $currency = self::detectCurrency($lower);
 
-        if (preg_match('/(?:qmim\w*\s+max\s+)?(?:\bderi\b|\bunder\b|\bbis\b|\bmax\b|\bup to\b)\s*([\d\s.,\']+)(?:\s*k\b|\s*(?:euro|eur|ero|€|franga|franc|chf|usd|\$))?/ui', $lower, $m)) {
-            return self::buildLimit($m[1], str_contains($m[0], 'k') ? 'k' : '', $currency, $m[0]);
+        if (preg_match('/\b(?:deri|under|bis|up to)\s*([\d\s.,\']+?)\s*(?:euro|eur|ero|€|franga|franc|chf|usd|\$)\b/ui', $lower, $m)) {
+            return self::buildLimit($m[1], '', $currency, $m[0]);
         }
 
-        if (preg_match('/([\d\s.,\']+)(?:euro|eur|ero|€)/ui', $lower, $m)) {
+        if (preg_match('/(?:qmim\w*|çmim\w*|price|budget)\s+max\s*([\d\s.,\']+)/ui', $lower, $m)) {
+            return self::buildLimit($m[1], '', $currency, 'euro');
+        }
+
+        if (preg_match('/([\d\s.,\']+)\s*(?:euro|eur|ero|€)\b/ui', $lower, $m)) {
             return self::buildLimit($m[1], '', 'EUR', 'euro');
         }
 

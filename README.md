@@ -3,9 +3,10 @@
 **Describe it. Powerbook finds it.** · *Search less. Discover smarter.*  
 *Albanian: Trego çfarë kërkon — Powerbook e gjen.*
 
-Powerbook.ai is **not a traditional marketplace**. It is a **semantic product discovery engine**: users describe what they want in natural language (or a photo); the AI understands intent, expands meaning, searches sources across the internet, ranks by relevance and location, and **then** generates dynamic filters to refine — **no database, no registration, no login**.
+Powerbook.ai is **not a traditional marketplace**. It is a **federated AI meta search platform**: users describe what they want in natural language (or a photo); the AI understands intent, queries multiple marketplaces in real time, aggregates and compares results, ranks by exact match — **no database, no registration, no login**.
 
-Full product vision: **[docs/PLATFORM_VISION.md](docs/PLATFORM_VISION.md)**
+- Product vision: **[docs/PLATFORM_VISION.md](docs/PLATFORM_VISION.md)**
+- Federated architecture: **[docs/FEDERATED_SEARCH_ARCHITECTURE.md](docs/FEDERATED_SEARCH_ARCHITECTURE.md)**
 
 ## Stack
 
