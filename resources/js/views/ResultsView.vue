@@ -27,134 +27,162 @@
         <p class="text-xs text-slate-400">{{ t('searched_by_photo') }}</p>
       </div>
 
-      <div
-        v-if="data?.location_context?.summary"
-        class="glass rounded-xl p-4 mb-6 border border-emerald-500/20"
-      >
-        <p class="text-xs uppercase tracking-wider text-emerald-300 mb-2">{{ t('search_near_landmark') }}</p>
-        <p class="text-sm text-slate-300 leading-relaxed">{{ data.location_context.summary }}</p>
-        <div v-if="data.location_context.streets?.length" class="flex flex-wrap gap-1.5 mt-3">
+      <div class="results-insights mb-4">
+        <InsightScrollSection
+          v-if="data?.location_context?.summary"
+          :title="t('search_near_landmark')"
+          tone="emerald"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            </svg>
+          </template>
+          <span class="insight-chip insight-chip--card insight-chip--emerald">
+            {{ data.location_context.summary }}
+          </span>
           <span
             v-for="street in data.location_context.streets"
             :key="street"
-            class="px-2 py-0.5 rounded-md text-[11px] bg-white/5 text-slate-400 border border-white/10"
+            class="insight-chip insight-chip--emerald"
           >
             {{ street }}
           </span>
-        </div>
-      </div>
+        </InsightScrollSection>
 
-      <div
-        v-else-if="data?.vision?.description || data?.parsed?.description"
-        class="glass rounded-xl p-4 mb-6 border border-violet-500/20"
-      >
-        <p class="text-xs uppercase tracking-wider text-violet-300 mb-2">{{ t('ai_product_description') }}</p>
-        <p class="text-sm text-slate-300 leading-relaxed">
-          {{ data.vision?.description || data.parsed.description }}
-        </p>
-      </div>
-
-      <div
-        v-if="locationBanner"
-        class="glass rounded-xl p-4 mb-6 border"
-        :class="locationBanner.mode === 'query' ? 'border-sky-500/25' : 'border-white/10'"
-      >
-        <p class="text-xs uppercase tracking-wider mb-1.5" :class="locationBanner.mode === 'query' ? 'text-sky-300' : 'text-slate-400'">
-          {{ locationBanner.mode === 'query' ? t('location_from_query_title') : t('location_from_ip_title') }}
-        </p>
-        <p class="text-sm text-slate-300">{{ locationBanner.text }}</p>
-      </div>
-
-      <div v-if="!loading" class="mb-4 max-w-xl -mx-1 sm:mx-0 overflow-visible">
-        <SearchScopeChips
-          :model-value="activeScope"
-          @update:model-value="onScopeChange"
-        />
-        <p v-if="scopeSummary" class="text-[11px] text-slate-500 mt-2">{{ scopeSummary }}</p>
-      </div>
-
-      <div
-        v-if="data?.parsed && showParsedTags"
-        class="glass rounded-xl p-4 mb-6 flex flex-wrap gap-2 items-center"
-      >
-        <span class="text-xs text-slate-400">{{ t('parsed_intent') }}:</span>
-        <span class="px-2 py-1 rounded-lg bg-sky-500/20 text-sky-300 text-xs font-medium">
-          {{ categoryLabel(data.parsed.category) }}
-        </span>
-        <span
-          v-for="(val, key) in parsedTags"
-          :key="key"
-          class="px-2 py-1 rounded-lg bg-white/5 text-slate-300 text-xs"
+        <InsightScrollSection
+          v-else-if="productDescription"
+          :title="t('ai_product_description')"
+          tone="violet"
         >
-          {{ fieldLabel(key) }}: {{ formatTagValue(val) }}
-        </span>
-        <span v-if="showVisitorGeo" class="ml-auto text-xs text-slate-500">
-          {{ data.geo.city }}, {{ data.geo.country }}
-        </span>
-      </div>
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </template>
+          <span class="insight-chip insight-chip--card insight-chip--violet">
+            {{ productDescription }}
+          </span>
+        </InsightScrollSection>
 
-      <div
-        v-if="platformCapabilities.length"
-        class="glass rounded-xl p-4 mb-6 border border-violet-500/20"
-      >
-        <p class="text-xs uppercase tracking-wider text-violet-300 mb-3">{{ t('platform_engine') }}</p>
-        <div class="flex flex-wrap gap-2">
+        <InsightScrollSection
+          v-if="locationBanner"
+          :title="locationBannerTitle"
+          tone="sky"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
+            </svg>
+          </template>
+          <span class="insight-chip insight-chip--card">
+            {{ locationBanner.text }}
+          </span>
+        </InsightScrollSection>
+
+        <div v-if="!loading">
+          <SearchScopeChips
+            :model-value="activeScope"
+            @update:model-value="onScopeChange"
+          />
+          <p v-if="scopeSummary" class="text-[11px] text-slate-500 mt-2 px-1">{{ scopeSummary }}</p>
+        </div>
+
+        <InsightScrollSection
+          v-if="parsedChipItems.length"
+          :title="t('parsed_intent')"
+          tone="slate"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </template>
+          <span
+            v-for="(chip, idx) in parsedChipItems"
+            :key="idx"
+            class="insight-chip"
+            :class="chip.accent ? 'insight-chip--accent' : ''"
+          >
+            {{ chip.label }}
+          </span>
+        </InsightScrollSection>
+
+        <InsightScrollSection
+          v-if="platformCapabilities.length"
+          :title="t('platform_engine')"
+          tone="violet"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </template>
           <span
             v-for="cap in platformCapabilities"
             :key="cap"
-            class="px-2.5 py-1 rounded-lg text-xs bg-violet-500/10 text-violet-200 border border-violet-500/25"
+            class="insight-chip insight-chip--violet"
           >
             {{ t(`platform_caps.${cap}`) }}
           </span>
-        </div>
-      </div>
+        </InsightScrollSection>
 
-      <div
-        v-if="showKosovoMarketplaces"
-        class="glass rounded-xl p-4 mb-6 border border-emerald-500/20"
-      >
-        <p class="text-xs uppercase tracking-wider text-emerald-300 mb-3">{{ t('kosovo_marketplaces') }}</p>
-        <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+        <InsightScrollSection
+          v-if="showKosovoMarketplaces"
+          :title="t('kosovo_marketplaces')"
+          tone="emerald"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+          </template>
           <span
             v-for="label in kosovoMarketplaceLabels"
             :key="label"
-            class="px-2.5 py-1 rounded-lg text-xs bg-emerald-500/10 text-emerald-200 border border-emerald-500/25"
+            class="insight-chip insight-chip--emerald"
           >
             {{ label }}
           </span>
-        </div>
-      </div>
+        </InsightScrollSection>
 
-      <div
-        v-if="showDutchCarMarketplaces"
-        class="glass rounded-xl p-4 mb-6 border border-orange-500/20"
-      >
-        <p class="text-xs uppercase tracking-wider text-orange-300 mb-3">{{ t('dutch_car_marketplaces') }}</p>
-        <div class="flex flex-wrap gap-2">
+        <InsightScrollSection
+          v-if="showDutchCarMarketplaces"
+          :title="t('dutch_car_marketplaces')"
+          tone="orange"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </template>
           <span
             v-for="label in dutchMarketplaceLabels"
             :key="label"
-            class="px-2.5 py-1 rounded-lg text-xs bg-orange-500/10 text-orange-200 border border-orange-500/25"
+            class="insight-chip insight-chip--orange"
           >
             {{ label }}
           </span>
-        </div>
-      </div>
+        </InsightScrollSection>
 
-      <div
-        v-if="showSwissCarMarketplaces"
-        class="glass rounded-xl p-4 mb-6 border border-sky-500/20"
-      >
-        <p class="text-xs uppercase tracking-wider text-sky-300 mb-3">{{ t('swiss_car_marketplaces') }}</p>
-        <div class="flex flex-wrap gap-2">
+        <InsightScrollSection
+          v-if="showSwissCarMarketplaces"
+          :title="t('swiss_car_marketplaces')"
+          tone="sky"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </template>
           <span
             v-for="label in swissMarketplaceLabels"
             :key="label"
-            class="px-2.5 py-1 rounded-lg text-xs bg-sky-500/10 text-sky-200 border border-sky-500/25"
+            class="insight-chip insight-chip--sky"
           >
             {{ label }}
           </span>
-        </div>
+        </InsightScrollSection>
       </div>
 
       <div class="lg:grid lg:grid-cols-[minmax(200px,220px)_1fr] xl:grid-cols-[minmax(200px,240px)_1fr] gap-4 xl:gap-5">
@@ -207,6 +235,7 @@
 import { ref, computed, watch, onMounted, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../services/api';
+import InsightScrollSection from '../components/InsightScrollSection.vue';
 import ProductCard from '../components/ProductCard.vue';
 import DynamicFilters from '../components/DynamicFilters.vue';
 import ResultsSkeleton from '../components/ResultsSkeleton.vue';
@@ -314,6 +343,41 @@ const scopeSummary = computed(() => {
   const labels = tiers.map((t) => t.label).filter(Boolean);
   return labels.length ? `${t('search_area')}: ${labels.join(' → ')}` : '';
 });
+const locationBannerTitle = computed(() => {
+  if (!locationBanner.value) return '';
+  return locationBanner.value.mode === 'query'
+    ? t('location_from_query_title')
+    : t('location_from_ip_title');
+});
+
+const productDescription = computed(
+  () => data.value?.vision?.description || data.value?.parsed?.description || ''
+);
+
+const parsedChipItems = computed(() => {
+  if (!data.value?.parsed || !showParsedTags.value) return [];
+
+  const items = [
+    { label: categoryLabel(data.value.parsed.category), accent: true },
+  ];
+
+  for (const [key, val] of Object.entries(parsedTags.value)) {
+    items.push({
+      label: `${fieldLabel(key)}: ${formatTagValue(val)}`,
+      accent: false,
+    });
+  }
+
+  if (showVisitorGeo.value) {
+    items.push({
+      label: `${data.value.geo.city}, ${data.value.geo.country}`,
+      accent: false,
+    });
+  }
+
+  return items;
+});
+
 const uploadedPreview = ref(null);
 
 const activeScope = ref(api.getLocationScope());

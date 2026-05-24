@@ -208,6 +208,77 @@
     @apply w-1.5 h-1.5 rounded-full bg-white/90;
   }
 
+  .insight-strip {
+    @apply mb-3 sm:mb-5;
+  }
+
+  .insight-strip-header {
+    @apply flex items-center gap-2 mb-2.5;
+  }
+
+  .insight-strip-icon {
+    @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-md;
+  }
+
+  .insight-strip-icon--violet {
+    @apply bg-violet-500/10 text-violet-400;
+  }
+
+  .insight-strip-icon--sky {
+    @apply bg-sky-500/10 text-sky-400;
+  }
+
+  .insight-strip-icon--emerald {
+    @apply bg-emerald-500/10 text-emerald-400;
+  }
+
+  .insight-strip-icon--orange {
+    @apply bg-orange-500/10 text-orange-400;
+  }
+
+  .insight-strip-icon--slate {
+    @apply bg-slate-500/10 text-slate-400;
+  }
+
+  .insight-strip-label {
+    @apply text-xs font-medium text-slate-400 tracking-wide;
+  }
+
+  .insight-chip {
+    @apply shrink-0 snap-start inline-flex items-center
+      whitespace-nowrap px-3.5 py-2 rounded-full text-xs font-medium
+      text-slate-300 bg-slate-800/50 border border-white/[0.06];
+  }
+
+  .insight-chip--accent {
+    @apply bg-sky-500/15 text-sky-300 border-sky-500/25 font-semibold;
+  }
+
+  .insight-chip--violet {
+    @apply bg-violet-500/10 text-violet-200 border-violet-500/25;
+  }
+
+  .insight-chip--emerald {
+    @apply bg-emerald-500/10 text-emerald-200 border-emerald-500/25;
+  }
+
+  .insight-chip--orange {
+    @apply bg-orange-500/10 text-orange-200 border-orange-500/25;
+  }
+
+  .insight-chip--sky {
+    @apply bg-sky-500/10 text-sky-200 border-sky-500/25;
+  }
+
+  .insight-chip--card {
+    @apply whitespace-normal text-left leading-relaxed
+      max-w-[min(300px,88vw)] sm:max-w-md rounded-2xl py-2.5;
+  }
+
+  .results-insights {
+    @apply -mx-1 px-1 sm:mx-0 sm:px-0 space-y-1;
+  }
+
   .btn-search-spinner {
     @apply inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin;
   }
