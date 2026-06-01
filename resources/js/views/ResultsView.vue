@@ -9,6 +9,27 @@
           {{ t('results_for') }}
           <span class="text-sky-400">"{{ displayQuery }}"</span>
         </h1>
+
+        <form
+          class="mt-4 flex items-center gap-2 max-w-3xl"
+          @submit.prevent="submitEditedQuery"
+        >
+          <input
+            v-model="editableQuery"
+            type="text"
+            class="w-full px-4 py-2.5 rounded-xl bg-slate-900/40 border border-white/10 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+            :placeholder="t('placeholder')"
+            :aria-label="t('placeholder')"
+          />
+          <button
+            type="submit"
+            class="shrink-0 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-sky-600/90 to-violet-600/90 hover:from-sky-500 hover:to-violet-500 border border-white/10 transition-all active:scale-[0.98]"
+            :disabled="!editableQuery.trim() || editableQuery.trim() === String(route.query.q || '').trim()"
+          >
+            {{ t('search') }}
+          </button>
+        </form>
+
         <p v-if="data?.meta" class="text-sm text-slate-500 mt-2">
           <template v-if="results.length">
             {{ t('showing_results', { shown: results.length, total: formatTotal(data.meta.total) }) }}
@@ -263,6 +284,16 @@ const displayQuery = computed(() => {
   }
   return route.query.q || '';
 });
+
+const editableQuery = ref(String(route.query.q || ''));
+
+watch(
+  () => route.query.q,
+  (q) => {
+    editableQuery.value = String(q || '');
+  }
+);
+
 const results = computed(() => visibleResults.value);
 const hasMore = computed(() => Boolean(data.value?.meta?.has_more));
 const showKosovoMarketplaces = computed(() => {
@@ -421,6 +452,21 @@ function formatTotal(total) {
   const n = Number(total);
   if (!Number.isFinite(n) || n <= 0) return '0';
   return n.toLocaleString(locale.value === 'sq' ? 'sq-AL' : 'en-US');
+}
+
+function submitEditedQuery() {
+  const next = editableQuery.value.trim();
+  if (!next) return;
+  const current = String(route.query.q || '').trim();
+  if (next === current) return;
+
+  router.push({
+    path: '/search',
+    query: {
+      ...route.query,
+      q: next,
+    },
+  });
 }
 
 function onScopeChange(scope) {

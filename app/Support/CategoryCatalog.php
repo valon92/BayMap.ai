@@ -194,7 +194,7 @@ class CategoryCatalog
             ),
             'fashion' => array_merge(
                 self::sizeFilter($parsed, $sq),
-                self::select('brand', $sq ? 'Marka' : 'Brand', ['adidas', 'nike', 'puma', 'zara', 'h&m', 'gucci'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
+                self::select('brand', $sq ? 'Marka' : 'Brand', ['boss', 'hugo boss', 'adidas', 'nike', 'puma', 'zara', 'h&m', 'gucci'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
                 self::select('product_type', $sq ? 'Lloji' : 'Type', ['sneakers', 'shoes', 'dress', 'jacket', 'shirt', 'jeans'], $parsed['product_type'] ?? null),
                 self::select('gender', $sq ? 'Gjinia' : 'Gender', ['men', 'women', 'unisex', 'kids'], $parsed['gender'] ?? null),
                 self::colorFilter($parsed, $sq),
@@ -432,10 +432,13 @@ class CategoryCatalog
      */
     private static function priceFilter(array $parsed, bool $sq, int $min, int $max, ?string $label = null): array
     {
+        $currency = strtoupper((string) ($parsed['currency'] ?? 'EUR'));
+        $defaultLabel = ($sq ? 'Çmimi max' : 'Max price').' ('.$currency.')';
+
         return [[
             'key' => 'price',
             'type' => 'range',
-            'label' => $label ?? ($sq ? 'Çmimi max (€)' : 'Max price (€)'),
+            'label' => $label ?? $defaultLabel,
             'min' => $min,
             'max' => $max,
             'value' => $parsed['max_price'] ?? null,

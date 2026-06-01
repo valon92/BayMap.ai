@@ -20,7 +20,8 @@ class PriceIntentParser
         }
 
         if (preg_match('/(?:qmim\w*|çmim\w*|price|budget)\s+max\s*([\d\s.,\']+)/ui', $lower, $m)) {
-            return self::buildLimit($m[1], '', $currency, 'euro');
+            // Do not force EUR here; rely on detected currency from query context.
+            return self::buildLimit($m[1], '', $currency, '');
         }
 
         if (preg_match('/([\d\s.,\']+)\s*(?:euro|eur|ero|€)\b/ui', $lower, $m)) {
@@ -79,7 +80,10 @@ class PriceIntentParser
         $t = mb_strtolower(trim($token));
 
         return match (true) {
-            str_contains($t, 'franc'), $t === 'chf', str_contains($t, 'franga') => 'CHF',
+            str_contains($t, 'franc'),
+            str_contains($t, 'fr.'),
+            str_contains($t, 'chf'),
+            str_contains($t, 'franga') => 'CHF',
             str_contains($t, 'usd'), $t === '$' => 'USD',
             default => 'EUR',
         };

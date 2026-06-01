@@ -11,6 +11,7 @@ class FashionIntentParser
     private const BRANDS = [
         'puma', 'nike', 'adidas', 'reebok', 'new balance', 'jordan', 'converse',
         'vans', 'asics', 'fila', 'under armour', 'salomon', 'hoka',
+        'boss', 'hugo boss',
     ];
 
     /** @var array<string, string> */
