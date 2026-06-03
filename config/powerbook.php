@@ -4,13 +4,13 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Powerbook.ai Configuration
+    | BuyMap.ai Configuration
     |--------------------------------------------------------------------------
     */
 
-    'name' => 'Powerbook.ai',
-    'tagline' => 'Describe it. Powerbook finds it.',
-    'tagline_sq' => 'Trego çfarë kërkon — Powerbook e gjen.',
+    'name' => 'BuyMap.ai',
+    'tagline' => 'Describe it. BuyMap finds it.',
+    'tagline_sq' => 'Trego çfarë kërkon — BuyMap e gjen.',
 
     'geolocation' => [
         'providers' => ['ip-api.com', 'ipapi.co'],

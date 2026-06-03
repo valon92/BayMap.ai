@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Powerbook.ai API — Stateless, no database
+| BuyMap.ai API — Stateless, no database
 |--------------------------------------------------------------------------
 */
 

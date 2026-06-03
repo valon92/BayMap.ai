@@ -1,6 +1,6 @@
-# Powerbook.ai në cPanel (pa prekur arontrade.net)
+# BuyMap.ai në cPanel (pa prekur arontrade.net)
 
-Ky udhëzues është për llogarinë **aronqbxm** ku **arontrade.net** është domeni kryesor. Powerbook vendoset në **folder të veçantë** + **Addon Domain** — `public_html` i arontrade.net **nuk ndryshohet**.
+Ky udhëzues është për llogarinë **aronqbxm** ku **arontrade.net** është domeni kryesor. BuyMap vendoset në **folder të veçantë** + **Addon Domain** — `public_html` i arontrade.net **nuk ndryshohet**.
 
 ---
 
@@ -11,15 +11,15 @@ Ky udhëzues është për llogarinë **aronqbxm** ku **arontrade.net** është d
 | Domain | Vendndodhja tipike | Prek arontrade? |
 |--------|-------------------|-----------------|
 | `arontrade.net` | `/home/aronqbxm/public_html` | — (mos e prek) |
-| `powerbook.ai` | `/home/aronqbxm/powerbook.ai/public` | **Jo** (folder i ri) |
+| `buymap.ai` | `/home/aronqbxm/buymap.ai/public` | **Jo** (folder i ri) |
 
 Kërkesa: PHP **8.1+**, `composer`, leje shkrimi në `storage/` dhe `bootstrap/cache/`.
 
 ---
 
-## Hapi 1 — DNS në Namecheap (powerbook.ai)
+## Hapi 1 — DNS në Namecheap (buymap.ai)
 
-Te **Namecheap → Domain List → powerbook.ai → Advanced DNS**:
+Te **Namecheap → Domain List → buymap.ai → Advanced DNS**:
 
 | Type | Host | Value | TTL |
 |------|------|-------|-----|
@@ -36,17 +36,17 @@ Prit 15 minuta–24 orë që DNS të përhapet.
 
 1. Hyr në **cPanel** (si user `aronqbxm`).
 2. **Domains** → **Create A New Domain** (ose **Addon Domains**).
-3. Domain: `powerbook.ai`
+3. Domain: `buymap.ai`
 4. **Document Root** (e rëndësishme):
 
    ```
-   /home/aronqbxm/powerbook.ai/public
+   /home/aronqbxm/buymap.ai/public
    ```
 
    Mos përdor `public_html` të arontrade.net.  
-   cPanel mund të sugjerojë `powerbook.ai/public_html` — ndryshoje në strukturën Laravel: folderi `public` i projektit.
+   cPanel mund të sugjerojë `buymap.ai/public_html` — ndryshoje në strukturën Laravel: folderi `public` i projektit.
 
-5. Krijo domainin. Aktivizo **SSL** (AutoSSL / Let's Encrypt) për `powerbook.ai` dhe `www.powerbook.ai`.
+5. Krijo domainin. Aktivizo **SSL** (AutoSSL / Let's Encrypt) për `buymap.ai` dhe `www.buymap.ai`.
 
 **Kontroll:** Hap `arontrade.net` — duhet të funksionojë njësoj si më parë.
 
@@ -57,17 +57,17 @@ Prit 15 minuta–24 orë që DNS të përhapet.
 ### Opsioni A — Git (rekomandohet)
 
 1. cPanel → **Git Version Control** → **Create**.
-2. Clone URL: `https://github.com/valon92/Power-Book-AI-Agent-Search.git`
+2. Clone URL: `https://github.com/valon92/BayMap.ai.git`
 3. Repository Path:
 
    ```
-   /home/aronqbxm/powerbook.ai
+   /home/aronqbxm/buymap.ai
    ```
 
 4. Pas clone, në terminal cPanel (ose SSH):
 
    ```bash
-   cd /home/aronqbxm/powerbook.ai
+   cd /home/aronqbxm/buymap.ai
    composer install --no-dev --optimize-autoloader
    ```
 
@@ -90,20 +90,20 @@ Prit 15 minuta–24 orë që DNS të përhapet.
    ```
 
 2. ZIP projektin (pa `node_modules`, pa `.git`, **pa `.env`**).
-3. cPanel → **File Manager** → `/home/aronqbxm/powerbook.ai` → Upload & Extract.
+3. cPanel → **File Manager** → `/home/aronqbxm/buymap.ai` → Upload & Extract.
 
 ---
 
 ## Hapi 4 — Skedari `.env` në server
 
-Në `/home/aronqbxm/powerbook.ai/.env` (kopjo nga `.env.example`):
+Në `/home/aronqbxm/buymap.ai/.env` (kopjo nga `.env.example`):
 
 ```env
-APP_NAME=Powerbook.ai
+APP_NAME=BuyMap.ai
 APP_ENV=production
 APP_KEY=base64:...   # php artisan key:generate --show
 APP_DEBUG=false
-APP_URL=https://powerbook.ai
+APP_URL=https://buymap.ai
 
 LOG_CHANNEL=stack
 LOG_LEVEL=error
@@ -128,7 +128,7 @@ SERPAPI_KEY=
 Gjenero çelësin:
 
 ```bash
-cd /home/aronqbxm/powerbook.ai
+cd /home/aronqbxm/buymap.ai
 php artisan key:generate
 php artisan config:cache
 php artisan route:cache
@@ -151,7 +151,7 @@ chown -R aronqbxm:aronqbxm storage bootstrap/cache
 
 cPanel → **Select PHP Version** (ose **MultiPHP Manager**):
 
-- Zgjidh **PHP 8.1** ose **8.2** për domain `powerbook.ai`.
+- Zgjidh **PHP 8.1** ose **8.2** për domain `buymap.ai`.
 - Aktivizo: `curl`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `fileinfo`.
 
 **Mos ndrysho** versionin global në mënyrë që të prishë arontrade nëse ai kërkon version tjetër — vendos PHP vetëm për addon domain nëse ofrohet.
@@ -160,8 +160,8 @@ cPanel → **Select PHP Version** (ose **MultiPHP Manager**):
 
 ## Hapi 7 — Test
 
-1. https://powerbook.ai — faqja kryesore (Vue SPA).
-2. https://powerbook.ai/api/health — duhet JSON `ok`.
+1. https://buymap.ai — faqja kryesore (Vue SPA).
+2. https://buymap.ai/api/health — duhet JSON `ok`.
 3. https://arontrade.net — **i njëjti** si para deploy-it.
 
 ---
@@ -170,9 +170,9 @@ cPanel → **Select PHP Version** (ose **MultiPHP Manager**):
 
 | Mos bëj | Pse |
 |---------|-----|
-| Mos ngarko Powerbook në `public_html` | Është faqja e arontrade.net |
+| Mos ngarko BuyMap në `public_html` | Është faqja e arontrade.net |
 | Mos ndrysho `.htaccess` në rrënjë të arontrade | Mund ta prishë sitin ekzistues |
-| Mos fshi/substituo databazën e arontrade | Powerbook MVP nuk përdor DB |
+| Mos fshi/substituo databazën e arontrade | BuyMap MVP nuk përdor DB |
 | Mos përdor **Alias** që tregon në të njëjtin `public_html` | Të dy domainet do përplasen |
 
 ---
@@ -182,9 +182,9 @@ cPanel → **Select PHP Version** (ose **MultiPHP Manager**):
 ```
 /home/aronqbxm/
 ├── public_html/              ← arontrade.net (MOS PREK)
-├── powerbook.ai/             ← projekti Laravel
+├── buymap.ai/             ← projekti Laravel
 │   ├── app/
-│   ├── public/               ← Document Root i powerbook.ai
+│   ├── public/               ← Document Root i buymap.ai
 │   │   ├── index.php
 │   │   ├── favicon.ico
 │   │   ├── favicon-32x32.png
@@ -206,15 +206,15 @@ cPanel → **Select PHP Version** (ose **MultiPHP Manager**):
 | 500 Error | Kontrollo `storage/logs/laravel.log`, lejet, `APP_KEY` |
 | Faqe bosh / pa CSS | `npm run build`, kontrollo `public/build/` |
 | API kthen HTML | Document root duhet të jetë `public/`, jo rrënja e Laravel |
-| powerbook.ai nuk hapet | DNS A record → `162.0.232.61`, prit propagim |
-| arontrade u prish | Rikthe `public_html` nga backup cPanel; Powerbook duhet në folder tjetër |
+| buymap.ai nuk hapet | DNS A record → `162.0.232.61`, prit propagim |
+| arontrade u prish | Rikthe `public_html` nga backup cPanel; BuyMap duhet në folder tjetër |
 
 ---
 
 ## Përditësim i ardhshëm
 
 ```bash
-cd /home/aronqbxm/powerbook.ai
+cd /home/aronqbxm/buymap.ai
 git pull
 composer install --no-dev --optimize-autoloader
 npm run build   # ose build lokalisht dhe upload public/build
@@ -226,4 +226,4 @@ php artisan route:cache
 
 ## Mbështetje cPanel
 
-Nëse **Git** ose **PHP 8.2** nuk janë të aktivizuara, hap ticket te hosting provider: *"Enable Git + PHP 8.1 for addon domain powerbook.ai without modifying primary domain arontrade.net."*
+Nëse **Git** ose **PHP 8.2** nuk janë të aktivizuara, hap ticket te hosting provider: *"Enable Git + PHP 8.1 for addon domain buymap.ai without modifying primary domain arontrade.net."*

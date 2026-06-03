@@ -60,7 +60,7 @@ class ProductVisionService
         $hint = $userHint ? "User note: {$userHint}" : 'No extra text from user.';
 
         $decoded = $this->gemini->generateJson(
-            'You are Powerbook.ai visual product expert. Analyze shopping product photos and return JSON only.',
+            'You are BuyMap.ai visual product expert. Analyze shopping product photos and return JSON only.',
             [
                 ['text' => ParserPrompts::visionUser($lang, $locCtx, $hint)],
                 [
@@ -110,7 +110,7 @@ class ProductVisionService
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'You are Powerbook.ai visual product expert. Analyze shopping product photos and return JSON only.',
+                        'content' => 'You are BuyMap.ai visual product expert. Analyze shopping product photos and return JSON only.',
                     ],
                     [
                         'role' => 'user',

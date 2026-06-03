@@ -3,7 +3,7 @@
     <div class="max-w-7xl mx-auto">
       <div class="mb-6">
         <router-link to="/" class="text-sm text-slate-400 hover:text-sky-400 transition-colors">
-          ← Powerbook.ai
+          ← BuyMap.ai
         </router-link>
         <h1 class="text-2xl sm:text-3xl font-bold mt-4">
           {{ t('results_for') }}

@@ -1,6 +1,6 @@
-# Powerbook.ai — Platform Vision
+# BuyMap.ai — Platform Vision
 
-Powerbook.ai is **not a traditional marketplace**. It is an **AI-powered semantic product discovery engine**.
+BuyMap.ai is **not a traditional marketplace**. It is an **AI-powered semantic product discovery engine**.
 
 Users do **not** start with filters. They describe what they want in natural language. The AI agent understands intent, searches across sources, ranks matches, and **then** generates intelligent filters to refine results — live, without page reload.
 
@@ -90,8 +90,8 @@ AI descriptions adapt to the active UI locale where supported.
 
 | Language | Primary | Alternative |
 |----------|---------|-------------|
-| English | Describe it. Powerbook finds it. | Search less. Discover smarter. |
-| Albanian | Trego çfarë kërkon — Powerbook e gjen. | Kërko më pak. Zbulo më smart. |
+| English | Describe it. BuyMap finds it. | Search less. Discover smarter. |
+| Albanian | Trego çfarë kërkon — BuyMap e gjen. | Kërko më pak. Zbulo më smart. |
 
 ---
 
@@ -103,7 +103,7 @@ Deploy: cPanel addon domain, Render, Railway, Vercel/Netlify (static + API host)
 
 ---
 
-## What Powerbook is not
+## What BuyMap is not
 
 - Not a shop cart or checkout platform  
 - Not filter-first classifieds  

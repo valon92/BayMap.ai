@@ -2,7 +2,7 @@
 
 /**
  * Curated landmarks → nearby streets for local real-estate search (Kosovo cities).
- * Extend per city as Powerbook grows.
+ * Extend per city as BuyMap grows.
  */
 return [
     'ferizaj' => [

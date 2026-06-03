@@ -1,14 +1,14 @@
 {
-  "tagline": "Describe it. Powerbook finds it.",
+  "tagline": "Describe it. BuyMap finds it.",
   "tagline_alt": "Search less. Discover smarter.",
   "hero_ai_badge": "AI semantic search",
   "how": {
-    "badge_aria": "Learn how Powerbook.ai works",
+    "badge_aria": "Learn how BuyMap.ai works",
     "back_home": "Back to search",
-    "title": "How Powerbook.ai works",
+    "title": "How BuyMap.ai works",
     "subtitle": "A futuristic semantic discovery engine — not a traditional marketplace. Describe first; intelligent filters appear after AI understands you.",
-    "what_title": "What is Powerbook.ai?",
-    "what_body": "Powerbook is an AI product discovery engine. You do not start with filters — you describe what you want in your own words (or show a photo). The agent understands intent, expands meaning semantically, searches across the internet, ranks the best matches, and then generates dynamic filters to refine live. No database, no registration, no login.",
+    "what_title": "What is BuyMap.ai?",
+    "what_body": "BuyMap is an AI product discovery engine. You do not start with filters — you describe what you want in your own words (or show a photo). The agent understands intent, expands meaning semantically, searches across the internet, ranks the best matches, and then generates dynamic filters to refine live. No database, no registration, no login.",
     "principles_title": "Built for instant discovery",
     "principles": {
       "describe": "Natural language or photo — no forms first",
@@ -27,7 +27,7 @@
       "fashion": "EU size, brand, color, type, condition"
     },
     "serve_title": "What the platform delivers",
-    "serve_intro": "Powerbook is built for buyers who want clarity before they click through to a listing:",
+    "serve_intro": "BuyMap is built for buyers who want clarity before they click through to a listing:",
     "serve_items": {
       "intent": "Clear AI interpretation of what you asked for",
       "marketplaces": "Aggregated results from multiple marketplace sources",
@@ -94,8 +94,8 @@
   "back_to_top": "Back to top",
   "search": "Search",
   "searching": "AI is analyzing and searching the web…",
-  "search_pipeline": "How Powerbook searched",
-  "platform_engine": "Powerbook.ai engine",
+  "search_pipeline": "How BuyMap searched",
+  "platform_engine": "BuyMap.ai engine",
   "platform_caps": {
     "ai_semantic_search": "AI Semantic Search Engine",
     "federated_product_discovery": "Federated Product Discovery Platform",
@@ -153,7 +153,7 @@
   "search_area": "Search area",
   "search_near_landmark": "Search area (near landmark)",
   "affiliate_note": "Buy links may include affiliate partnerships (coming soon).",
-  "footer": "Powerbook.ai — Semantic shopping engine. No accounts. Real-time AI search.",
+  "footer": "BuyMap.ai — Semantic shopping engine. No accounts. Real-time AI search.",
   "categories": {
     "electronics_tech": "Electronics & Technology",
     "fashion": "Fashion & Clothing",

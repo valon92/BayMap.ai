@@ -1,9 +1,14 @@
-# Power-Book-AI-Agent-Search · Powerbook.ai
+# BuyMap.ai · AI Federated Product Search
 
-**Describe it. Powerbook finds it.** · *Search less. Discover smarter.*  
-*Albanian: Trego çfarë kërkon — Powerbook e gjen.*
+[![GitHub](https://img.shields.io/badge/GitHub-valon92%2FBayMap.ai-181717?logo=github)](https://github.com/valon92/BayMap.ai)
 
-Powerbook.ai is **not a traditional marketplace**. It is a **federated AI meta search platform**: users describe what they want in natural language (or a photo); the AI understands intent, queries multiple marketplaces in real time, aggregates and compares results, ranks by exact match — **no database, no registration, no login**.
+**Describe it. BuyMap finds it.** · *Search less. Discover smarter.*  
+*Albanian: Trego çfarë kërkon — BuyMap e gjen.*
+
+BuyMap.ai is **not a traditional marketplace**. It is a **federated AI meta search platform**: users describe what they want in natural language (or a photo); the AI understands intent, queries multiple marketplaces in real time, aggregates and compares results, ranks by exact match — **no database, no registration, no login**.
+
+- **Live demo / product:** [buymap.ai](https://buymap.ai)
+- **Repository:** [github.com/valon92/BayMap.ai](https://github.com/valon92/BayMap.ai)
 
 - Product vision: **[docs/PLATFORM_VISION.md](docs/PLATFORM_VISION.md)**
 - Federated architecture: **[docs/FEDERATED_SEARCH_ARCHITECTURE.md](docs/FEDERATED_SEARCH_ARCHITECTURE.md)**
@@ -21,6 +26,9 @@ Powerbook.ai is **not a traditional marketplace**. It is a **federated AI meta s
 ## Quick start
 
 ```bash
+git clone https://github.com/valon92/BayMap.ai.git
+cd BayMap.ai
+
 # Install PHP dependencies
 composer install
 
@@ -214,7 +222,7 @@ Laravel requires PHP runtime — use Render/Railway for the API. For split deplo
 - Set `VITE_API_URL=https://your-api.onrender.com/api` before `npm run build`
 - Optional static CDN for assets only
 
-## Domain (Namecheap → Powerbook.ai)
+## Domain (Namecheap → BuyMap.ai)
 
 ### Same cPanel as arontrade.net (shared hosting)
 
@@ -224,15 +232,19 @@ Full step-by-step: **[docs/DEPLOY_CPANEL.md](docs/DEPLOY_CPANEL.md)**
 
 Summary:
 1. Namecheap DNS: **A** `@` and `www` → server IP (`162.0.232.61`)
-2. cPanel → Addon domain `powerbook.ai` → document root `/home/aronqbxm/powerbook.ai/public`
+2. cPanel → Addon domain `buymap.ai` → document root `/home/aronqbxm/buymap.ai/public`
 3. Clone repo, `composer install --no-dev`, `npm run build`, configure `.env`
+
+```bash
+git clone https://github.com/valon92/BayMap.ai.git
+```
 4. SSL via AutoSSL in cPanel
 
 ### Cloud (Render / Railway)
 
 1. Add CNAME record: `@` or `www` → your Render/Railway host
 2. Enable HTTPS on host
-3. Set `APP_URL=https://powerbook.ai` in production `.env`
+3. Set `APP_URL=https://buymap.ai` in production `.env`
 
 ## Environment variables
 
@@ -250,4 +262,4 @@ Summary:
 
 ## License
 
-MIT — built as MVP for Powerbook.ai
+MIT — built as MVP for BuyMap.ai

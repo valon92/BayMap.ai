@@ -31,7 +31,7 @@ stop_vite_dev() {
 
 health_ok() {
   curl -sf "http://127.0.0.1:${PORT}/api/health" 2>/dev/null \
-    | grep -q '"app":"Powerbook.ai"'
+    | grep -q '"app":"BuyMap.ai"'
 }
 
 uses_vite_dev_urls() {
@@ -59,7 +59,7 @@ fi
 
 if lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
   if health_ok && ! uses_vite_dev_urls; then
-    echo "Powerbook is already running on port ${PORT}."
+    echo "BuyMap is already running on port ${PORT}."
     print_iphone_url
     exit 0
   fi
@@ -69,6 +69,6 @@ if lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1; then
   stop_lan_server
 fi
 
-echo "Starting Powerbook on 0.0.0.0:${PORT} ..."
+echo "Starting BuyMap on 0.0.0.0:${PORT} ..."
 print_iphone_url
 exec php artisan serve --host=0.0.0.0 --port="${PORT}"

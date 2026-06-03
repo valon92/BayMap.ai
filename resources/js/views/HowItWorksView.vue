@@ -11,8 +11,8 @@
         {{ t('how.back_home') }}
       </router-link>
 
-      <header class="text-center mb-12 sm:mb-14">
-        <p class="hero-badge mx-auto mb-5">
+      <header class="text-center flex flex-col items-center mb-12 sm:mb-14">
+        <p class="hero-badge mb-5">
           <span class="relative flex h-2 w-2">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-60" />
             <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />

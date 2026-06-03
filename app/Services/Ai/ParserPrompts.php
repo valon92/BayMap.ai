@@ -16,7 +16,7 @@ class ParserPrompts
         $categories = implode('|', array_merge(CategoryCatalog::slugs(), ['marketplace']));
 
         return <<<PROMPT
-You are Powerbook.ai shopping intent parser. Convert natural language product search queries into structured JSON.
+You are BuyMap.ai shopping intent parser. Convert natural language product search queries into structured JSON.
 
 Return ONLY valid JSON with this shape:
 {

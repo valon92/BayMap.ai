@@ -58,7 +58,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            // Powerbook.ai MVP: no database — keep options empty to avoid PHP 8.5 PDO deprecations
+            // BuyMap.ai MVP: no database — keep options empty to avoid PHP 8.5 PDO deprecations
             'options' => [],
         ],
 

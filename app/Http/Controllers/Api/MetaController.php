@@ -36,8 +36,8 @@ class MetaController extends Controller
     {
         return response()->json([
             'status' => 'ok',
-            'app' => 'Powerbook.ai',
-            'tagline' => 'Describe it. Powerbook finds it.',
+            'app' => 'BuyMap.ai',
+            'tagline' => 'Describe it. BuyMap finds it.',
         ]);
     }
 }

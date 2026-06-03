@@ -8,19 +8,19 @@ const routes = [
     path: '/',
     name: 'home',
     component: HomeView,
-    meta: { title: 'Powerbook.ai — AI Semantic Shopping' },
+    meta: { title: 'BuyMap.ai — AI Semantic Shopping' },
   },
   {
     path: '/how-it-works',
     name: 'how-it-works',
     component: HowItWorksView,
-    meta: { title: 'How It Works — Powerbook.ai' },
+    meta: { title: 'How It Works — BuyMap.ai' },
   },
   {
     path: '/search',
     name: 'search',
     component: ResultsView,
-    meta: { title: 'Search Results — Powerbook.ai' },
+    meta: { title: 'Search Results — BuyMap.ai' },
   },
 ];
 
@@ -33,15 +33,15 @@ const router = createRouter({
 });
 
 const titles = {
-  home: { en: 'Powerbook.ai — AI Semantic Shopping', sq: 'Powerbook.ai — Blerje semantike me AI' },
-  'how-it-works': { en: 'How It Works — Powerbook.ai', sq: 'Si funksionon — Powerbook.ai' },
-  search: { en: 'Search Results — Powerbook.ai', sq: 'Rezultatet — Powerbook.ai' },
+  home: { en: 'BuyMap.ai — AI Semantic Shopping', sq: 'BuyMap.ai — Blerje semantike me AI' },
+  'how-it-works': { en: 'How It Works — BuyMap.ai', sq: 'Si funksionon — BuyMap.ai' },
+  search: { en: 'Search Results — BuyMap.ai', sq: 'Rezultatet — BuyMap.ai' },
 };
 
 router.afterEach((to) => {
   const lang = document.documentElement.lang === 'sq' ? 'sq' : 'en';
   const routeTitles = titles[to.name];
-  document.title = routeTitles?.[lang] || routeTitles?.en || 'Powerbook.ai';
+  document.title = routeTitles?.[lang] || routeTitles?.en || 'BuyMap.ai';
 });
 
 export default router;

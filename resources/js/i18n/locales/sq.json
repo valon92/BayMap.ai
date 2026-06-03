@@ -1,14 +1,14 @@
 {
-  "tagline": "Trego çfarë kërkon — Powerbook e gjen.",
+  "tagline": "Trego çfarë kërkon — BuyMap e gjen.",
   "tagline_alt": "Kërko më pak. Zbulo më smart.",
   "hero_ai_badge": "Kërkim semantik me AI",
   "how": {
-    "badge_aria": "Mëso si funksionon Powerbook.ai",
+    "badge_aria": "Mëso si funksionon BuyMap.ai",
     "back_home": "Kthehu te kërkimi",
-    "title": "Si funksionon Powerbook.ai",
+    "title": "Si funksionon BuyMap.ai",
     "subtitle": "Motor futuristik zbulimi semantik — jo marketplace klasik. Së pari përshkruan; filtrat inteligjentë vijnë pasi AI të kupton.",
-    "what_title": "Çfarë është Powerbook.ai?",
-    "what_body": "Powerbook është motor zbulimi produktesh me AI. Nuk fillon me filtra — përshkruan me fjalët e tua (ose tregon foto). Agjenti kupton qëllimin, zgjeron kuptimin semantik, kërkon në internet, rendit përputhjet më të mira, pastaj gjeneron filtra dinamikë për përimtim live. Pa databazë, pa regjistrim, pa kyçje.",
+    "what_title": "Çfarë është BuyMap.ai?",
+    "what_body": "BuyMap është motor zbulimi produktesh me AI. Nuk fillon me filtra — përshkruan me fjalët e tua (ose tregon foto). Agjenti kupton qëllimin, zgjeron kuptimin semantik, kërkon në internet, rendit përputhjet më të mira, pastaj gjeneron filtra dinamikë për përimtim live. Pa databazë, pa regjistrim, pa kyçje.",
     "principles_title": "Për zbulim të menjëhershëm",
     "principles": {
       "describe": "Gjuhë natyrore ose foto — jo forma në fillim",
@@ -27,7 +27,7 @@
       "fashion": "Numri EU, markë, ngjyrë, lloj, gjendje"
     },
     "serve_title": "Çfarë ofron platforma",
-    "serve_intro": "Powerbook është ndërtuar për blerësit që duan qartësi para se të klikojnë listimin:",
+    "serve_intro": "BuyMap është ndërtuar për blerësit që duan qartësi para se të klikojnë listimin:",
     "serve_items": {
       "intent": "Interpretim i qartë AI i asaj që kërkove",
       "marketplaces": "Rezultate të grumbulluara nga burime të shumta marketplace",
@@ -94,8 +94,8 @@
   "back_to_top": "Kthehu lart",
   "search": "Kërko",
   "searching": "AI po analizon dhe po kërkon në internet…",
-  "search_pipeline": "Si kërkoi Powerbook",
-  "platform_engine": "Motori Powerbook.ai",
+  "search_pipeline": "Si kërkoi BuyMap",
+  "platform_engine": "Motori BuyMap.ai",
   "platform_caps": {
     "ai_semantic_search": "Motor Kërkimi Semantik AI",
     "federated_product_discovery": "Platformë Federated për Zbulim Produktesh",
@@ -153,7 +153,7 @@
   "search_area": "Zona e kërkimit",
   "search_near_landmark": "Zona e kërkimit (afër pikës referuese)",
   "affiliate_note": "Linqet e blerjes mund të përfshijnë partneritete affiliate (së shpejti).",
-  "footer": "Powerbook.ai — Motor kërkimi semantik. Pa llogari. Kërkim AI në kohë reale.",
+  "footer": "BuyMap.ai — Motor kërkimi semantik. Pa llogari. Kërkim AI në kohë reale.",
   "categories": {
     "electronics_tech": "Elektronikë & Teknologji",
     "fashion": "Fashion / Veshje",

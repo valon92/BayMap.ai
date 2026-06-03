@@ -3,7 +3,7 @@
 namespace App\Support;
 
 /**
- * Powerbook.ai category catalog — 20 verticals with category-specific filters.
+ * BuyMap.ai category catalog — 20 verticals with category-specific filters.
  */
 class CategoryCatalog
 {
@@ -286,7 +286,7 @@ class CategoryCatalog
                 self::rangeFilter('bedrooms', $sq ? 'Dhoma' : 'Bedrooms', 1, 8, $parsed['bedrooms'] ?? null),
                 self::select('listing_type', $sq ? 'Lloji' : 'Listing', ['rent', 'sale'], $parsed['listing_type'] ?? null),
                 self::select('property_type', $sq ? 'Prona' : 'Property', ['apartment', 'house', 'land', 'commercial'], $parsed['property_type'] ?? null),
-                self::priceFilter($parsed, $sq, 100, 500000, $sq ? 'Çmimi (€)' : 'Price (€)'),
+                self::priceFilter($parsed, $sq, 100, 500000),
             ),
             'industrial_b2b' => array_merge(
                 self::select('equipment_type', $sq ? 'Pajisja' : 'Equipment', ['machinery', 'tools', 'safety', 'packaging', 'logistics'], $parsed['equipment_type'] ?? null),

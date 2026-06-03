@@ -14,7 +14,7 @@ class GeminiTestCommand extends Command
 
     public function handle(GeminiApiService $gemini, AiProviderResolver $providers): int
     {
-        $this->info('Powerbook — Gemini API test');
+        $this->info('BuyMap — Gemini API test');
         $this->newLine();
 
         $key = config('gemini.api_key');
@@ -31,7 +31,7 @@ class GeminiTestCommand extends Command
         $this->newLine();
 
         $userText = $this->option('query')
-            ?: 'Kthe vetëm JSON: {"status":"ok","message":"Powerbook Gemini funksionon"}';
+            ?: 'Kthe vetëm JSON: {"status":"ok","message":"BuyMap Gemini funksionon"}';
 
         $this->comment('Sending test request…');
 

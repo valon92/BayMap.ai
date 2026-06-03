@@ -1,0 +1,36 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#020617"/>
+  <radialGradient id="glow1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 120) rotate(90) scale(320 520)">
+    <stop stop-color="#38bdf8" stop-opacity="0.28"/>
+    <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="glow2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(980 380) rotate(90) scale(260 420)">
+    <stop stop-color="#8b5cf6" stop-opacity="0.22"/>
+    <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1200" height="630" fill="url(#glow1)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+  <g transform="translate(520 175) scale(2.4)">
+    <defs>
+      <linearGradient id="pin" x1="6" y1="2" x2="42" y2="54" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#38bdf8"/>
+        <stop offset="0.42" stop-color="#2563eb"/>
+        <stop offset="1" stop-color="#7c3aed"/>
+      </linearGradient>
+    </defs>
+    <path d="M24 1.5C12.8 1.5 3.5 10.8 3.5 22c0 9.1 11.2 23.6 18.8 33.5 1 1.3 3.2 1.3 4.2 0C34.1 45.6 44.5 31.1 44.5 22 44.5 10.8 35.2 1.5 24 1.5Z" fill="url(#pin)"/>
+    <g stroke="white" stroke-linecap="round">
+      <line x1="24" y1="23" x2="14.5" y2="14" stroke-width="1.35" stroke-opacity="0.9"/>
+      <line x1="24" y1="23" x2="33.5" y2="14" stroke-width="1.35" stroke-opacity="0.9"/>
+      <line x1="24" y1="23" x2="12.5" y2="27" stroke-width="1.2" stroke-opacity="0.75"/>
+      <line x1="24" y1="23" x2="35.5" y2="27" stroke-width="1.2" stroke-opacity="0.75"/>
+    </g>
+    <circle cx="24" cy="23" r="3.25" fill="white"/>
+    <circle cx="14.5" cy="14" r="2.15" fill="white"/>
+    <circle cx="33.5" cy="14" r="2.15" fill="white"/>
+    <circle cx="12.5" cy="27" r="1.85" fill="white" fill-opacity="0.92"/>
+    <circle cx="35.5" cy="27" r="1.85" fill="white" fill-opacity="0.92"/>
+  </g>
+  <text x="600" y="420" text-anchor="middle" fill="#f8fafc" font-family="Inter, system-ui, sans-serif" font-size="72" font-weight="700" letter-spacing="-2">BuyMap<tspan fill="#38bdf8">.ai</tspan></text>
+  <text x="600" y="480" text-anchor="middle" fill="#94a3b8" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="500">AI Federated Product Search</text>
+</svg>
