@@ -53,12 +53,12 @@ onUnmounted(() => {
   @apply fixed z-50 bottom-6 right-4 sm:right-6
     flex flex-col items-center justify-center gap-0.5
     w-14 h-14 rounded-2xl
-    bg-gradient-to-br from-sky-500/90 to-violet-600/90
-    text-white shadow-lg shadow-sky-500/30
-    border border-white/20 backdrop-blur-md
+    bg-blue-600
+    text-white shadow-lg shadow-blue-500/30
+    border border-blue-500/20
     transition-all duration-300
-    hover:from-sky-400 hover:to-violet-500 hover:scale-105 hover:shadow-xl hover:shadow-sky-500/40
-    focus:outline-none focus:ring-2 focus:ring-sky-400/60;
+    hover:bg-blue-700 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/35
+    focus:outline-none focus:ring-2 focus:ring-blue-500/50;
 }
 
 .top-btn-enter-active,

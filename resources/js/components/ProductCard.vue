@@ -1,15 +1,13 @@
 <template>
-  <article
-    class="product-card group/card relative flex flex-col h-full overflow-hidden rounded-xl border border-white/[0.08] bg-slate-900/50 backdrop-blur-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-sky-500/30 hover:bg-slate-900/75 hover:shadow-[0_10px_32px_-14px_rgba(56,189,248,0.28)]"
-  >
-    <div class="relative aspect-square sm:aspect-[4/3] overflow-hidden bg-slate-950/60 shrink-0">
+  <article class="product-card group/card">
+    <div class="relative aspect-square sm:aspect-[4/3] overflow-hidden bg-slate-100 shrink-0">
       <img
         :src="product.image"
         :alt="displayTitle"
         class="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-[1.04]"
         loading="lazy"
       />
-      <div class="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/10 to-transparent pointer-events-none" />
+      <div class="absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-transparent pointer-events-none" />
 
       <span
         class="absolute top-1.5 right-1.5 px-1 py-px rounded text-[9px] font-semibold tabular-nums backdrop-blur-md"
@@ -33,7 +31,7 @@
 
       <span
         v-if="product.source"
-        class="absolute bottom-1.5 left-1.5 max-w-[calc(100%-2.5rem)] truncate px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/60 text-slate-200 backdrop-blur-sm border border-white/10"
+        class="absolute bottom-1.5 left-1.5 max-w-[calc(100%-2.5rem)] truncate px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-white/95 text-slate-700 shadow-sm border border-slate-200/80"
       >
         {{ product.source }}
       </span>
@@ -41,19 +39,19 @@
 
     <div class="relative flex flex-col flex-1 p-2 gap-1 min-h-0 pr-9">
       <h3
-        class="text-[11px] leading-[1.35] font-medium text-slate-100 line-clamp-2 tracking-tight"
+        class="text-[11px] leading-[1.35] font-medium text-slate-800 line-clamp-2 tracking-tight"
         :title="displayTitle"
       >
         {{ displayTitle }}
       </h3>
 
       <div class="flex items-center gap-1.5 flex-wrap mt-auto">
-        <p class="text-[13px] font-semibold text-sky-400 tabular-nums leading-none">
+        <p class="text-[13px] font-semibold text-blue-600 tabular-nums leading-none">
           {{ formatPrice(product.price, product.currency) }}
         </p>
         <span
           v-if="product.offer_count > 1"
-          class="px-1 py-px rounded text-[8px] font-medium text-sky-300/90 bg-sky-500/10 border border-sky-500/15"
+          class="px-1 py-px rounded text-[8px] font-medium text-blue-700 bg-blue-50 border border-blue-100"
         >
           +{{ product.offer_count - 1 }}
         </span>
@@ -71,7 +69,7 @@
       :href="product.url"
       target="_blank"
       rel="noopener noreferrer sponsored"
-      class="absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-slate-800/80 text-slate-400 backdrop-blur-sm transition-all duration-200 hover:border-sky-500/40 hover:bg-sky-500/15 hover:text-sky-300 group-hover/card:translate-x-0.5 group-hover/card:border-sky-500/30"
+      class="absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 group-hover/card:translate-x-0.5"
       :aria-label="listingAriaLabel"
       @click.stop
     >
@@ -93,9 +91,9 @@ const { t } = inject('i18n');
 
 const scoreClass = computed(() => {
   const s = props.product.match_score || 0;
-  if (s >= 90) return 'bg-emerald-500/85 text-white';
-  if (s >= 80) return 'bg-sky-500/85 text-white';
-  return 'bg-slate-700/90 text-slate-200';
+  if (s >= 90) return 'bg-emerald-500 text-white';
+  if (s >= 80) return 'bg-blue-600 text-white';
+  return 'bg-slate-600 text-white';
 });
 
 const displayTitle = computed(() => stripStoreFromTitle(props.product.title, props.product.source));

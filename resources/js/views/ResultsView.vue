@@ -2,12 +2,12 @@
   <section class="px-4 sm:px-6 lg:px-8 pb-16">
     <div class="max-w-7xl mx-auto">
       <div class="mb-6">
-        <router-link to="/" class="text-sm text-slate-400 hover:text-sky-400 transition-colors">
+        <router-link to="/" class="text-sm text-slate-500 hover:text-blue-600 transition-colors font-medium">
           ← BuyMap.ai
         </router-link>
-        <h1 class="text-2xl sm:text-3xl font-bold mt-4">
+        <h1 class="text-2xl sm:text-3xl font-bold mt-4 text-slate-900">
           {{ t('results_for') }}
-          <span class="text-sky-400">"{{ displayQuery }}"</span>
+          <span class="text-blue-600">"{{ displayQuery }}"</span>
         </h1>
 
         <form
@@ -17,13 +17,13 @@
           <input
             v-model="editableQuery"
             type="text"
-            class="w-full px-4 py-2.5 rounded-xl bg-slate-900/40 border border-white/10 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/40"
+            class="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
             :placeholder="t('placeholder')"
             :aria-label="t('placeholder')"
           />
           <button
             type="submit"
-            class="shrink-0 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-sky-600/90 to-violet-600/90 hover:from-sky-500 hover:to-violet-500 border border-white/10 transition-all active:scale-[0.98]"
+            class="shrink-0 px-4 py-2.5 rounded-xl font-semibold text-sm text-white bg-blue-600 hover:bg-blue-700 shadow-[0_4px_14px_-4px_rgba(37,99,235,0.45)] transition-all active:scale-[0.98]"
             :disabled="!editableQuery.trim() || editableQuery.trim() === String(route.query.q || '').trim()"
           >
             {{ t('search') }}
@@ -44,7 +44,7 @@
         v-if="uploadedPreview"
         class="glass rounded-xl p-3 mb-4 inline-flex items-center gap-3"
       >
-        <img :src="uploadedPreview" alt="" class="h-16 w-16 object-contain rounded-lg bg-white/10" />
+        <img :src="uploadedPreview" alt="" class="h-16 w-16 object-contain rounded-lg bg-slate-50 border border-slate-200" />
         <p class="text-xs text-slate-400">{{ t('searched_by_photo') }}</p>
       </div>
 
@@ -234,7 +234,7 @@
             <div v-if="hasMore" class="mt-8 flex flex-col items-center gap-2">
               <button
                 type="button"
-                class="px-6 py-3 rounded-xl font-medium text-sm bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 hover:border-sky-400/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-6 py-3 rounded-xl font-medium text-sm bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 :disabled="loadingMore"
                 @click="loadMore"
               >

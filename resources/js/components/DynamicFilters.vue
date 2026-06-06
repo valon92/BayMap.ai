@@ -1,11 +1,11 @@
 <template>
   <aside class="glass rounded-2xl p-4 lg:sticky lg:top-24 h-fit">
     <div class="flex items-center justify-between mb-4">
-      <h3 class="font-semibold text-white">{{ t('filters') }}</h3>
+      <h3 class="font-semibold text-slate-900">{{ t('filters') }}</h3>
       <button
         v-if="hasActive"
         type="button"
-        class="text-xs text-sky-400 hover:text-sky-300"
+        class="text-xs text-blue-600 hover:text-blue-700 font-medium"
         @click="clearAll"
       >
         {{ t('clear_filters') }}
@@ -14,12 +14,12 @@
 
     <div class="space-y-4">
       <div v-for="filter in filters" :key="filter.key" class="space-y-1.5">
-        <label class="text-xs text-slate-400 font-medium">{{ filter.label }}</label>
+        <label class="text-xs text-slate-500 font-medium">{{ filter.label }}</label>
 
         <select
           v-if="filter.type === 'select' || filter.type === 'sort'"
           :value="active[filter.key] ?? filter.value ?? (filter.type === 'sort' ? 'relevance' : '')"
-          class="w-full rounded-lg bg-white/5 border border-white/10 text-sm text-white px-3 py-2 focus:ring-sky-500/40"
+          class="w-full rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-900 px-3 py-2 focus:ring-blue-500/30 focus:border-blue-400"
           @change="update(filter.key, $event.target.value || null)"
         >
           <option v-if="filter.type !== 'sort'" value="">{{ t('filter_any') }}</option>
@@ -40,7 +40,7 @@
           :step="filter.step ?? 1"
           :value="active[filter.key] ?? filter.value ?? ''"
           :placeholder="filter.placeholder || '—'"
-          class="w-full rounded-lg bg-white/5 border border-white/10 text-sm text-white px-3 py-2 focus:ring-sky-500/40"
+          class="w-full rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-900 px-3 py-2 focus:ring-blue-500/30 focus:border-blue-400"
           @input="update(filter.key, $event.target.value === '' ? null : $event.target.value)"
         />
 
@@ -50,7 +50,7 @@
           :min="filter.min"
           :max="filter.max"
           :value="active[filter.key] ?? filter.value ?? filter.min"
-          class="w-full accent-sky-500"
+          class="w-full accent-blue-600"
           @input="update(filter.key, Number($event.target.value))"
         />
         <span v-if="filter.type === 'range' && (active[filter.key] ?? filter.value)" class="text-xs text-slate-500">

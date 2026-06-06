@@ -1,14 +1,14 @@
 <template>
   <div class="w-full max-w-3xl mx-auto mt-8">
-    <h3 class="text-sm font-medium text-slate-400 mb-3 text-center">{{ t('examples_title') }}</h3>
+    <h3 class="text-sm font-semibold text-slate-600 mb-3 text-center">{{ t('examples_title') }}</h3>
     <div class="flex flex-wrap justify-center gap-2">
       <button
         v-for="(ex, i) in examples"
         :key="i"
         type="button"
-        class="px-4 py-2.5 rounded-full text-sm text-slate-300
-          bg-slate-800/40 border border-white/[0.06] backdrop-blur-sm
-          hover:text-white hover:bg-white/[0.08] hover:border-white/12
+        class="px-4 py-2.5 rounded-full text-sm text-slate-700
+          bg-white border border-slate-200 shadow-sm
+          hover:text-slate-900 hover:border-blue-200 hover:shadow-md
           active:scale-[0.98] transition-all duration-200 text-left"
         @click="$emit('select', localizedExample(ex))"
       >

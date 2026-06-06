@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
-    <meta name="theme-color" content="#020617">
+    <meta name="theme-color" content="#f5f7fa">
 
     <title>BuyMap.ai — AI Semantic Shopping Search</title>
     <meta name="description" content="Describe what you want to buy in natural language. BuyMap.ai finds the best matches across marketplaces worldwide.">
@@ -31,7 +31,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <script type="application/ld+json">
     {
@@ -47,7 +47,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="antialiased bg-slate-950 text-slate-100">
+<body class="antialiased bg-[#f5f7fa] text-slate-900">
     <div id="app"></div>
 </body>
 </html>

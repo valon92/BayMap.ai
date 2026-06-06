@@ -1,6 +1,6 @@
 <template>
   <div class="w-full max-w-3xl mx-auto mt-10">
-    <h3 class="text-sm font-medium text-slate-400 mb-4 text-center">{{ t('trending_title') }}</h3>
+    <h3 class="text-sm font-semibold text-slate-600 mb-4 text-center">{{ t('trending_title') }}</h3>
     <div v-if="loading" class="flex justify-center gap-2">
       <div v-for="n in 4" :key="n" class="skeleton h-8 w-32 rounded-full" />
     </div>
@@ -12,7 +12,7 @@
         class="glass-card px-4 py-3 text-left flex items-center justify-between group"
         @click="$emit('select', item.query)"
       >
-        <span class="text-sm text-slate-200 group-hover:text-white truncate pr-2">{{ item.query }}</span>
+        <span class="text-sm text-slate-800 group-hover:text-blue-700 truncate pr-2 font-medium">{{ item.query }}</span>
         <span class="text-xs text-slate-500 shrink-0">{{ formatCount(item.count) }}</span>
       </button>
     </div>

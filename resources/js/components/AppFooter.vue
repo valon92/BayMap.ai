@@ -1,10 +1,10 @@
 <template>
-  <footer class="relative z-10 px-4 py-8 text-center text-sm text-slate-500 border-t border-white/5">
+  <footer class="relative z-10 px-4 py-8 text-center text-sm text-slate-500 border-t border-slate-200/80 bg-white/50">
     <p>{{ t('footer') }}</p>
     <p class="mt-3">
       <router-link
         to="/how-it-works"
-        class="text-sky-400/80 hover:text-sky-300 transition-colors"
+        class="text-blue-600 hover:text-blue-700 transition-colors font-medium"
       >
         {{ t('how.title') }}
       </router-link>

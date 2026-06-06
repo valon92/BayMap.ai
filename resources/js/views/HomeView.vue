@@ -13,8 +13,8 @@
           :aria-label="t('how.badge_aria')"
         >
           <span class="relative flex h-2 w-2">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-60" />
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-50" />
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
           </span>
           {{ t('hero_ai_badge') }}
           <svg class="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -23,7 +23,7 @@
         </router-link>
       </div>
 
-      <p class="tagline-hero text-slate-300/90 mb-2 max-w-xl mx-auto w-full px-1 sm:px-0 sm:text-xl font-medium">
+      <p class="tagline-hero mb-2 max-w-xl mx-auto w-full px-1 sm:px-0">
         {{ tagline }}
       </p>
       <p

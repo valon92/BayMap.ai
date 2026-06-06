@@ -24,7 +24,7 @@
             :key="opt.code"
             type="button"
             class="px-2.5 sm:px-3 py-1 rounded-md transition-colors shrink-0"
-            :class="locale === opt.code ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'"
+            :class="locale === opt.code ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'"
             :title="opt.code === 'en' ? 'English' : geo?.country"
             @click="setLocale(opt.code)"
           >
