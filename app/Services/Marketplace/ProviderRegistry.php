@@ -8,6 +8,7 @@ use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
+use App\Support\GermanCarMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
@@ -39,6 +40,7 @@ class ProviderRegistry
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),
             $this->dutchAutomotiveProviders(),
+            $this->germanAutomotiveProviders(),
             $this->kosovoMarketplaceProviders(),
         );
 
@@ -60,6 +62,7 @@ class ProviderRegistry
         $targets = $expandedFilters['marketplaces'] ?? [];
         $swissCar = $countryCode === 'CH' && CategoryCatalog::isAutomotive($category);
         $dutchCar = $countryCode === 'NL' && CategoryCatalog::isAutomotive($category) && ! empty($parsedQuery['search_target']);
+        $germanCar = $countryCode === 'DE' && CategoryCatalog::isAutomotive($category) && ! empty($parsedQuery['search_target']);
         $kosovoLocal = $countryCode === 'XK';
 
         return array_values(array_filter($this->all(), function (FederatedSearchProviderInterface $provider) use (
@@ -68,6 +71,7 @@ class ProviderRegistry
             $targets,
             $swissCar,
             $dutchCar,
+            $germanCar,
             $kosovoLocal,
             $geo
         ) {
@@ -88,6 +92,17 @@ class ProviderRegistry
                     return false;
                 }
                 if (in_array($provider->sourceKey(), ['ebay', 'google_shopping', 'mobile.de', 'autoscout24', 'facebook_marketplace'], true)) {
+                    return false;
+                }
+            }
+
+            if ($germanCar) {
+                $germanKeys = $targets ?: GermanCarMarketplaces::keys();
+                if (! GermanCarMarketplaces::isTarget($provider->sourceKey(), $germanKeys)
+                    && ! in_array($provider->sourceKey(), $germanKeys, true)) {
+                    return false;
+                }
+                if (in_array($provider->sourceKey(), ['ebay', 'google_shopping', 'facebook_marketplace', 'amazon', 'etsy'], true)) {
                     return false;
                 }
             }
@@ -118,7 +133,7 @@ class ProviderRegistry
                 }
             }
 
-            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $kosovoLocal)) {
+            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $kosovoLocal)) {
                 return false;
             }
 
@@ -129,13 +144,17 @@ class ProviderRegistry
     /**
      * @param  array<int, string>  $targets
      */
-    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $kosovoLocal = false): bool
+    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $kosovoLocal = false): bool
     {
         if ($swissCar && SwissCarMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
         }
 
         if ($dutchCar && DutchCarMarketplaces::isTarget($sourceKey, $targets)) {
+            return true;
+        }
+
+        if ($germanCar && GermanCarMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
         }
 
@@ -233,6 +252,30 @@ class ProviderRegistry
                 priority: 75,
                 categories: ['automotive'],
                 countries: ['NL'],
+            );
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array<int, MockSearchProvider>
+     */
+    private function germanAutomotiveProviders(): array
+    {
+        $providers = [];
+
+        foreach (GermanCarMarketplaces::keys() as $key) {
+            if (isset(config('marketplaces.providers', [])[$key])) {
+                continue;
+            }
+
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: GermanCarMarketplaces::label($key),
+                priority: 72,
+                categories: ['automotive'],
+                countries: ['DE'],
             );
         }
 

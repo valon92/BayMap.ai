@@ -3,6 +3,9 @@
 namespace App\Services\Search;
 
 use App\Support\CategoryCatalog;
+use App\Support\CountryMatcher;
+use App\Support\ElectronicsIntentParser;
+use App\Support\KosovoMarketplaces;
 use App\Support\ShoeSize;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
@@ -107,22 +110,43 @@ class SearchOrchestratorService
             'label' => 'AI understood product attributes',
         ];
 
-        // Step 2: Location tiers — buyer's target country overrides visitor IP when specified
+        // Step 2: Location tiers + intelligent agent activation
         $locationTiers = $this->localTiers->tiersForSearch($searchGeo, $parsed, $locationScope);
         $expanded = $this->expansion->expand($parsed, $searchGeo, $locale);
         $expanded['location_tiers'] = $locationTiers;
         $expanded['location_scope'] = $locationScope;
         $dynamicFilters = $this->expansion->buildDynamicFilters($parsed, $locale);
 
-        // Step 3: Federated real-time search (multi-source, no local DB)
+        // Step 3: Federated search — dynamic agent pool (3–6 agents), parallel execution
         $search = $this->aggregator->searchAll($parsed, $expanded, $searchGeo);
         $products = $search['results'];
         $sourceReport = $search['report'];
+        $agentPlan = $search['agent_plan'] ?? ['activated' => [], 'source_keys' => [], 'final_level' => 'country'];
+        $valonPlan = $search['valon'] ?? [];
+
+        $expanded['agent_plan'] = $agentPlan;
+        $expanded['activated_agents'] = $agentPlan['activated'] ?? [];
+        $expanded['activated_sources'] = $agentPlan['source_keys'] ?? [];
+        $expanded['valon'] = $valonPlan;
+
+        $workerCount = $valonPlan['workers_spawned'] ?? count($agentPlan['activated'] ?? []);
+
+        $pipeline[] = [
+            'step' => 'valon_orchestrate',
+            'status' => 'completed',
+            'label' => 'Valon AI spawned '.$workerCount.' parallel workers',
+        ];
+
+        $pipeline[] = [
+            'step' => 'agent_activation',
+            'status' => 'completed',
+            'label' => 'Task split across '.count($valonPlan['workers'] ?? []).' platform roles',
+        ];
 
         $pipeline[] = [
             'step' => 'federated_search',
             'status' => 'completed',
-            'label' => 'Queried '.count($sourceReport).' marketplace connectors in real time',
+            'label' => 'Valon Workers searched in parallel (location: '.($valonPlan['final_location_level'] ?? $agentPlan['final_level'] ?? 'country').')',
         ];
 
         // Step 4: Product aggregation — normalize, unify attributes, dedupe
@@ -217,6 +241,16 @@ class SearchOrchestratorService
                     'federated' => true,
                     'connectors_queried' => count($sourceReport),
                 ],
+                'agent_plan' => $agentPlan,
+                'agents_activated' => count($agentPlan['activated'] ?? []),
+                'location_expansion_level' => $valonPlan['final_location_level'] ?? $agentPlan['final_level'] ?? null,
+                'valon' => ($valonPlan !== [] && $valonPlan !== null) ? [
+                    'orchestrator' => $valonPlan['orchestrator'] ?? 'Valon AI',
+                    'workers_spawned' => $valonPlan['workers_spawned'] ?? 0,
+                    'workers' => $valonPlan['workers'] ?? [],
+                    'results_merged' => $valonPlan['results_merged'] ?? 0,
+                    'intent' => $valonPlan['intent'] ?? null,
+                ] : null,
             ],
             'platform' => [
                 'type' => 'federated_meta_search',
@@ -250,7 +284,21 @@ class SearchOrchestratorService
             if (isset($filters['price_max']) && ($product['price'] ?? PHP_INT_MAX) > (float) $filters['price_max']) {
                 return false;
             }
-            if (isset($filters['year']) && $filters['year'] !== '') {
+            if (isset($filters['year_min']) && $filters['year_min'] !== '') {
+                $minYear = (int) $filters['year_min'];
+                $productYear = isset($product['year']) ? (int) $product['year'] : null;
+                if ($productYear !== null && $productYear < $minYear) {
+                    return false;
+                }
+            }
+            if (isset($filters['year_max']) && $filters['year_max'] !== '') {
+                $maxYear = (int) $filters['year_max'];
+                $productYear = isset($product['year']) ? (int) $product['year'] : null;
+                if ($productYear !== null && $productYear > $maxYear) {
+                    return false;
+                }
+            }
+            if (isset($filters['year']) && $filters['year'] !== '' && ! isset($filters['year_min']) && ! isset($filters['year_max'])) {
                 $wantedYear = (int) $filters['year'];
                 $productYear = isset($product['year']) ? (int) $product['year'] : null;
                 if ($productYear !== null) {
@@ -295,28 +343,11 @@ class SearchOrchestratorService
                 }
             }
             if (isset($filters['country']) && $filters['country'] !== '') {
-                $needle = mb_strtolower((string) $filters['country']);
-                if (str_contains($needle, 'world') || str_contains($needle, 'universal') || str_contains($needle, 'bot')) {
-                    return true;
-                }
-                $loc = mb_strtolower($product['location'] ?? '');
-                $matches = str_contains($loc, $needle);
-                if (str_contains($needle, 'switzerland') || $needle === 'ch') {
-                    $matches = $matches || (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/', $loc);
-                }
-                if (str_contains($needle, 'netherlands') || str_contains($needle, 'holland') || $needle === 'nl') {
-                    $matches = $matches || (bool) preg_match('/netherlands|holland|nederland|amsterdam|rotterdam|utrecht|den haag|eindhoven|groningen/', $loc);
-                }
-                if (str_contains($needle, 'united states') || $needle === 'us' || str_contains($needle, 'usa')) {
-                    $matches = $matches || (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc);
-                }
-                if (str_contains($needle, 'uae') || str_contains($needle, 'emirates') || str_contains($needle, 'dubai')) {
-                    $matches = $matches || (bool) preg_match('/uae|dubai|abu dhabi|emirates/', $loc);
-                }
-                if (str_contains($needle, 'united kingdom') || $needle === 'uk' || str_contains($needle, 'england')) {
-                    $matches = $matches || (bool) preg_match('/united kingdom|england|london|manchester|uk/', $loc);
-                }
-                if (! $matches) {
+                if (! CountryMatcher::locationMatchesFilter(
+                    (string) ($product['location'] ?? ''),
+                    (string) $filters['country'],
+                    isset($product['country_code']) ? (string) $product['country_code'] : null,
+                )) {
                     return false;
                 }
             }
@@ -328,7 +359,7 @@ class SearchOrchestratorService
             }
             if (isset($filters['size']) && $filters['size'] !== '' && ! ShoeSize::productHasSize($product, (string) $filters['size'])) {
                 // Keep Kosovo local stores visible — buyer verifies sizes on the shop page
-                if (($product['store'] ?? '') !== 'driloni') {
+                if (! KosovoMarketplaces::isKosovoPlatform((string) ($product['store'] ?? ''))) {
                     return false;
                 }
             }
@@ -337,8 +368,18 @@ class SearchOrchestratorService
                     return false;
                 }
             }
+            if (isset($filters['gender']) && $filters['gender'] !== '') {
+                if (! $this->productMatchesGender($product, (string) $filters['gender'])) {
+                    return false;
+                }
+            }
             if (isset($filters['product_type']) && $filters['product_type'] !== '') {
-                if (! $this->productMatchesType($product, (string) $filters['product_type'])) {
+                if (! ElectronicsIntentParser::productMatchesType($product, (string) $filters['product_type'])) {
+                    return false;
+                }
+            }
+            if (! empty($parsed['features']) && is_array($parsed['features'])) {
+                if (! ElectronicsIntentParser::productMatchesFeatures($product, $parsed['features'])) {
                     return false;
                 }
             }
@@ -376,6 +417,25 @@ class SearchOrchestratorService
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private function productMatchesGender(array $product, string $gender): bool
+    {
+        $gender = mb_strtolower(trim($gender));
+        $itemGender = mb_strtolower((string) ($product['gender'] ?? ''));
+
+        if ($itemGender === '') {
+            return true;
+        }
+
+        return match ($gender) {
+            'male', 'men' => in_array($itemGender, ['male', 'men', 'unisex'], true),
+            'female', 'women' => in_array($itemGender, ['female', 'women', 'unisex'], true),
+            default => $itemGender === $gender || $itemGender === 'unisex',
+        };
     }
 
     /**

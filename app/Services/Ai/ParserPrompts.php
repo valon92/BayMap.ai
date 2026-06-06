@@ -27,6 +27,8 @@ Return ONLY valid JSON with this shape:
   "brand": null,
   "model": null,
   "year": null,
+  "year_min": null,
+  "year_max": null,
   "color": null,
   "max_km": null,
   "transmission": null,
@@ -91,14 +93,15 @@ Rules:
 - description: always in {$lang} when provided
 - Omit null fields or use null explicitly
 - features: array of strings e.g. long_battery, quiet_cooling, gaming
+- electronics: "laptop gaming" / "kompjuter gaming" => product_type "laptop" + features ["gaming", ...]. Never return phones for laptop queries.
 - real_estate: "banes"/apartment near a landmark (e.g. gjykata in Ferizaj) => category real_estate, city, landmark, min_sqm; nearby_streets if you know them
 - min_sqm: integer area (120m => 120)
 - Albanian: banes=apartment, gjykata=courthouse, Ferizaj=city
 - fashion/shoes: size or shoe_size as EU number string (e.g. 42, 42.5, 43) when mentioned
 - fashion: extract brand (puma, nike), color (Albanian: kalter/kaltër=blue, bardh/bardhë=white, zezë=black), product_type (patika=sneakers). Multiple colors => color "multicolor"
-- cars: model must match query exactly (Q5 not A6). year as integer.
+- cars: model must match query exactly (Q5 not A6). year as integer; year range "2016-2018" => year_min 2016, year_max 2018
 - search_country / search_country_code: ONLY when buyer names where to buy. "ne zvicerr" => CH. If no place in query, leave null (platform uses visitor IP).
-- max_price + currency: "deri 17500 franga" => max_price 17500, currency CHF. "under 20k euro" => EUR
+- max_price + currency: "deri 17500 franga" => max_price 17500, currency CHF. "under 20k euro" => EUR. Albanian "22 mij euro" => max_price 22000
 - Do NOT set country to visitor hint when query names another country
 - Do NOT infer search_country from visitor IP — that is handled separately
 PROMPT;

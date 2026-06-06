@@ -5,6 +5,8 @@ namespace App\Services\Marketplace;
 use App\Contracts\MarketplaceSearchInterface;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
+use App\Support\ElectronicsIntentParser;
+use App\Support\GermanCarMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 use Illuminate\Support\Facades\File;
@@ -41,6 +43,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         if (! empty($marketplaces)
             && ! SwissCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! DutchCarMarketplaces::isTarget($this->source, $marketplaces)
+            && ! GermanCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! KosovoMarketplaces::isTarget($this->source, $marketplaces)) {
             $sourceKey = $this->mapSourceToKey();
             $allowed = false;
@@ -64,7 +67,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             $item['url'] = $this->listingUrl($item['url'] ?? null);
             $item['affiliate_ready'] = true;
             $item['sponsored'] = (bool) ($item['sponsored'] ?? false);
-            $item['live'] = $this->source === 'driloni';
+            $item['live'] = false;
 
             return $item;
         }, $dataset);
@@ -144,7 +147,16 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                     }
                 }
 
-                if (! empty($parsed['year']) && ! empty($item['year']) && (int) $item['year'] !== (int) $parsed['year']) {
+                if (! empty($parsed['year_min']) || ! empty($parsed['year_max'])) {
+                    $minYear = (int) ($parsed['year_min'] ?? $parsed['year'] ?? 0);
+                    $maxYear = (int) ($parsed['year_max'] ?? $parsed['year'] ?? $minYear);
+                    if (! empty($item['year'])) {
+                        $itemYear = (int) $item['year'];
+                        if ($itemYear < $minYear || $itemYear > $maxYear) {
+                            return false;
+                        }
+                    }
+                } elseif (! empty($parsed['year']) && ! empty($item['year']) && (int) $item['year'] !== (int) $parsed['year']) {
                     return false;
                 }
             }
@@ -155,6 +167,54 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 $itemCurrency = $item['currency'] ?? 'EUR';
                 $queryCurrency = $parsed['currency'] ?? $itemCurrency;
                 if ($itemCurrency === $queryCurrency && $price > $limit) {
+                    return false;
+                }
+            }
+
+            if (CategoryCatalog::isLocalFashion($parsed['category'] ?? '')) {
+                if (! empty($parsed['brand']) && ! $this->matchesFashionBrand($item, (string) $parsed['brand'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['size']) && ! empty($item['sizes'])) {
+                    $wanted = (string) $parsed['size'];
+                    $sizes = array_map('strval', $item['sizes']);
+                    if (! in_array($wanted, $sizes, true) && ! KosovoMarketplaces::isKosovoPlatform((string) ($item['store'] ?? ''))) {
+                        return false;
+                    }
+                }
+
+                if (! empty($parsed['gender']) && ! empty($item['gender'])) {
+                    $wanted = mb_strtolower((string) $parsed['gender']);
+                    $itemGender = mb_strtolower((string) $item['gender']);
+                    if ($wanted === 'male' || $wanted === 'men') {
+                        if (! in_array($itemGender, ['male', 'men', 'unisex'], true)) {
+                            return false;
+                        }
+                    } elseif ($wanted === 'female' || $wanted === 'women') {
+                        if (! in_array($itemGender, ['female', 'women', 'unisex'], true)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            if (CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+                if (! empty($parsed['product_type'])
+                    && ! ElectronicsIntentParser::productMatchesType($item, (string) $parsed['product_type'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['features']) && is_array($parsed['features'])
+                    && ! ElectronicsIntentParser::productMatchesFeatures($item, $parsed['features'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['brand']) && ! $this->matchesElectronicsBrand($item, (string) $parsed['brand'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['storage']) && ! $this->matchesStorage($item, (string) $parsed['storage'])) {
                     return false;
                 }
             }
@@ -173,7 +233,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         return match (strtoupper($code)) {
             'CH' => (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/', $loc),
             'XK' => str_contains($loc, 'kosovo') || str_contains($loc, 'pristina') || str_contains($loc, 'ferizaj'),
-            'DE' => str_contains($loc, 'germany') || str_contains($loc, 'munich') || str_contains($loc, 'berlin') || str_contains($loc, 'stuttgart'),
+            'DE' => (bool) preg_match('/germany|deutschland|munich|münchen|berlin|frankfurt|hamburg|stuttgart|cologne|köln|düsseldorf|dusseldorf|hannover|leipzig|dresden/', $loc),
             'AL' => str_contains($loc, 'albania') || str_contains($loc, 'tirana'),
             'NL' => (bool) preg_match('/netherlands|holland|nederland|amsterdam|rotterdam|utrecht|den haag|eindhoven|groningen|tilburg|breda|almere|haarlem/i', $loc),
             'US' => (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc),
@@ -207,6 +267,61 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         return false;
     }
 
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function matchesFashionBrand(array $item, string $brand): bool
+    {
+        $brand = mb_strtolower($brand);
+        $title = mb_strtolower($item['title'] ?? '');
+        $tags = array_map('mb_strtolower', $item['tags'] ?? []);
+        $itemBrand = mb_strtolower((string) ($item['brand'] ?? ''));
+
+        return $itemBrand === $brand
+            || str_contains($title, $brand)
+            || in_array($brand, $tags, true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function matchesElectronicsBrand(array $item, string $brand): bool
+    {
+        $brand = mb_strtolower($brand);
+        $title = mb_strtolower($item['title'] ?? '');
+        $tags = array_map('mb_strtolower', $item['tags'] ?? []);
+        $itemBrand = mb_strtolower((string) ($item['brand'] ?? ''));
+        $needles = match ($brand) {
+            'apple' => ['apple', 'macbook'],
+            'asus' => ['asus', 'rog'],
+            'lenovo' => ['lenovo', 'legion'],
+            'hp' => ['hp', 'omen'],
+            'acer' => ['acer', 'predator'],
+            'msi' => ['msi'],
+            default => [$brand],
+        };
+
+        foreach ($needles as $needle) {
+            if ($itemBrand === $needle || str_contains($title, $needle) || in_array($needle, $tags, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function matchesStorage(array $item, string $storage): bool
+    {
+        $storage = strtoupper(trim($storage));
+        $title = strtoupper($item['title'] ?? '');
+        $tags = array_map('strtoupper', $item['tags'] ?? []);
+
+        return str_contains($title, $storage) || in_array($storage, $tags, true);
+    }
+
     private function mapSourceToKey(): string
     {
         return str_replace('.', '_', $this->source);
@@ -220,6 +335,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
 
         if (DutchCarMarketplaces::url($this->source)) {
             return DutchCarMarketplaces::label($this->source);
+        }
+
+        if (GermanCarMarketplaces::url($this->source)) {
+            return GermanCarMarketplaces::label($this->source);
         }
 
         if (KosovoMarketplaces::url($this->source)) {

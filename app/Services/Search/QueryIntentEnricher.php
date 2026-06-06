@@ -52,6 +52,17 @@ class QueryIntentEnricher
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
 
+        if (! empty($parsed['gender'])) {
+            $parsed['gender'] = CategoryCatalog::normalizeGender((string) $parsed['gender']);
+        }
+
+        if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
+            $parsed = AutomotiveIntentParser::normalizeYearFields($parsed);
+            if (! empty($parsed['year_min']) && ! empty($parsed['year_max']) && (int) $parsed['year_min'] !== (int) $parsed['year_max']) {
+                unset($parsed['year']);
+            }
+        }
+
         return array_filter($parsed, fn ($v) => $v !== null && $v !== '' && $v !== []);
     }
 
@@ -70,6 +81,17 @@ class QueryIntentEnricher
             if (empty($parsed[$key])) {
                 $parsed[$key] = $value;
             }
+        }
+
+        $yearFromQuery = AutomotiveIntentParser::parseYearFields($rawQuery);
+        if (
+            ! empty($yearFromQuery['year_min'])
+            && ! empty($yearFromQuery['year_max'])
+            && $yearFromQuery['year_max'] !== $yearFromQuery['year_min']
+        ) {
+            $parsed = array_merge($parsed, $yearFromQuery);
+        } elseif ($yearFromQuery !== [] && empty($parsed['year_min'])) {
+            $parsed = array_merge($parsed, $yearFromQuery);
         }
 
         if (CategoryCatalog::normalize($parsed['category'] ?? 'marketplace') === 'marketplace') {
@@ -91,6 +113,15 @@ class QueryIntentEnricher
         }
 
         foreach ($electronics as $key => $value) {
+            if ($key === 'features') {
+                $parsed['features'] = array_values(array_unique(array_merge(
+                    is_array($parsed['features'] ?? null) ? $parsed['features'] : [],
+                    is_array($value) ? $value : [$value],
+                )));
+
+                continue;
+            }
+
             if (empty($parsed[$key])) {
                 $parsed[$key] = $value;
             }
@@ -223,6 +254,16 @@ class QueryIntentEnricher
             && ! isset($clientFilters['price_max'])
             && ! isset($clientFilters['price'])) {
             $defaults['price_max'] = (float) $parsed['max_price'];
+        }
+
+        foreach (['brand', 'size', 'product_type', 'color', 'fuel', 'year_min', 'year_max'] as $key) {
+            if (! empty($parsed[$key]) && ! isset($clientFilters[$key])) {
+                $defaults[$key] = $parsed[$key];
+            }
+        }
+
+        if (! empty($parsed['gender']) && ! isset($clientFilters['gender'])) {
+            $defaults['gender'] = CategoryCatalog::normalizeGender((string) $parsed['gender']);
         }
 
         return array_merge($defaults, $clientFilters);

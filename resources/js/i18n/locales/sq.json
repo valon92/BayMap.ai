@@ -96,6 +96,8 @@
   "searching": "AI po analizon dhe po kërkon në internet…",
   "search_pipeline": "Si kërkoi BuyMap",
   "platform_engine": "Motori BuyMap.ai",
+  "valon_workers": "Valon Workers (paralel)",
+  "valon_orchestrator": "Valon AI Orchestrator",
   "platform_caps": {
     "ai_semantic_search": "Motor Kërkimi Semantik AI",
     "federated_product_discovery": "Platformë Federated për Zbulim Produktesh",
@@ -126,6 +128,7 @@
   "loading_more": "Duke ngarkuar…",
   "swiss_car_marketplaces": "Marketplace zvicerane të kërkuara",
   "dutch_car_marketplaces": "Marketplace holandeze të kërkuara",
+  "german_car_marketplaces": "Dyqane online gjermane të kërkuara",
   "kosovo_marketplaces": "Dyqane & platforma online në Kosovë",
   "location_from_query_title": "Ku të blihet (nga kërkesa jote)",
   "location_from_ip_title": "Zona e kërkimit (nga lidhja/IP)",
@@ -187,6 +190,7 @@
   },
   "parsed_fields": {
     "parser": "Motor AI",
+    "valon_orchestrator": "Valon AI",
     "color": "Ngjyra",
     "product_type": "Lloji",
     "features": "Veçoritë",
@@ -197,6 +201,8 @@
     "style": "Stili",
     "model": "Modeli",
     "year": "Viti",
+    "year_min": "Viti nga",
+    "year_max": "Viti deri",
     "max_km": "Km max",
     "transmission": "Transmisioni",
     "fuel": "Karburanti",
@@ -235,5 +241,11 @@
     "language": "Gjuha",
     "colors": "Ngjyrat",
     "size": "Numri (EU)"
+  },
+  "gender_values": {
+    "men": "Meshkuj",
+    "women": "Femra",
+    "unisex": "Unisex",
+    "kids": "Fëmijë"
   }
 }

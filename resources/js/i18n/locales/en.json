@@ -96,6 +96,8 @@
   "searching": "AI is analyzing and searching the web…",
   "search_pipeline": "How BuyMap searched",
   "platform_engine": "BuyMap.ai engine",
+  "valon_workers": "Valon Workers (parallel)",
+  "valon_orchestrator": "Valon AI Orchestrator",
   "platform_caps": {
     "ai_semantic_search": "AI Semantic Search Engine",
     "federated_product_discovery": "Federated Product Discovery Platform",
@@ -126,6 +128,7 @@
   "loading_more": "Loading more…",
   "swiss_car_marketplaces": "Swiss car marketplaces searched",
   "dutch_car_marketplaces": "Dutch car marketplaces searched",
+  "german_car_marketplaces": "German car marketplaces searched",
   "kosovo_marketplaces": "Kosovo online stores searched",
   "location_from_query_title": "Where to buy (from your request)",
   "location_from_ip_title": "Search area (from your connection)",
@@ -187,6 +190,7 @@
   },
   "parsed_fields": {
     "parser": "AI engine",
+    "valon_orchestrator": "Valon AI",
     "color": "Color",
     "product_type": "Type",
     "features": "Features",
@@ -197,6 +201,8 @@
     "style": "Style",
     "model": "Model",
     "year": "Year",
+    "year_min": "Year from",
+    "year_max": "Year to",
     "max_km": "Max km",
     "transmission": "Transmission",
     "fuel": "Fuel",
@@ -235,5 +241,11 @@
     "language": "Language",
     "colors": "Colors",
     "size": "Size (EU)"
+  },
+  "gender_values": {
+    "men": "Men",
+    "women": "Women",
+    "unisex": "Unisex",
+    "kids": "Kids"
   }
 }

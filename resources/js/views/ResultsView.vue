@@ -130,6 +130,26 @@
         </InsightScrollSection>
 
         <InsightScrollSection
+          v-if="valonWorkerChips.length"
+          :title="t('valon_workers')"
+          tone="violet"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+          </template>
+          <span
+            v-for="chip in valonWorkerChips"
+            :key="chip.id"
+            class="insight-chip insight-chip--violet"
+            :title="chip.role"
+          >
+            {{ chip.label }}
+          </span>
+        </InsightScrollSection>
+
+        <InsightScrollSection
           v-if="platformCapabilities.length"
           :title="t('platform_engine')"
           tone="violet"
@@ -162,6 +182,25 @@
             v-for="label in kosovoMarketplaceLabels"
             :key="label"
             class="insight-chip insight-chip--emerald"
+          >
+            {{ label }}
+          </span>
+        </InsightScrollSection>
+
+        <InsightScrollSection
+          v-if="showGermanCarMarketplaces"
+          :title="t('german_car_marketplaces')"
+          tone="orange"
+        >
+          <template #icon>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </template>
+          <span
+            v-for="label in germanMarketplaceLabels"
+            :key="label"
+            class="insight-chip insight-chip--orange"
           >
             {{ label }}
           </span>
@@ -278,6 +317,15 @@ let lastQueryKey = '';
 
 const platformCapabilities = computed(() => data.value?.platform?.positioning ?? []);
 
+const valonWorkerChips = computed(() => {
+  const workers = data.value?.meta?.valon?.workers ?? [];
+  return workers.map((w) => ({
+    id: w.id,
+    role: w.role,
+    label: `${w.id} → ${w.platform_label || w.platform}${w.results != null ? ` (${w.results})` : ''}`,
+  }));
+});
+
 const displayQuery = computed(() => {
   if (route.query.has_image === '1' && data.value?.vision?.search_query) {
     return data.value.vision.search_query;
@@ -318,6 +366,20 @@ const showDutchCarMarketplaces = computed(() => {
     && String(p?.search_country_code || '').toUpperCase() === 'NL'
     && (p?.category === 'automotive' || p?.category === 'car')
   );
+});
+
+const showGermanCarMarketplaces = computed(() => {
+  const p = data.value?.parsed;
+  return Boolean(
+    p?.search_target
+    && String(p?.search_country_code || '').toUpperCase() === 'DE'
+    && (p?.category === 'automotive' || p?.category === 'car')
+  );
+});
+
+const germanMarketplaceLabels = computed(() => {
+  if (!showGermanCarMarketplaces.value) return [];
+  return data.value?.meta?.marketplace_labels ?? [];
 });
 
 const dutchMarketplaceLabels = computed(() => {
@@ -394,7 +456,7 @@ const parsedChipItems = computed(() => {
 
   for (const [key, val] of Object.entries(parsedTags.value)) {
     items.push({
-      label: `${fieldLabel(key)}: ${formatTagValue(val)}`,
+      label: `${fieldLabel(key)}: ${formatTagValue(val, key)}`,
       accent: false,
     });
   }
@@ -442,9 +504,14 @@ function fieldLabel(key) {
   return label !== k ? label : key;
 }
 
-function formatTagValue(val) {
+function formatTagValue(val, key) {
   if (Array.isArray(val)) return val.join(', ');
   if (typeof val === 'boolean') return val ? '✓' : '—';
+  if (key === 'gender') {
+    const gk = `gender_values.${val}`;
+    const gl = t(gk);
+    if (gl !== gk) return gl;
+  }
   return String(val);
 }
 
@@ -475,6 +542,16 @@ function onScopeChange(scope) {
   router.replace({ query: { ...route.query, scope } });
 }
 
+function filtersFromResponse(response) {
+  const initial = {};
+  for (const filter of response?.filters || []) {
+    if (filter.value != null && filter.value !== '') {
+      initial[filter.key] = filter.value;
+    }
+  }
+  return initial;
+}
+
 async function fetchPage(page, append = false) {
   const q = String(route.query.q || '');
   const imageBase64 = api.loadSearchImage();
@@ -496,6 +573,9 @@ async function fetchPage(page, append = false) {
   } else {
     data.value = response;
     visibleResults.value = response.results || [];
+    if (Object.keys(activeFilters.value).length === 0) {
+      activeFilters.value = filtersFromResponse(response);
+    }
   }
 
   currentPage.value = page;

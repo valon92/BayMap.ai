@@ -1,0 +1,249 @@
+<?php
+
+namespace App\Services\Agents;
+
+use App\Contracts\FederatedSearchProviderInterface;
+use App\Services\Marketplace\ProviderRegistry;
+use App\Support\CategoryCatalog;
+
+/**
+ * Dynamically selects top 3–6 relevant agents per query — never mass-activates all providers.
+ */
+class AgentActivationService
+{
+    public function __construct(
+        private AgentPoolRegistry $pools,
+        private ProviderRegistry $registry,
+    ) {}
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $expanded
+     * @param  array<string, mixed>  $geo
+     * @return array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }
+     */
+    public function activate(array $parsed, array $expanded, array $geo = []): array
+    {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
+        $poolAgents = $this->pools->poolForCategory($category);
+        $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
+        $providerMap = [];
+        foreach ($allProviders as $provider) {
+            $providerMap[$provider->sourceKey()] = $provider;
+        }
+
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? $geo['country_code'] ?? 'XK'));
+        $scored = [];
+
+        foreach ($poolAgents as $agent) {
+            $sources = $agent['sources'] ?? [];
+            $matchedProviders = [];
+            foreach ($sources as $source) {
+                foreach ($allProviders as $provider) {
+                    if ($this->pools->matchesSourceKey($provider->sourceKey(), [$source])) {
+                        $matchedProviders[$provider->sourceKey()] = $provider;
+                    }
+                }
+            }
+
+            if ($matchedProviders === []) {
+                continue;
+            }
+
+            $score = $this->scoreAgent($agent, $parsed, $geo, $countryCode, $matchedProviders);
+            $scored[] = [
+                'id' => $agent['id'],
+                'sources' => array_keys($matchedProviders),
+                'score' => $score,
+                'trust' => (int) ($agent['trust'] ?? 70),
+                'speed' => (int) ($agent['speed'] ?? 75),
+                'providers' => array_values($matchedProviders),
+            ];
+        }
+
+        usort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        $min = (int) config('agent_pools.min_agents', 3);
+        $max = (int) config('agent_pools.max_agents', 6);
+        $selected = array_slice($scored, 0, $max);
+
+        if (count($selected) < $min && $allProviders !== []) {
+            $selected = $this->fillFromRegistry($scored, $allProviders, $min, $max, $parsed, $geo, $countryCode);
+        }
+
+        $providers = [];
+        $sourceKeys = [];
+        $agents = [];
+
+        foreach ($selected as $entry) {
+            $agents[] = [
+                'id' => $entry['id'],
+                'score' => round($entry['score'], 2),
+                'sources' => $entry['sources'],
+                'trust' => $entry['trust'],
+            ];
+            foreach ($entry['providers'] as $provider) {
+                $key = $provider->sourceKey();
+                if (! isset($providers[$key])) {
+                    $providers[$key] = $provider;
+                    $sourceKeys[] = $key;
+                }
+            }
+        }
+
+        return [
+            'agents' => $agents,
+            'source_keys' => array_values(array_unique($sourceKeys)),
+            'providers' => array_values($providers),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $scored
+     * @param  array<int, FederatedSearchProviderInterface>  $allProviders
+     * @return array<int, array<string, mixed>>
+     */
+    private function fillFromRegistry(
+        array $scored,
+        array $allProviders,
+        int $min,
+        int $max,
+        array $parsed,
+        array $geo,
+        string $countryCode,
+    ): array {
+        $usedKeys = [];
+        foreach ($scored as $entry) {
+            foreach ($entry['sources'] as $source) {
+                $usedKeys[$source] = true;
+            }
+        }
+
+        foreach ($allProviders as $provider) {
+            if (count($scored) >= $max) {
+                break;
+            }
+            $key = $provider->sourceKey();
+            if (isset($usedKeys[$key])) {
+                continue;
+            }
+
+            $scored[] = [
+                'id' => 'FallbackAgent',
+                'sources' => [$key],
+                'score' => $this->scoreProvider($provider, $parsed, $geo, $countryCode),
+                'trust' => $this->pools->trustScore($key),
+                'speed' => max(50, 100 - $provider->priority()),
+                'providers' => [$provider],
+            ];
+            $usedKeys[$key] = true;
+        }
+
+        usort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice($scored, 0, max($min, min($max, count($scored))));
+    }
+
+    /**
+     * @param  array<string, mixed>  $agent
+     * @param  array<string, FederatedSearchProviderInterface>  $providers
+     */
+    private function scoreAgent(array $agent, array $parsed, array $geo, string $countryCode, array $providers): float
+    {
+        $location = $this->locationScore($agent['countries'] ?? ['*'], $countryCode, $parsed);
+        $availability = $this->availabilityScore($providers);
+        $speed = ((float) ($agent['speed'] ?? 75)) / 100;
+        $trust = ((float) ($agent['trust'] ?? 70)) / 100;
+        $budget = $this->budgetAffinity($parsed, $providers);
+
+        return ($location * 0.35) + ($availability * 0.30) + ($speed * 0.15) + ($trust * 0.10) + ($budget * 0.10);
+    }
+
+    private function scoreProvider(
+        FederatedSearchProviderInterface $provider,
+        array $parsed,
+        array $geo,
+        string $countryCode,
+    ): float {
+        $availability = $provider->mode() === 'live' && $provider->isAvailable() ? 1.0 : ($provider->mode() === 'live' ? 0.2 : 0.75);
+        $speed = max(0.5, 1 - ($provider->priority() / 120));
+        $trust = $this->pools->trustScore($provider->sourceKey()) / 100;
+
+        return ($availability * 0.45) + ($speed * 0.30) + ($trust * 0.25);
+    }
+
+    /**
+     * @param  array<int, string>  $agentCountries
+     */
+    private function locationScore(array $agentCountries, string $countryCode, array $parsed): float
+    {
+        if (in_array('*', $agentCountries, true)) {
+            return 0.65;
+        }
+
+        if (in_array($countryCode, $agentCountries, true)) {
+            return 1.0;
+        }
+
+        $regional = [
+            'XK' => ['AL', 'MK', 'RS', 'ME'],
+            'AL' => ['XK', 'MK', 'IT', 'GR'],
+            'DE' => ['AT', 'CH', 'NL', 'FR'],
+            'CH' => ['DE', 'AT', 'FR', 'IT'],
+            'NL' => ['DE', 'BE', 'FR'],
+        ];
+
+        foreach ($regional[$countryCode] ?? [] as $neighbor) {
+            if (in_array($neighbor, $agentCountries, true)) {
+                return 0.75;
+            }
+        }
+
+        if (! empty($parsed['search_target'])) {
+            return 0.25;
+        }
+
+        return 0.45;
+    }
+
+    /**
+     * @param  array<string, FederatedSearchProviderInterface>  $providers
+     */
+    private function availabilityScore(array $providers): float
+    {
+        $scores = [];
+        foreach ($providers as $provider) {
+            if ($provider->mode() === 'live') {
+                $scores[] = $provider->isAvailable() ? 1.0 : 0.15;
+            } else {
+                $scores[] = 0.8;
+            }
+        }
+
+        return $scores === [] ? 0.5 : max($scores);
+    }
+
+    /**
+     * @param  array<string, FederatedSearchProviderInterface>  $providers
+     */
+    private function budgetAffinity(array $parsed, array $providers): float
+    {
+        if (empty($parsed['max_price'])) {
+            return 0.6;
+        }
+
+        $hasLive = false;
+        foreach ($providers as $provider) {
+            if ($provider->mode() === 'live' && $provider->isAvailable()) {
+                $hasLive = true;
+                break;
+            }
+        }
+
+        return $hasLive ? 0.85 : 0.55;
+    }
+}

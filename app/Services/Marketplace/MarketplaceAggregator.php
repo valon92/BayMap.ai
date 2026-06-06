@@ -18,6 +18,13 @@ class MarketplaceAggregator
      */
     public function searchAll(array $parsedQuery, array $expandedFilters, array $geo = []): array
     {
-        return $this->coordinator->search($parsedQuery, $expandedFilters, $geo);
+        $result = $this->coordinator->search($parsedQuery, $expandedFilters, $geo);
+
+        return [
+            'results' => $result['results'] ?? [],
+            'report' => $result['report'] ?? [],
+            'agent_plan' => $result['agent_plan'] ?? null,
+            'valon' => $result['valon'] ?? null,
+        ];
     }
 }

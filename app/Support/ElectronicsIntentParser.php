@@ -27,6 +27,17 @@ class ElectronicsIntentParser
         'green' => 'green',
     ];
 
+    /** @var array<int, string> */
+    private const LAPTOP_SIGNALS = [
+        'laptop', 'notebook', 'macbook', 'chromebook', 'ultrabook',
+        'kompjuter', 'kompjuter portativ', 'rog', 'legion', 'omen', 'predator', 'tuf', 'nitro', 'stealth',
+    ];
+
+    /** @var array<int, string> */
+    private const PHONE_SIGNALS = [
+        'iphone', 'telefon', 'smartphone', 'galaxy', 'pixel', 'redmi', 'xiaomi',
+    ];
+
     /**
      * @return array<string, mixed>
      */
@@ -53,11 +64,32 @@ class ElectronicsIntentParser
                 'ipad' => 'tablet',
                 default => 'headphones',
             };
+        } elseif (self::mentionsLaptop($lower)) {
+            $result['product_type'] = 'laptop';
+        }
+
+        $features = self::extractFeatures($lower);
+        if ($features !== []) {
+            $result['features'] = $features;
+        }
+
+        if (empty($result['product_type']) && $features !== [] && ! self::mentionsPhone($lower)) {
+            if (in_array('gaming', $features, true) || in_array('long_battery', $features, true)) {
+                $result['product_type'] = 'laptop';
+            }
+        }
+
+        if (preg_match('/\b(gaming|loj[aë]ra)\b/u', $lower)) {
+            $result['product_type'] = $result['product_type'] ?? 'laptop';
         }
 
         $storage = self::extractStorage($query);
         if ($storage !== null) {
             $result['storage'] = $storage;
+        }
+
+        if (preg_match('/\b(\d+)\s*gb\s*ram\b/i', $query, $m)) {
+            $result['ram'] = $m[1].'GB';
         }
 
         foreach (self::COLORS as $needle => $canonical) {
@@ -68,6 +100,28 @@ class ElectronicsIntentParser
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function extractFeatures(string $lower): array
+    {
+        $features = [];
+
+        if (preg_match('/\b(gaming|loj[aë]ra|rtx|geforce)\b/u', $lower)) {
+            $features[] = 'gaming';
+        }
+
+        if (preg_match('/\b(bateri|battery|autonomi|all[- ]day)\b/u', $lower)) {
+            $features[] = 'long_battery';
+        }
+
+        if (preg_match('/\b(ftohje|cooling|quiet|silent|qet[eë]|thermals|fans?)\b/u', $lower)) {
+            $features[] = 'quiet_cooling';
+        }
+
+        return array_values(array_unique($features));
     }
 
     public static function extractStorage(string $query): ?string
@@ -92,5 +146,102 @@ class ElectronicsIntentParser
     public static function isElectronicsQuery(string $query): bool
     {
         return self::fromQuery($query) !== [];
+    }
+
+    /**
+     * @param  array<int, string>  $features
+     */
+    public static function productMatchesFeatures(array $product, array $features): bool
+    {
+        if ($features === []) {
+            return true;
+        }
+
+        $title = mb_strtolower($product['title'] ?? '');
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+        $haystack = $title.' '.implode(' ', $tags);
+
+        foreach ($features as $feature) {
+            if (! self::featureMatches($feature, $haystack, $tags)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    public static function productMatchesType(array $product, string $type): bool
+    {
+        $type = mb_strtolower(trim($type));
+        $title = mb_strtolower($product['title'] ?? '');
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+        $productType = mb_strtolower((string) ($product['product_type'] ?? ''));
+
+        if ($productType === $type) {
+            return true;
+        }
+
+        $needles = match ($type) {
+            'phone' => ['phone', 'iphone', 'smartphone', 'galaxy', 'telefon'],
+            'laptop' => ['laptop', 'macbook', 'notebook', 'rog', 'legion', 'omen', 'predator', 'nitro', 'stealth', 'tuf', 'kompjuter portativ'],
+            'tablet' => ['tablet', 'ipad'],
+            'headphones' => ['headphones', 'airpods', 'earbuds', 'headset'],
+            'monitor' => ['monitor', 'display', 'ekran'],
+            default => [$type],
+        };
+
+        foreach ($needles as $needle) {
+            if (str_contains($title, $needle) || in_array($needle, $tags, true)) {
+                return true;
+            }
+        }
+
+        if ($type === 'laptop' && (str_contains($title, 'iphone') || in_array('phone', $tags, true) || in_array('iphone', $tags, true))) {
+            return false;
+        }
+
+        return false;
+    }
+
+    private static function mentionsLaptop(string $lower): bool
+    {
+        foreach (self::LAPTOP_SIGNALS as $signal) {
+            if (str_contains($lower, $signal)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function mentionsPhone(string $lower): bool
+    {
+        foreach (self::PHONE_SIGNALS as $signal) {
+            if (str_contains($lower, $signal)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<int, string>  $tags
+     */
+    private static function featureMatches(string $feature, string $haystack, array $tags): bool
+    {
+        if (in_array($feature, $tags, true)) {
+            return true;
+        }
+
+        return match ($feature) {
+            'gaming' => (bool) preg_match('/gaming|rog|legion|omen|predator|nitro|stealth|tuf|rtx|geforce|loj[aë]ra/u', $haystack),
+            'long_battery' => (bool) preg_match('/long_battery|long battery|battery|bateri|autonomi|10\s*hr|10h|all[- ]day/u', $haystack),
+            'quiet_cooling' => (bool) preg_match('/quiet_cooling|quiet cooling|silent|quiet fans|ftohje|cooling|thermals|qet[eë]/u', $haystack),
+            default => str_contains($haystack, str_replace('_', ' ', $feature)) || in_array($feature, $tags, true),
+        };
     }
 }

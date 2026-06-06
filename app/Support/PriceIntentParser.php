@@ -15,13 +15,16 @@ class PriceIntentParser
         $lower = mb_strtolower($query);
         $currency = self::detectCurrency($lower);
 
-        if (preg_match('/\b(?:deri|under|bis|up to)\s*([\d\s.,\']+?)\s*(?:euro|eur|ero|€|franga|franc|chf|usd|\$)\b/ui', $lower, $m)) {
-            return self::buildLimit($m[1], '', $currency, $m[0]);
+        if (preg_match('/\b(?:deri|under|bis|up to)\s*([\d\s.,\']+?)\s*(mij(?:e)?|mil|k|tys|tausend|thousand)?\s*(?:euro|eur|ero|€|franga|franc|chf|usd|\$)\b/ui', $lower, $m)) {
+            return self::buildLimit($m[1], $m[2] ?? '', $currency, $m[0]);
         }
 
-        if (preg_match('/(?:qmim\w*|çmim\w*|price|budget)\s+max\s*([\d\s.,\']+)/ui', $lower, $m)) {
-            // Do not force EUR here; rely on detected currency from query context.
-            return self::buildLimit($m[1], '', $currency, '');
+        if (preg_match('/(?:qmim\w*|çmim\w*|price|budget)\s+max\s*([\d\s.,\']+?)(?:\s*(mij(?:e)?|mil|k|tys))?\b/ui', $lower, $m)) {
+            return self::buildLimit($m[1], $m[2] ?? '', $currency, '');
+        }
+
+        if (preg_match('/([\d\s.,\']+)\s*(mij(?:e)?|mil|tys|k)\s*(?:euro|eur|ero|€)\b/ui', $lower, $m)) {
+            return self::buildLimit($m[1], $m[2], 'EUR', 'euro');
         }
 
         if (preg_match('/([\d\s.,\']+)\s*(?:euro|eur|ero|€)\b/ui', $lower, $m)) {
@@ -65,7 +68,10 @@ class PriceIntentParser
         }
 
         $amount = (int) $digits;
-        if ($kSuffix !== '' || preg_match('/\d\s*k\b/i', $amountRaw)) {
+        $multiplierHint = mb_strtolower(trim($amountRaw.' '.$kSuffix.' '.$token));
+        if (self::hasThousandsMultiplier($multiplierHint) && $amount < 1000) {
+            $amount *= 1000;
+        } elseif ($kSuffix !== '' || preg_match('/\d\s*k\b/i', $amountRaw)) {
             $amount *= 1000;
         }
 
@@ -73,6 +79,11 @@ class PriceIntentParser
             'max_price' => $amount,
             'currency' => $currency,
         ]);
+    }
+
+    private static function hasThousandsMultiplier(string $text): bool
+    {
+        return (bool) preg_match('/\b(mij(?:e)?|mil|tys|tsd|tausend|thousand)\b/u', $text);
     }
 
     private static function normalizeCurrencyToken(string $token): string

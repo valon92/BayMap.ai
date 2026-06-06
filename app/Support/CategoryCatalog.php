@@ -51,6 +51,40 @@ class CategoryCatalog
         return in_array($slug, self::ALL, true) ? $slug : 'marketplace';
     }
 
+    /** Map AI / Albanian gender tokens to filter option values (men, women, unisex, kids). */
+    public static function normalizeGender(?string $gender): ?string
+    {
+        if ($gender === null || trim($gender) === '') {
+            return null;
+        }
+
+        return match (mb_strtolower(trim($gender))) {
+            'male', 'man', 'men', 'meshkuj', 'burra', 'mashkull', 'masculine' => 'men',
+            'female', 'woman', 'women', 'femra', 'femër', 'femer', 'dama', 'gra' => 'women',
+            'kid', 'kids', 'child', 'children', 'fëmijë', 'femije', 'femij' => 'kids',
+            'unisex' => 'unisex',
+            default => mb_strtolower(trim($gender)),
+        };
+    }
+
+    /**
+     * @return array<int, array{value: string, label: string}>
+     */
+    private static function genderOptions(bool $sq, bool $includeKids = true): array
+    {
+        $options = [
+            ['value' => 'men', 'label' => $sq ? 'Meshkuj' : 'Men'],
+            ['value' => 'women', 'label' => $sq ? 'Femra' : 'Women'],
+            ['value' => 'unisex', 'label' => 'Unisex'],
+        ];
+
+        if ($includeKids) {
+            $options[] = ['value' => 'kids', 'label' => $sq ? 'Fëmijë' : 'Kids'];
+        }
+
+        return $options;
+    }
+
     /**
      * @return array<int, string>
      */
@@ -72,6 +106,11 @@ class CategoryCatalog
     public static function isLocalFashion(string $category): bool
     {
         return in_array(self::normalize($category), ['fashion', 'sports_outdoor', 'luxury_collectibles'], true);
+    }
+
+    public static function isElectronics(string $category): bool
+    {
+        return in_array(self::normalize($category), ['electronics_tech', 'gaming_entertainment'], true);
     }
 
     /** Mock JSON dataset key under storage/data/products/ */
@@ -158,7 +197,7 @@ class CategoryCatalog
             'genre', 'product_type', 'features', 'max_price', 'condition', 'style', 'size',
             'room', 'subject', 'bedrooms', 'listing_type', 'city', 'landmark', 'near_landmark',
             'property_type', 'min_sqm', 'nearby_streets', 'currency', 'search_country', 'search_country_code',
-            'storage', 'ram', 'gender', 'appliance_type', 'energy_class', 'dietary', 'skin_type',
+            'storage', 'ram', 'gender', 'year_min', 'year_max', 'appliance_type', 'energy_class', 'dietary', 'skin_type',
             'platform', 'billing', 'use_case', 'material_type', 'tool_type', 'level', 'format',
             'destination', 'travel_type', 'travelers', 'pet_type', 'sport_type', 'equipment_type',
             'industry', 'media_type', 'authenticity', 'seller_type', 'item', 'quantity', 'colors',
@@ -196,7 +235,7 @@ class CategoryCatalog
                 self::sizeFilter($parsed, $sq),
                 self::select('brand', $sq ? 'Marka' : 'Brand', ['boss', 'hugo boss', 'adidas', 'nike', 'puma', 'zara', 'h&m', 'gucci'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
                 self::select('product_type', $sq ? 'Lloji' : 'Type', ['sneakers', 'shoes', 'dress', 'jacket', 'shirt', 'jeans'], $parsed['product_type'] ?? null),
-                self::select('gender', $sq ? 'Gjinia' : 'Gender', ['men', 'women', 'unisex', 'kids'], $parsed['gender'] ?? null),
+                self::select('gender', $sq ? 'Gjinia' : 'Gender', self::genderOptions($sq), self::normalizeGender($parsed['gender'] ?? null)),
                 self::colorFilter($parsed, $sq),
                 self::conditionFilter($parsed, $sq, ['new', 'used']),
                 self::priceFilter($parsed, $sq, 10, 800),
@@ -218,7 +257,7 @@ class CategoryCatalog
                 self::select('product_type', $sq ? 'Lloji' : 'Type', ['skincare', 'makeup', 'perfume', 'haircare', 'bodycare'], $parsed['product_type'] ?? null),
                 self::select('brand', $sq ? 'Marka' : 'Brand', ['loreal', 'nivea', 'dior', 'chanel', 'mac'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
                 self::select('skin_type', $sq ? 'Lloji i lëkurës' : 'Skin type', ['dry', 'oily', 'combination', 'sensitive'], $parsed['skin_type'] ?? null),
-                self::select('gender', $sq ? 'Gjinia' : 'Gender', ['women', 'men', 'unisex'], $parsed['gender'] ?? null),
+                self::select('gender', $sq ? 'Gjinia' : 'Gender', self::genderOptions($sq, false), self::normalizeGender($parsed['gender'] ?? null)),
                 self::priceFilter($parsed, $sq, 5, 300),
             ),
             'automotive' => self::automotiveFilters($parsed, $sq),
@@ -336,7 +375,8 @@ class CategoryCatalog
         ])));
 
         return array_merge(
-            self::rangeFilter('year', $sq ? 'Viti' : 'Year', 1995, (int) date('Y'), $parsed['year'] ?? null),
+            self::rangeFilter('year_min', $sq ? 'Viti nga' : 'Year from', 1995, (int) date('Y'), $parsed['year_min'] ?? $parsed['year'] ?? null),
+            self::rangeFilter('year_max', $sq ? 'Viti deri' : 'Year to', 1995, (int) date('Y'), $parsed['year_max'] ?? $parsed['year'] ?? null),
             self::rangeFilter('max_km', $sq ? 'Km max' : 'Max mileage', 0, 300000, $parsed['max_km'] ?? null),
             self::colorFilter($parsed, $sq),
             self::select('transmission', $sq ? 'Transmisioni' : 'Transmission', ['automatic', 'manual'], $parsed['transmission'] ?? null),

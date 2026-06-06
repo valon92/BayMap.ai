@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Support\CategoryCatalog;
+use App\Support\ElectronicsIntentParser;
 use App\Support\ShoeSize;
 
 /**
@@ -194,16 +195,28 @@ class AiRequestParserService
     /** @return array<string, mixed> */
     private function parseElectronicsQuery(string $query): array
     {
-        return array_filter([
-            'product_type' => $this->matchFirst($query, ['laptop', 'phone', 'tablet', 'monitor', 'headphones', 'gpu', 'console', 'game']),
-            'platform' => $this->matchFirst($query, ['ps5', 'xbox', 'pc', 'switch']),
-            'features' => array_values(array_filter([
-                str_contains($query, 'battery') ? 'long_battery' : null,
-                str_contains($query, 'quiet') || str_contains($query, 'cooling') ? 'quiet_cooling' : null,
-                str_contains($query, 'gaming') ? 'gaming' : null,
+        $lower = mb_strtolower($query);
+        $fromRules = ElectronicsIntentParser::fromQuery($query);
+
+        $features = array_values(array_unique(array_merge(
+            $fromRules['features'] ?? [],
+            array_values(array_filter([
+                preg_match('/\b(bateri|battery|autonomi)\b/u', $lower) ? 'long_battery' : null,
+                preg_match('/\b(ftohje|cooling|quiet|silent|qet)\b/u', $lower) ? 'quiet_cooling' : null,
+                preg_match('/\b(gaming|loj[aë]ra|rtx)\b/u', $lower) ? 'gaming' : null,
             ])),
+        )));
+
+        return array_filter(array_merge([
+            'product_type' => $fromRules['product_type']
+                ?? $this->matchFirst($query, ['laptop', 'phone', 'tablet', 'monitor', 'headphones', 'gpu', 'console', 'game']),
+            'platform' => $this->matchFirst($query, ['ps5', 'xbox', 'pc', 'switch']),
+            'features' => $features !== [] ? $features : null,
             'max_price' => $this->extractMaxPrice($query),
-        ]);
+            'brand' => $fromRules['brand'] ?? null,
+            'storage' => $fromRules['storage'] ?? null,
+            'ram' => $fromRules['ram'] ?? null,
+        ], array_diff_key($fromRules, ['features' => true])));
     }
 
     /** @return array<string, mixed> */

@@ -41,6 +41,14 @@ class LocalSearchTierService
             ];
         }
 
+        foreach ($this->europeCountries($code) as $europe) {
+            $tiers[] = [
+                'level' => 'europe',
+                'label' => $europe,
+                'suffix' => $europe,
+            ];
+        }
+
         $tiers[] = [
             'level' => 'international',
             'label' => 'International',
@@ -130,6 +138,7 @@ class LocalSearchTierService
             'city', 'local' => ['city'],
             'country' => ['city', 'country'],
             'region' => ['city', 'country', 'region'],
+            'europe' => ['city', 'country', 'region', 'europe'],
             default => null,
         };
 
@@ -147,6 +156,26 @@ class LocalSearchTierService
         }
 
         return $filtered !== [] ? $filtered : $all;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function europeCountries(string $code): array
+    {
+        $code = strtoupper($code);
+        $already = array_merge(
+            [$this->countryLabel($code)],
+            $this->nearbyCountries($code),
+        );
+
+        $europe = ['Germany', 'Italy', 'Austria', 'France', 'Netherlands', 'Switzerland', 'United Kingdom'];
+        $filtered = array_values(array_filter(
+            $europe,
+            fn (string $country) => ! in_array($country, $already, true)
+        ));
+
+        return array_slice($filtered, 0, 3);
     }
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Services\Search;
 
 use App\Support\CategoryCatalog;
+use App\Support\CountryMatcher;
+use App\Support\ElectronicsIntentParser;
 use App\Support\ShoeSize;
 
 /**
@@ -42,6 +44,18 @@ class ExactMatchScoringService
 
         if ($this->matchesAutomotiveExact($product, $parsed, $title)) {
             $bonus += 18;
+        }
+
+        if ($this->matchesElectronicsType($product, $parsed)) {
+            $bonus += 20;
+        }
+
+        if ($this->matchesElectronicsFeatures($product, $parsed)) {
+            $bonus += 12;
+        }
+
+        if ($this->conflictsElectronicsType($product, $parsed)) {
+            $bonus -= 40;
         }
 
         return $bonus;
@@ -192,6 +206,45 @@ class ExactMatchScoringService
     }
 
     /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     */
+    private function matchesElectronicsType(array $product, array $parsed): bool
+    {
+        if (empty($parsed['product_type']) || ! CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+            return false;
+        }
+
+        return ElectronicsIntentParser::productMatchesType($product, (string) $parsed['product_type']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     */
+    private function matchesElectronicsFeatures(array $product, array $parsed): bool
+    {
+        if (empty($parsed['features']) || ! is_array($parsed['features']) || ! CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+            return false;
+        }
+
+        return ElectronicsIntentParser::productMatchesFeatures($product, $parsed['features']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     */
+    private function conflictsElectronicsType(array $product, array $parsed): bool
+    {
+        if (($parsed['product_type'] ?? '') !== 'laptop' || ! CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+            return false;
+        }
+
+        return ElectronicsIntentParser::productMatchesType($product, 'phone');
+    }
+
+    /**
      * Location priority bonus: local country → nearby → regional → global.
      *
      * @param  array<string, mixed>  $product
@@ -202,7 +255,13 @@ class ExactMatchScoringService
         $location = mb_strtolower($product['location'] ?? '');
 
         if (! empty($parsed['search_target']) && ! empty($parsed['search_country'])) {
-            return str_contains($location, mb_strtolower((string) $parsed['search_country'])) ? 20 : -15;
+            $matches = CountryMatcher::locationMatchesFilter(
+                (string) ($product['location'] ?? ''),
+                (string) $parsed['search_country'],
+                isset($product['country_code']) ? (string) $product['country_code'] : null,
+            );
+
+            return $matches ? 20 : -15;
         }
 
         $visitorCountry = mb_strtolower((string) ($parsed['search_country'] ?? $parsed['country'] ?? ''));

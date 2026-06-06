@@ -50,9 +50,7 @@ class AutomotiveIntentParser
             $result['model'] = strtoupper($m[1]).'-Class';
         }
 
-        if (preg_match('/\b(20\d{2}|19\d{2})\b/', $query, $m)) {
-            $result['year'] = (int) $m[1];
-        }
+        $result = array_merge($result, self::parseYearFields($query));
 
         if (preg_match('/\b(\d+)\s*k\s*(?:km|klm|kilomet)/ui', $lower, $m)) {
             $result['max_km'] = (int) $m[1] * 1000;
@@ -84,5 +82,61 @@ class AutomotiveIntentParser
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public static function parseYearFields(string $query): array
+    {
+        if (preg_match('/\b(20\d{2}|19\d{2})\s*[-–—]\s*(20\d{2}|19\d{2})\b/u', $query, $m)) {
+            $min = min((int) $m[1], (int) $m[2]);
+            $max = max((int) $m[1], (int) $m[2]);
+
+            return ['year' => $min, 'year_min' => $min, 'year_max' => $max];
+        }
+
+        if (preg_match('/\b(?:viti|vitit|year)\s*(20\d{2}|19\d{2})\s*(?:deri|to|until|bis)\s*(20\d{2}|19\d{2})\b/ui', $query, $m)) {
+            $min = min((int) $m[1], (int) $m[2]);
+            $max = max((int) $m[1], (int) $m[2]);
+
+            return ['year' => $min, 'year_min' => $min, 'year_max' => $max];
+        }
+
+        if (preg_match('/\b(20\d{2}|19\d{2})\b/', $query, $m)) {
+            $year = (int) $m[1];
+
+            return ['year' => $year, 'year_min' => $year, 'year_max' => $year];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    public static function normalizeYearFields(array $parsed): array
+    {
+        if (! empty($parsed['year_min']) || ! empty($parsed['year_max'])) {
+            $min = (int) ($parsed['year_min'] ?? $parsed['year'] ?? 0);
+            $max = (int) ($parsed['year_max'] ?? $parsed['year'] ?? $min);
+            if ($min > $max) {
+                [$min, $max] = [$max, $min];
+            }
+            $parsed['year_min'] = $min;
+            $parsed['year_max'] = $max;
+            $parsed['year'] = $min;
+
+            return $parsed;
+        }
+
+        if (! empty($parsed['year'])) {
+            $year = (int) $parsed['year'];
+            $parsed['year_min'] = $year;
+            $parsed['year_max'] = $year;
+        }
+
+        return $parsed;
     }
 }

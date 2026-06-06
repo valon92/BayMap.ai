@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Support\CategoryCatalog;
+use App\Support\CountryMatcher;
 use App\Support\ShoeSize;
 
 /**
@@ -10,7 +11,10 @@ use App\Support\ShoeSize;
  */
 class ProductRankingService
 {
-    public function __construct(private ExactMatchScoringService $exactMatch) {}
+    public function __construct(
+        private ExactMatchScoringService $exactMatch,
+        private WeightedRankingEngine $weightedRanking,
+    ) {}
 
     /**
      * @param  array<int, array<string, mixed>>  $products
@@ -36,71 +40,7 @@ class ProductRankingService
      */
     private function calculateScore(array $product, array $parsed): int
     {
-        $score = 40;
-        $title = mb_strtolower($product['title'] ?? '');
-        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
-        $location = mb_strtolower($product['location'] ?? '');
-
-        $score += $this->exactMatch->exactMatchBonus($product, $parsed);
-        $score += $this->exactMatch->locationPriorityBonus($product, $parsed);
-        $score += $this->scoreBrand($product, $parsed, $title, $tags);
-
-        $score += $this->scoreModel($product, $parsed, $title, $tags);
-        $score += $this->scoreYear($parsed, $product, $title);
-        $score += $this->scoreTargetCountry($parsed, $location);
-        $score += $this->scorePrice($parsed, $product);
-
-        if (! empty($parsed['color']) && (str_contains($title, $parsed['color']) || in_array($parsed['color'], $tags, true))) {
-            $score += 8;
-        }
-        if (! empty($parsed['storage'])) {
-            $storage = strtoupper((string) $parsed['storage']);
-            $titleUpper = strtoupper($product['title'] ?? '');
-            $tagsUpper = array_map('strtoupper', $product['tags'] ?? []);
-            if (str_contains($titleUpper, $storage) || in_array($storage, $tagsUpper, true)) {
-                $score += 14;
-            }
-        }
-        if (! empty($parsed['max_km']) && ! empty($product['mileage']) && $product['mileage'] <= $parsed['max_km']) {
-            $score += 10;
-        }
-        if (! empty($parsed['genre']) && (str_contains($title, $parsed['genre']) || in_array($parsed['genre'], $tags, true))) {
-            $score += 12;
-        }
-        if (! empty($parsed['product_type']) && str_contains($title, $parsed['product_type'])) {
-            $score += 12;
-        }
-        if (! empty($parsed['size'])) {
-            if (ShoeSize::productHasSize($product, (string) $parsed['size'])) {
-                $score += 18;
-            } elseif (($product['store'] ?? '') === 'driloni') {
-                $score += 8;
-            }
-        }
-
-        if (($parsed['category'] ?? '') === 'real_estate') {
-            $score += $this->scoreRealEstate($product, $parsed, $title, $tags);
-        }
-
-        foreach ($parsed['keywords'] ?? [] as $keyword) {
-            if (strlen($keyword) > 3 && (str_contains($title, $keyword) || in_array($keyword, $tags, true))) {
-                $score += 3;
-            }
-        }
-
-        if (! empty($product['sponsored'])) {
-            $score += 3;
-        }
-
-        if (! empty($product['offer_count']) && (int) $product['offer_count'] > 1) {
-            $score += min(6, (int) $product['offer_count']);
-        }
-
-        if (! empty($product['price_spread_eur']) && (float) $product['price_spread_eur'] > 20) {
-            $score += 4;
-        }
-
-        return min(99, max(35, $score));
+        return $this->weightedRanking->score($product, $parsed);
     }
 
     /**
@@ -167,24 +107,39 @@ class ProductRankingService
      */
     private function scoreYear(array $parsed, array $product, string $title): int
     {
-        if (empty($parsed['year'])) {
+        $minYear = ! empty($parsed['year_min']) ? (int) $parsed['year_min'] : null;
+        $maxYear = ! empty($parsed['year_max']) ? (int) $parsed['year_max'] : null;
+
+        if ($minYear === null && $maxYear === null && empty($parsed['year'])) {
             return 0;
         }
 
-        $wanted = (int) $parsed['year'];
-        if (! empty($product['year'])) {
-            $diff = abs((int) $product['year'] - $wanted);
-            if ($diff === 0) {
-                return 14;
-            }
-            if ($diff <= 1) {
-                return 6;
-            }
-
-            return -12;
+        if ($minYear === null && $maxYear === null) {
+            $minYear = (int) $parsed['year'];
+            $maxYear = $minYear;
+        } elseif ($minYear === null) {
+            $minYear = $maxYear;
+        } elseif ($maxYear === null) {
+            $maxYear = $minYear;
         }
 
-        return str_contains($title, (string) $wanted) ? 10 : -5;
+        if (! empty($product['year'])) {
+            $productYear = (int) $product['year'];
+            if ($productYear >= $minYear && $productYear <= $maxYear) {
+                return 14;
+            }
+            $diff = min(abs($productYear - $minYear), abs($productYear - $maxYear));
+
+            return $diff <= 1 ? 4 : -12;
+        }
+
+        foreach (range($minYear, $maxYear) as $year) {
+            if (str_contains($title, (string) $year)) {
+                return 10;
+            }
+        }
+
+        return -5;
     }
 
     /**
@@ -320,7 +275,11 @@ class ProductRankingService
             }
         }
 
-        if (! empty($parsed['search_country']) && str_contains(mb_strtolower($product['location'] ?? ''), mb_strtolower($parsed['search_country']))) {
+        if (! empty($parsed['search_country']) && CountryMatcher::locationMatchesFilter(
+            (string) ($product['location'] ?? ''),
+            (string) $parsed['search_country'],
+            isset($product['country_code']) ? (string) $product['country_code'] : null,
+        )) {
             $reasons[] = 'in '.$parsed['search_country'];
         }
 

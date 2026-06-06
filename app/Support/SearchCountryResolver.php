@@ -25,6 +25,8 @@ class SearchCountryResolver
         'genève' => ['code' => 'CH', 'name' => 'Switzerland'],
         'kosovo' => ['code' => 'XK', 'name' => 'Kosovo'],
         'kosovë' => ['code' => 'XK', 'name' => 'Kosovo'],
+        'kosove' => ['code' => 'XK', 'name' => 'Kosovo'],
+        'kosova' => ['code' => 'XK', 'name' => 'Kosovo'],
         'shqiperi' => ['code' => 'AL', 'name' => 'Albania'],
         'shqipëri' => ['code' => 'AL', 'name' => 'Albania'],
         'albania' => ['code' => 'AL', 'name' => 'Albania'],
