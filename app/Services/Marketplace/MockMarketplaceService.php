@@ -7,6 +7,7 @@ use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\ElectronicsIntentParser;
 use App\Support\GermanCarMarketplaces;
+use App\Support\GermanElectronicsMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 use Illuminate\Support\Facades\File;
@@ -44,6 +45,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             && ! SwissCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! DutchCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! GermanCarMarketplaces::isTarget($this->source, $marketplaces)
+            && ! GermanElectronicsMarketplaces::isTarget($this->source, $marketplaces)
             && ! KosovoMarketplaces::isTarget($this->source, $marketplaces)) {
             $sourceKey = $this->mapSourceToKey();
             $allowed = false;
@@ -107,6 +109,13 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             }));
         }
 
+        if (GermanElectronicsMarketplaces::isPlatform($this->source)) {
+            return array_values(array_filter(
+                $items,
+                fn (array $item) => ($item['store'] ?? '') === $this->source
+            ));
+        }
+
         if ($this->source === 'driloni') {
             return array_values(array_filter(
                 $items,
@@ -116,7 +125,18 @@ class MockMarketplaceService implements MarketplaceSearchInterface
 
         return array_values(array_filter(
             $items,
-            fn (array $item) => ($item['store'] ?? 'general') !== 'driloni'
+            function (array $item) {
+                if (($item['store'] ?? 'general') === 'driloni') {
+                    return false;
+                }
+
+                $store = (string) ($item['store'] ?? 'general');
+                if ($store !== 'general' && $store !== '' && KosovoMarketplaces::isKosovoPlatform($store)) {
+                    return false;
+                }
+
+                return true;
+            }
         ));
     }
 
@@ -200,8 +220,18 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             }
 
             if (CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+                if (! empty($parsed['search_target']) && ! empty($parsed['search_country_code'])
+                    && ! $this->locationMatchesCountry($item, (string) $parsed['search_country_code'])) {
+                    return false;
+                }
+
                 if (! empty($parsed['product_type'])
                     && ! ElectronicsIntentParser::productMatchesType($item, (string) $parsed['product_type'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['model'])
+                    && ! ElectronicsIntentParser::productMatchesModel($item, (string) $parsed['model'])) {
                     return false;
                 }
 
@@ -228,12 +258,17 @@ class MockMarketplaceService implements MarketplaceSearchInterface
      */
     private function locationMatchesCountry(array $item, string $code): bool
     {
+        $itemCode = strtoupper((string) ($item['country_code'] ?? ''));
+        if ($itemCode !== '' && $itemCode === strtoupper($code)) {
+            return true;
+        }
+
         $loc = mb_strtolower($item['location'] ?? '');
 
         return match (strtoupper($code)) {
             'CH' => (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/', $loc),
             'XK' => str_contains($loc, 'kosovo') || str_contains($loc, 'pristina') || str_contains($loc, 'ferizaj'),
-            'DE' => (bool) preg_match('/germany|deutschland|munich|münchen|berlin|frankfurt|hamburg|stuttgart|cologne|köln|düsseldorf|dusseldorf|hannover|leipzig|dresden/', $loc),
+            'DE' => (bool) preg_match('/germany|deutschland|amazon de|ebay de|munich|münchen|berlin|frankfurt|hamburg|stuttgart|cologne|köln|düsseldorf|dusseldorf|hannover|leipzig|dresden/', $loc),
             'AL' => str_contains($loc, 'albania') || str_contains($loc, 'tirana'),
             'NL' => (bool) preg_match('/netherlands|holland|nederland|amsterdam|rotterdam|utrecht|den haag|eindhoven|groningen|tilburg|breda|almere|haarlem/i', $loc),
             'US' => (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc),
@@ -341,6 +376,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             return GermanCarMarketplaces::label($this->source);
         }
 
+        if (GermanElectronicsMarketplaces::url($this->source)) {
+            return GermanElectronicsMarketplaces::label($this->source);
+        }
+
         if (KosovoMarketplaces::url($this->source)) {
             return KosovoMarketplaces::label($this->source);
         }
@@ -364,6 +403,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
     {
         $catalogUrl = SwissCarMarketplaces::url($this->source)
             ?? DutchCarMarketplaces::url($this->source)
+            ?? GermanElectronicsMarketplaces::url($this->source)
             ?? KosovoMarketplaces::url($this->source);
         if ($catalogUrl) {
             return $catalogUrl;

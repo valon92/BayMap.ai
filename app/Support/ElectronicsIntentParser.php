@@ -46,10 +46,18 @@ class ElectronicsIntentParser
         $lower = mb_strtolower(trim($query));
         $result = [];
 
-        if (preg_match('/\biphone\s*(\d+\s*(?:pro\s*)?(?:max)?(?:\s*pro)?(?:\s*max)?)/iu', $lower, $m)) {
+        if (preg_match('/\biphone\s*(\d+)\s*pro\s*max\b/iu', $lower, $m)) {
             $result['brand'] = 'apple';
             $result['product_type'] = 'phone';
-            $result['model'] = trim(preg_replace('/\s+/', ' ', $m[0]));
+            $result['model'] = "iPhone {$m[1]} Pro Max";
+        } elseif (preg_match('/\biphone\s*(\d+)pro\s*max\b/iu', $lower, $m)) {
+            $result['brand'] = 'apple';
+            $result['product_type'] = 'phone';
+            $result['model'] = "iPhone {$m[1]} Pro Max";
+        } elseif (preg_match('/\biphone\s*(\d+\s*(?:pro\s*)?(?:max)?(?:\s*pro)?(?:\s*max)?)/iu', $lower, $m)) {
+            $result['brand'] = 'apple';
+            $result['product_type'] = 'phone';
+            $result['model'] = self::normalizeIphoneModel(trim(preg_replace('/\s+/', ' ', $m[0]))) ?? trim(preg_replace('/\s+/', ' ', $m[0]));
         } elseif (preg_match('/\biphone\b/u', $lower)) {
             $result['brand'] = 'apple';
             $result['product_type'] = 'phone';
@@ -141,6 +149,54 @@ class ElectronicsIntentParser
         }
 
         return $gb >= 1024 ? '1TB' : $gb.'GB';
+    }
+
+    public static function normalizeIphoneModel(?string $model): ?string
+    {
+        if ($model === null || trim($model) === '') {
+            return null;
+        }
+
+        $clean = mb_strtolower(trim($model));
+        if (preg_match('/iphone\s*(\d+)\s*pro\s*max/u', $clean, $m)) {
+            return "iPhone {$m[1]} Pro Max";
+        }
+        if (preg_match('/iphone\s*(\d+)pro\s*max/u', $clean, $m)) {
+            return "iPhone {$m[1]} Pro Max";
+        }
+        if (preg_match('/iphone\s*(\d+)\s*pro/u', $clean, $m)) {
+            return "iPhone {$m[1]} Pro";
+        }
+
+        return trim($model);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    public static function productMatchesModel(array $product, string $model): bool
+    {
+        $normalized = self::normalizeIphoneModel($model) ?? $model;
+        $wanted = mb_strtolower(str_replace(' ', '', $normalized));
+        $title = mb_strtolower(str_replace(' ', '', $product['title'] ?? ''));
+        $itemModel = mb_strtolower(str_replace(' ', '', (string) ($product['model'] ?? '')));
+        $tags = array_map(fn ($t) => mb_strtolower(str_replace(' ', '', (string) $t)), $product['tags'] ?? []);
+
+        if ($itemModel !== '' && (str_contains($itemModel, $wanted) || str_contains($wanted, $itemModel))) {
+            return true;
+        }
+
+        if (str_contains($title, $wanted) || in_array($wanted, $tags, true)) {
+            return true;
+        }
+
+        if (preg_match('/iphone(\d+)promax/u', $wanted, $wm)) {
+            if (preg_match('/iphone(\d+)promax/u', $title, $tm)) {
+                return $wm[1] === $tm[1];
+            }
+        }
+
+        return false;
     }
 
     public static function isElectronicsQuery(string $query): bool

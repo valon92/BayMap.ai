@@ -31,6 +31,8 @@ return [
         'SwissCarAgent' => 'Swiss car marketplace search',
         'DutchCarAgent' => 'Dutch car marketplace search',
         'GermanCarAgent' => 'German car marketplace search',
+        'GermanElectronicsAgent' => 'German electronics retailer search',
+        'GermanTechRetailAgent' => 'German tech retail search',
         'LocalAutoAgent' => 'Local vehicle listings',
         'ZillowAgent' => 'Zillow property search',
         'HomegateAgent' => 'Homegate property search',

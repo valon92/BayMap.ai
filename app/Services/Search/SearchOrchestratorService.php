@@ -172,6 +172,9 @@ class SearchOrchestratorService
         $dutchCarSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'NL'
             && CategoryCatalog::isAutomotive($parsed['category'] ?? '')
             && ! empty($parsed['search_target']);
+        $germanElectronicsSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'DE'
+            && CategoryCatalog::isElectronics($parsed['category'] ?? '')
+            && ! empty($parsed['search_target']);
         $kosovoSearch = strtoupper((string) ($parsed['search_country_code'] ?? $searchGeo['country_code'] ?? '')) === 'XK';
 
         $pipeline[] = [
@@ -181,9 +184,11 @@ class SearchOrchestratorService
                 ? 'Searched '.count($expanded['marketplaces'] ?? []).' Swiss car marketplaces'
                 : ($dutchCarSearch
                     ? 'Searched '.count($expanded['marketplaces'] ?? []).' Dutch car marketplaces'
-                    : ($kosovoSearch
-                        ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
-                        : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional')),
+                    : ($germanElectronicsSearch
+                        ? 'Searched '.count($expanded['marketplaces'] ?? []).' German electronics retailers'
+                        : ($kosovoSearch
+                            ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
+                            : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional'))),
         ];
 
         $products = $this->applyClientFilters($products, $filters, $parsed);
@@ -365,6 +370,12 @@ class SearchOrchestratorService
             }
             if (isset($filters['brand']) && $filters['brand'] !== '') {
                 if (! $this->productMatchesBrand($product, (string) $filters['brand'])) {
+                    return false;
+                }
+            }
+            $wantedModel = $filters['model'] ?? $parsed['model'] ?? null;
+            if (! empty($wantedModel) && CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+                if (! ElectronicsIntentParser::productMatchesModel($product, (string) $wantedModel)) {
                     return false;
                 }
             }

@@ -48,31 +48,43 @@
         <p class="text-xs text-slate-400">{{ t('searched_by_photo') }}</p>
       </div>
 
-      <div class="results-insights mb-4">
+      <div class="results-insights-top mb-4">
         <InsightScrollSection
-          v-if="data?.location_context?.summary"
-          :title="t('search_near_landmark')"
-          tone="emerald"
+          v-if="platformCapabilities.length"
+          :title="t('platform_engine')"
+          tone="violet"
         >
           <template #icon>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </template>
-          <span class="insight-chip insight-chip--card insight-chip--emerald">
-            {{ data.location_context.summary }}
-          </span>
           <span
-            v-for="street in data.location_context.streets"
-            :key="street"
-            class="insight-chip insight-chip--emerald"
+            v-for="cap in platformCapabilities"
+            :key="cap"
+            class="insight-chip insight-chip--violet"
           >
-            {{ street }}
+            {{ t(`platform_caps.${cap}`) }}
           </span>
         </InsightScrollSection>
 
+        <p
+          v-if="locationBanner"
+          class="text-xs text-slate-500 mb-3 px-1"
+        >
+          {{ locationBanner.text }}
+        </p>
+
+        <div v-if="!loading">
+          <SearchScopeChips
+            :model-value="activeScope"
+            @update:model-value="onScopeChange"
+          />
+          <p v-if="scopeSummary" class="text-[11px] text-slate-500 mt-2 px-1">{{ scopeSummary }}</p>
+        </div>
+
         <InsightScrollSection
-          v-else-if="productDescription"
+          v-if="productDescription"
           :title="t('ai_product_description')"
           tone="violet"
         >
@@ -85,29 +97,6 @@
             {{ productDescription }}
           </span>
         </InsightScrollSection>
-
-        <InsightScrollSection
-          v-if="locationBanner"
-          :title="locationBannerTitle"
-          tone="sky"
-        >
-          <template #icon>
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
-            </svg>
-          </template>
-          <span class="insight-chip insight-chip--card">
-            {{ locationBanner.text }}
-          </span>
-        </InsightScrollSection>
-
-        <div v-if="!loading">
-          <SearchScopeChips
-            :model-value="activeScope"
-            @update:model-value="onScopeChange"
-          />
-          <p v-if="scopeSummary" class="text-[11px] text-slate-500 mt-2 px-1">{{ scopeSummary }}</p>
-        </div>
 
         <InsightScrollSection
           v-if="parsedChipItems.length"
@@ -148,23 +137,92 @@
             {{ chip.label }}
           </span>
         </InsightScrollSection>
+      </div>
 
+      <div class="results-main flex flex-col lg:grid lg:grid-cols-[minmax(200px,220px)_1fr] xl:grid-cols-[minmax(200px,240px)_1fr] gap-4 xl:gap-5">
+        <DynamicFilters
+          v-if="data?.filters?.length"
+          :key="String(route.query.q || '')"
+          :filters="data.filters"
+          v-model="activeFilters"
+          class="results-filters order-1 lg:order-none mb-0"
+          @change="refineSearch"
+        />
+
+        <div class="results-products order-2 lg:order-none min-w-0">
+          <InsightScrollSection
+            v-if="showGermanElectronicsMarketplaces"
+            :title="t('german_electronics_marketplaces')"
+            tone="orange"
+            class="mb-4"
+          >
+            <template #icon>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </template>
+            <span
+              v-for="label in germanElectronicsLabels"
+              :key="label"
+              class="insight-chip insight-chip--orange"
+            >
+              {{ label }}
+            </span>
+          </InsightScrollSection>
+
+          <div v-if="loading" class="mb-4 text-slate-400 text-sm animate-pulse">{{ t('searching') }}</div>
+          <ResultsSkeleton v-if="loading" />
+          <p v-else-if="!results.length" class="text-center text-slate-400 py-16 glass rounded-2xl">
+            {{ t('no_results') }}
+          </p>
+          <div v-else>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+              <ProductCard
+                v-for="product in results"
+                :key="product.id + (product.source_key || '')"
+                :product="product"
+                class="group"
+              />
+            </div>
+
+            <div v-if="hasMore" class="mt-8 flex flex-col items-center gap-2">
+              <button
+                type="button"
+                class="px-6 py-3 rounded-xl font-medium text-sm bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="loadingMore"
+                @click="loadMore"
+              >
+                {{ loadingMore ? t('loading_more') : t('load_more') }}
+              </button>
+              <p class="text-xs text-slate-500">
+                {{ t('showing_results', { shown: results.length, total: formatTotal(data?.meta?.total) }) }}
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div v-if="hasDetailInsights" class="results-insights mt-8">
         <InsightScrollSection
-          v-if="platformCapabilities.length"
-          :title="t('platform_engine')"
-          tone="violet"
+          v-if="data?.location_context?.summary"
+          :title="t('search_near_landmark')"
+          tone="emerald"
         >
           <template #icon>
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             </svg>
           </template>
+          <span class="insight-chip insight-chip--card insight-chip--emerald">
+            {{ data.location_context.summary }}
+          </span>
           <span
-            v-for="cap in platformCapabilities"
-            :key="cap"
-            class="insight-chip insight-chip--violet"
+            v-for="street in data.location_context.streets"
+            :key="street"
+            class="insight-chip insight-chip--emerald"
           >
-            {{ t(`platform_caps.${cap}`) }}
+            {{ street }}
           </span>
         </InsightScrollSection>
 
@@ -243,49 +301,6 @@
             {{ label }}
           </span>
         </InsightScrollSection>
-      </div>
-
-      <div class="lg:grid lg:grid-cols-[minmax(200px,220px)_1fr] xl:grid-cols-[minmax(200px,240px)_1fr] gap-4 xl:gap-5">
-        <DynamicFilters
-          v-if="data?.filters?.length"
-          :filters="data.filters"
-          v-model="activeFilters"
-          class="mb-6 lg:mb-0"
-          @change="refineSearch"
-        />
-
-        <div>
-          <div v-if="loading" class="mb-4 text-slate-400 text-sm animate-pulse">{{ t('searching') }}</div>
-          <ResultsSkeleton v-if="loading" />
-          <p v-else-if="!results.length" class="text-center text-slate-400 py-16 glass rounded-2xl">
-            {{ t('no_results') }}
-          </p>
-          <div v-else>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
-              <ProductCard
-                v-for="product in results"
-                :key="product.id + (product.source_key || '')"
-                :product="product"
-                class="group"
-              />
-            </div>
-
-            <div v-if="hasMore" class="mt-8 flex flex-col items-center gap-2">
-              <button
-                type="button"
-                class="px-6 py-3 rounded-xl font-medium text-sm bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="loadingMore"
-                @click="loadMore"
-              >
-                {{ loadingMore ? t('loading_more') : t('load_more') }}
-              </button>
-              <p class="text-xs text-slate-500">
-                {{ t('showing_results', { shown: results.length, total: formatTotal(data?.meta?.total) }) }}
-              </p>
-            </div>
-          </div>
-
-        </div>
       </div>
     </div>
   </section>
@@ -366,6 +381,20 @@ const showDutchCarMarketplaces = computed(() => {
     && String(p?.search_country_code || '').toUpperCase() === 'NL'
     && (p?.category === 'automotive' || p?.category === 'car')
   );
+});
+
+const showGermanElectronicsMarketplaces = computed(() => {
+  const p = data.value?.parsed;
+  return Boolean(
+    p?.search_target
+    && String(p?.search_country_code || '').toUpperCase() === 'DE'
+    && (p?.category === 'electronics_tech' || p?.category === 'gaming_entertainment')
+  );
+});
+
+const germanElectronicsLabels = computed(() => {
+  if (!showGermanElectronicsMarketplaces.value) return [];
+  return data.value?.meta?.marketplace_labels ?? [];
 });
 
 const showGermanCarMarketplaces = computed(() => {
@@ -470,6 +499,14 @@ const parsedChipItems = computed(() => {
 
   return items;
 });
+
+const hasDetailInsights = computed(() => Boolean(
+  data.value?.location_context?.summary
+  || showKosovoMarketplaces.value
+  || showGermanCarMarketplaces.value
+  || showDutchCarMarketplaces.value
+  || showSwissCarMarketplaces.value
+));
 
 const uploadedPreview = ref(null);
 

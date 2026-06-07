@@ -5,6 +5,7 @@ namespace App\Services\Search;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
+use App\Support\GermanElectronicsMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
@@ -110,6 +111,10 @@ class SearchExpansionService
             return GermanCarMarketplaces::keys();
         }
 
+        if ($countryCode === 'DE' && CategoryCatalog::isElectronics($category)) {
+            return GermanElectronicsMarketplaces::keys();
+        }
+
         if ($countryCode === 'XK') {
             return KosovoMarketplaces::keysForCategory($category);
         }
@@ -190,6 +195,10 @@ class SearchExpansionService
 
         if ($searchTarget && $countryCode === 'DE' && CategoryCatalog::isAutomotive($category)) {
             return GermanCarMarketplaces::labels();
+        }
+
+        if ($searchTarget && $countryCode === 'DE' && CategoryCatalog::isElectronics($category)) {
+            return GermanElectronicsMarketplaces::labels();
         }
 
         if ($countryCode === 'XK') {

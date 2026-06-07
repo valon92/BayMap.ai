@@ -41,8 +41,12 @@ class CountryMatcher
             return (bool) preg_match('/netherlands|holland|nederland|amsterdam|rotterdam|utrecht|den haag|eindhoven|groningen/u', $loc);
         }
 
-        if (str_contains($needle, 'germany') || str_contains($needle, 'deutschland') || $needle === 'de') {
-            return (bool) preg_match('/germany|deutschland|munich|münchen|berlin|frankfurt|hamburg|stuttgart|cologne|köln|düsseldorf|dusseldorf|hannover|leipzig|dresden/u', $loc);
+        if (str_contains($needle, 'germany') || str_contains($needle, 'deutschland') || str_contains($needle, 'gjermani') || $needle === 'de') {
+            if ($productCountryCode !== null && strtoupper($productCountryCode) === 'DE') {
+                return true;
+            }
+
+            return (bool) preg_match('/germany|deutschland|amazon de|ebay de|munich|münchen|berlin|frankfurt|hamburg|stuttgart|cologne|köln|düsseldorf|dusseldorf|hannover|leipzig|dresden/u', $loc);
         }
 
         if (str_contains($needle, 'united states') || $needle === 'us' || str_contains($needle, 'usa')) {

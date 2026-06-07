@@ -282,6 +282,10 @@
     @apply -mx-1 px-1 sm:mx-0 sm:px-0 space-y-1;
   }
 
+  .results-insights-top {
+    @apply -mx-1 px-1 sm:mx-0 sm:px-0 space-y-1;
+  }
+
   .btn-search-spinner {
     @apply inline-block w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin;
   }

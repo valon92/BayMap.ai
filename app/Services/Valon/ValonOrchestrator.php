@@ -8,6 +8,7 @@ use App\Services\Search\LocationExpansionEngine;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
+use App\Support\GermanElectronicsMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
@@ -135,7 +136,9 @@ class ValonOrchestrator
                 $status = match ($code) {
                     'CH' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'swiss_car_marketplace' : 'mock_data',
                     'NL' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'dutch_car_marketplace' : 'mock_data',
-                    'DE' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'german_car_marketplace' : 'mock_data',
+                    'DE' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '')
+                        ? 'german_car_marketplace'
+                        : (CategoryCatalog::isElectronics($parsedQuery['category'] ?? '') ? 'german_electronics_marketplace' : 'mock_data'),
                     'XK' => KosovoMarketplaces::isKosovoPlatform($platform) ? 'kosovo_marketplace' : 'mock_data',
                     default => 'mock_data',
                 };
@@ -144,6 +147,7 @@ class ValonOrchestrator
             return [
                 'source' => $platform,
                 'label' => KosovoMarketplaces::label($platform)
+                    ?: GermanElectronicsMarketplaces::label($platform)
                     ?: DutchCarMarketplaces::label($platform)
                     ?: SwissCarMarketplaces::label($platform)
                     ?: GermanCarMarketplaces::label($platform)

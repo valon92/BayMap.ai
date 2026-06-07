@@ -75,6 +75,8 @@ return [
 
         'electronics_tech' => [
             'agents' => [
+                ['id' => 'GermanElectronicsAgent', 'sources' => ['mediamarkt', 'saturn', 'cyberport', 'notebooksbilliger', 'euronics', 'computeruniverse'], 'countries' => ['DE'], 'trust' => 90, 'speed' => 92],
+                ['id' => 'GermanTechRetailAgent', 'sources' => ['conrad', 'expert_de', 'voelkner', 'pearl', 'jacob', 'alternate'], 'countries' => ['DE'], 'trust' => 84, 'speed' => 88],
                 ['id' => 'AmazonAgent', 'sources' => ['amazon'], 'countries' => ['*'], 'trust' => 88, 'speed' => 82],
                 ['id' => 'EbayTechAgent', 'sources' => ['ebay'], 'countries' => ['*'], 'trust' => 90, 'speed' => 80],
                 ['id' => 'GoogleShoppingAgent', 'sources' => ['google_shopping'], 'countries' => ['*'], 'trust' => 87, 'speed' => 78],

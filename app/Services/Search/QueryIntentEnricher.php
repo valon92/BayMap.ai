@@ -52,6 +52,11 @@ class QueryIntentEnricher
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
 
+        if (! empty($parsed['model'])) {
+            $parsed['model'] = ElectronicsIntentParser::normalizeIphoneModel((string) $parsed['model'])
+                ?? $parsed['model'];
+        }
+
         if (! empty($parsed['gender'])) {
             $parsed['gender'] = CategoryCatalog::normalizeGender((string) $parsed['gender']);
         }
@@ -256,7 +261,7 @@ class QueryIntentEnricher
             $defaults['price_max'] = (float) $parsed['max_price'];
         }
 
-        foreach (['brand', 'size', 'product_type', 'color', 'fuel', 'year_min', 'year_max'] as $key) {
+        foreach (['brand', 'size', 'product_type', 'color', 'fuel', 'year_min', 'year_max', 'model'] as $key) {
             if (! empty($parsed[$key]) && ! isset($clientFilters[$key])) {
                 $defaults[$key] = $parsed[$key];
             }

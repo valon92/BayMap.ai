@@ -9,6 +9,7 @@ use App\Services\Marketplace\Providers\SerpApiSearchProvider;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
+use App\Support\GermanElectronicsMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
@@ -41,6 +42,7 @@ class ProviderRegistry
             $this->swissAutomotiveProviders(),
             $this->dutchAutomotiveProviders(),
             $this->germanAutomotiveProviders(),
+            $this->germanElectronicsProviders(),
             $this->kosovoMarketplaceProviders(),
         );
 
@@ -63,6 +65,9 @@ class ProviderRegistry
         $swissCar = $countryCode === 'CH' && CategoryCatalog::isAutomotive($category);
         $dutchCar = $countryCode === 'NL' && CategoryCatalog::isAutomotive($category) && ! empty($parsedQuery['search_target']);
         $germanCar = $countryCode === 'DE' && CategoryCatalog::isAutomotive($category) && ! empty($parsedQuery['search_target']);
+        $germanElectronics = $countryCode === 'DE'
+            && CategoryCatalog::isElectronics($category)
+            && ! empty($parsedQuery['search_target']);
         $kosovoLocal = $countryCode === 'XK';
 
         return array_values(array_filter($this->all(), function (FederatedSearchProviderInterface $provider) use (
@@ -72,6 +77,7 @@ class ProviderRegistry
             $swissCar,
             $dutchCar,
             $germanCar,
+            $germanElectronics,
             $kosovoLocal,
             $geo
         ) {
@@ -107,6 +113,17 @@ class ProviderRegistry
                 }
             }
 
+            if ($germanElectronics) {
+                $germanKeys = $targets ?: GermanElectronicsMarketplaces::keys();
+                if (! GermanElectronicsMarketplaces::isTarget($provider->sourceKey(), $germanKeys)
+                    && ! in_array($provider->sourceKey(), $germanKeys, true)) {
+                    return false;
+                }
+                if (in_array($provider->sourceKey(), ['ebay', 'google_shopping', 'facebook_marketplace', 'amazon', 'etsy'], true)) {
+                    return false;
+                }
+            }
+
             if ($kosovoLocal) {
                 $kosovoKeys = $targets ?: KosovoMarketplaces::keysForCategory($category);
                 $key = $provider->sourceKey();
@@ -133,7 +150,7 @@ class ProviderRegistry
                 }
             }
 
-            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $kosovoLocal)) {
+            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $germanElectronics, $kosovoLocal)) {
                 return false;
             }
 
@@ -144,7 +161,7 @@ class ProviderRegistry
     /**
      * @param  array<int, string>  $targets
      */
-    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $kosovoLocal = false): bool
+    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $germanElectronics = false, bool $kosovoLocal = false): bool
     {
         if ($swissCar && SwissCarMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
@@ -155,6 +172,10 @@ class ProviderRegistry
         }
 
         if ($germanCar && GermanCarMarketplaces::isTarget($sourceKey, $targets)) {
+            return true;
+        }
+
+        if ($germanElectronics && GermanElectronicsMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
         }
 
@@ -275,6 +296,31 @@ class ProviderRegistry
                 sourceLabel: GermanCarMarketplaces::label($key),
                 priority: 72,
                 categories: ['automotive'],
+                countries: ['DE'],
+            );
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array<int, MockSearchProvider>
+     */
+    private function germanElectronicsProviders(): array
+    {
+        $providers = [];
+
+        foreach (GermanElectronicsMarketplaces::keys() as $key) {
+            if (isset(config('marketplaces.providers', [])[$key])) {
+                continue;
+            }
+
+            $meta = GermanElectronicsMarketplaces::catalog()[$key];
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: $meta['label'],
+                priority: 68,
+                categories: $meta['categories'],
                 countries: ['DE'],
             );
         }
