@@ -5,10 +5,33 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    overflow-x: clip;
+    max-width: 100%;
   }
 
   body {
     @apply bg-[#f5f7fa] text-slate-900 font-sans antialiased;
+    overflow-x: clip;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #app {
+    overflow-x: clip;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  img,
+  video,
+  svg {
+    max-width: 100%;
   }
 
   ::selection {
@@ -44,11 +67,11 @@
 
   /* —— Search hero (homepage) —— */
   .search-hero-form {
-    @apply relative w-full;
+    @apply relative w-full max-w-full min-w-0;
   }
 
   .search-hero-card {
-    @apply relative rounded-2xl sm:rounded-3xl border border-slate-200/90
+    @apply relative w-full max-w-full min-w-0 rounded-2xl sm:rounded-3xl border border-slate-200/90
       bg-white
       shadow-search
       transition-all duration-300;
@@ -85,11 +108,11 @@
   }
 
   .search-input-row {
-    @apply relative flex items-center;
+    @apply relative flex items-center min-w-0;
   }
 
   .search-textarea {
-    @apply w-full min-h-[4.25rem] sm:min-h-[4.5rem] resize-none bg-transparent
+    @apply w-full min-w-0 min-h-[4.25rem] sm:min-h-[4.5rem] resize-none bg-transparent
       pl-4 pr-[7.5rem] sm:pr-36 py-4
       text-base sm:text-lg text-slate-900 placeholder:text-slate-400
       leading-relaxed focus:outline-none disabled:opacity-50;
@@ -177,16 +200,16 @@
   }
 
   .scope-scroll {
-    @apply -mx-1 px-1 sm:mx-0 sm:px-0;
+    @apply w-full max-w-full overflow-x-auto overscroll-x-contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
   .scope-scroll-track {
-    @apply flex flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-0.5
+    @apply flex flex-nowrap gap-2 w-max max-w-none pb-0.5
       scroll-smooth snap-x snap-mandatory
-      sm:flex-wrap sm:overflow-visible sm:snap-none;
-    -webkit-overflow-scrolling: touch;
+      sm:flex-wrap sm:w-auto sm:max-w-full sm:overflow-visible sm:snap-none;
     overscroll-behavior-x: contain;
-    scrollbar-width: none;
   }
 
   .scope-scroll-track::-webkit-scrollbar {
@@ -212,7 +235,7 @@
   }
 
   .insight-strip {
-    @apply mb-3 sm:mb-5;
+    @apply mb-3 sm:mb-5 max-w-full min-w-0 overflow-x-clip;
   }
 
   .insight-strip-header {
@@ -279,11 +302,15 @@
   }
 
   .results-insights {
-    @apply -mx-1 px-1 sm:mx-0 sm:px-0 space-y-1;
+    @apply space-y-1 max-w-full min-w-0 overflow-x-clip;
   }
 
   .results-insights-top {
-    @apply -mx-1 px-1 sm:mx-0 sm:px-0 space-y-1;
+    @apply space-y-1 max-w-full min-w-0 overflow-x-clip;
+  }
+
+  .results-main {
+    @apply max-w-full min-w-0 overflow-x-clip;
   }
 
   .btn-search-spinner {
@@ -348,7 +375,7 @@
   }
 
   .header-brand {
-    @apply inline-flex items-center min-w-0 transition-opacity duration-200;
+    @apply inline-flex items-center min-w-0 max-w-[calc(100%-7rem)] sm:max-w-none transition-opacity duration-200;
   }
 
   .header-brand:hover {
@@ -452,14 +479,13 @@
 
 .tagline-hero {
   font-size: clamp(0.85rem, 3.6vw, 1.35rem);
-  line-height: 1.4;
-  white-space: nowrap;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
   @apply text-slate-800 font-semibold;
 }
 
 @media (min-width: 640px) {
   .tagline-hero {
-    white-space: normal;
     font-size: 1.35rem;
     line-height: 1.45;
   }

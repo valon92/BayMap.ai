@@ -1,5 +1,5 @@
 <template>
-  <footer class="relative z-10 px-4 py-8 text-center text-sm text-slate-500 border-t border-slate-200/80 bg-white/50">
+  <footer class="relative z-10 px-4 py-8 text-center text-sm text-slate-500 border-t border-slate-200/80 bg-white/50 overflow-x-clip max-w-full min-w-0">
     <p>{{ t('footer') }}</p>
     <p class="mt-3">
       <router-link

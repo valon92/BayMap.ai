@@ -1,5 +1,5 @@
 <template>
-  <section class="px-4 pb-20">
+  <section class="px-4 pb-20 overflow-x-clip max-w-full min-w-0">
     <div class="max-w-4xl mx-auto w-full flex flex-col items-center text-center pt-6 sm:pt-14 pb-10">
       <div class="hero-brand-wrap">
         <BrandLogoIcon size="xl" full />

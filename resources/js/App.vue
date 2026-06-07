@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="min-h-screen min-h-[100dvh] flex flex-col overflow-x-clip max-w-full">
     <AnimatedBackground />
     <AppHeader />
-    <main class="flex-1 relative z-10">
+    <main class="flex-1 relative z-10 overflow-x-clip max-w-full min-w-0">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />

@@ -1,5 +1,5 @@
 <template>
-  <section class="px-4 sm:px-6 lg:px-8 pb-16">
+  <section class="px-4 sm:px-6 lg:px-8 pb-16 overflow-x-clip max-w-full min-w-0">
     <div class="max-w-7xl mx-auto">
       <div class="mb-6">
         <router-link to="/" class="text-sm text-slate-500 hover:text-blue-600 transition-colors font-medium">

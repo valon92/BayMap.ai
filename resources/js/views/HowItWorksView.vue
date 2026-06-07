@@ -1,5 +1,5 @@
 <template>
-  <article class="px-4 pb-24">
+  <article class="px-4 pb-24 overflow-x-clip max-w-full min-w-0">
     <div class="max-w-3xl mx-auto pt-4 sm:pt-10">
       <router-link
         to="/"
