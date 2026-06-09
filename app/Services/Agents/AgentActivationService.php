@@ -5,6 +5,7 @@ namespace App\Services\Agents;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\ProviderRegistry;
 use App\Support\CategoryCatalog;
+use App\Support\KosovoFashionIntent;
 
 /**
  * Dynamically selects top 3–6 relevant agents per query — never mass-activates all providers.
@@ -67,11 +68,14 @@ class AgentActivationService
 
         usort($scored, fn ($a, $b) => $b['score'] <=> $a['score']);
 
-        $min = (int) config('agent_pools.min_agents', 3);
+        $kosovoBrandedFashion = strtoupper($countryCode) === 'XK' && KosovoFashionIntent::isBrandedCatalogSearch($parsed);
+        $min = $kosovoBrandedFashion
+            ? 1
+            : (int) config('agent_pools.min_agents', 3);
         $max = (int) config('agent_pools.max_agents', 6);
         $selected = array_slice($scored, 0, $max);
 
-        if (count($selected) < $min && $allProviders !== []) {
+        if (count($selected) < $min && $allProviders !== [] && ! $kosovoBrandedFashion) {
             $selected = $this->fillFromRegistry($scored, $allProviders, $min, $max, $parsed, $geo, $countryCode);
         }
 
@@ -154,6 +158,12 @@ class AgentActivationService
      */
     private function scoreAgent(array $agent, array $parsed, array $geo, string $countryCode, array $providers): float
     {
+        if (strtoupper($countryCode) === 'XK'
+            && KosovoFashionIntent::isBrandedCatalogSearch($parsed)
+            && in_array((string) ($agent['id'] ?? ''), ['BalkanScraperAgent', 'EUAggregatorAgent', 'AboutYouAgent', 'ASOSAgent', 'ZalandoAgent'], true)) {
+            return 0.0;
+        }
+
         $location = $this->locationScore($agent['countries'] ?? ['*'], $countryCode, $parsed);
         $availability = $this->availabilityScore($providers);
         $speed = ((float) ($agent['speed'] ?? 75)) / 100;

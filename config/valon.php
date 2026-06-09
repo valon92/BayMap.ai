@@ -13,12 +13,15 @@ return [
 
     'worker_timeout_seconds' => (int) env('VALON_WORKER_TIMEOUT', 15),
 
+    'melodiapx_timeout_seconds' => (int) env('VALON_MELODIA_PX_TIMEOUT', 120),
+
     /*
     |--------------------------------------------------------------------------
     | Role labels shown in UI / worker reports
     |--------------------------------------------------------------------------
     */
     'role_labels' => [
+        'KosovoFashionLiveAgent' => 'Kosovo fashion live catalog search',
         'LocalMarketplaceAgent' => 'Local marketplace search',
         'BalkanScraperAgent' => 'Balkan marketplace search',
         'ZalandoAgent' => 'Zalando search',

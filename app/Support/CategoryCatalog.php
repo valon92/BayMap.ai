@@ -113,12 +113,38 @@ class CategoryCatalog
         return in_array(self::normalize($category), ['electronics_tech', 'gaming_entertainment'], true);
     }
 
+    public static function isBooks(string $category): bool
+    {
+        return self::is($category, 'online_education');
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    public static function isBookSearch(array $parsed): bool
+    {
+        if (self::isBooks($parsed['category'] ?? '')) {
+            return true;
+        }
+
+        $type = mb_strtolower((string) ($parsed['product_type'] ?? $parsed['format'] ?? ''));
+        $bookTypes = ['book', 'libër', 'liber', 'librin', 'ebook', 'audiobook', 'paperback', 'hardcover'];
+
+        if (in_array($type, $bookTypes, true)) {
+            return true;
+        }
+
+        return BookIntentParser::mentionsBook(mb_strtolower((string) ($parsed['raw_query'] ?? '')));
+    }
+
     /** Mock JSON dataset key under storage/data/products/ */
     public static function datasetKey(string $category): string
     {
         switch (self::normalize($category)) {
             case 'automotive':
                 return 'car';
+            case 'online_education':
+                return 'book';
             case 'fashion':
             case 'sports_outdoor':
             case 'luxury_collectibles':
@@ -173,7 +199,7 @@ class CategoryCatalog
             'gaming_entertainment' => ['ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming', 'game', 'console', 'lojë', 'loje'],
             'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm'],
             'construction' => ['cement', 'concrete', 'drill', 'hammer', 'construction', 'ndërtim', 'ndertim', 'material ndertimi', 'tools', 'scaffold'],
-            'online_education' => ['course', 'udemy', 'certification', 'training', 'book', 'libër', 'liber', 'learn', 'edukim', 'kurs', 'tutorial'],
+            'online_education' => ['course', 'udemy', 'certification', 'training', 'book', 'libër', 'liber', 'librin', 'roman', 'thriller', 'psikologjik', 'papritur', 'novel', 'learn', 'edukim', 'kurs', 'tutorial', 'bestseller'],
             'travel' => ['flight', 'hotel', 'travel', 'trip', 'vacation', 'udhëtim', 'udhetim', 'resort', 'airbnb', 'turizëm', 'turizem'],
             'pets' => ['dog', 'cat', 'pet food', 'kafshë', 'kafshe', 'qen', 'mace', 'pet', 'aquarium'],
             'sports_outdoor' => ['bike', 'bicycle', 'camping', 'hiking', 'football', 'sport', 'outdoor', 'ski', 'futboll', 'atletik'],
@@ -294,11 +320,11 @@ class CategoryCatalog
                 self::priceFilter($parsed, $sq, 5, 10000),
             ),
             'online_education' => array_merge(
-                self::select('subject', $sq ? 'Fusha' : 'Subject', ['programming', 'business', 'language', 'design', 'marketing'], $parsed['subject'] ?? null),
-                self::select('level', $sq ? 'Niveli' : 'Level', ['beginner', 'intermediate', 'advanced'], $parsed['level'] ?? null),
-                self::select('format', $sq ? 'Formati' : 'Format', ['course', 'ebook', 'certification', 'bootcamp'], $parsed['format'] ?? null),
+                self::select('product_type', $sq ? 'Lloji' : 'Type', ['book', 'course', 'ebook', 'certification'], $parsed['product_type'] ?? 'book'),
+                self::select('genre', $sq ? 'Zhanri' : 'Genre', ['thriller', 'psychological_thriller', 'mystery', 'romance', 'fantasy', 'sci_fi', 'biography'], $parsed['genre'] ?? null),
+                self::select('format', $sq ? 'Formati' : 'Format', ['paperback', 'hardcover', 'ebook', 'audiobook', 'course'], $parsed['format'] ?? null),
                 self::select('language', $sq ? 'Gjuha' : 'Language', ['en', 'sq', 'de', 'fr'], $parsed['language'] ?? null),
-                self::priceFilter($parsed, $sq, 0, 500),
+                self::priceFilter($parsed, $sq, 0, 80),
             ),
             'travel' => array_merge(
                 self::select('travel_type', $sq ? 'Lloji' : 'Type', ['flight', 'hotel', 'package', 'car_rental', 'activity'], $parsed['travel_type'] ?? null),

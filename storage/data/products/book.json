@@ -1,36 +1,102 @@
 [
   {
-    "id": "book-001",
+    "id": "book-amazon-001",
+    "store": "amazon",
     "title": "The Silent Patient — Psychological Thriller",
     "image": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&q=80",
     "price": 14.99,
     "currency": "EUR",
-    "location": "Online — EU",
+    "location": "Amazon EU",
     "condition": "new",
-    "url": "https://amazon.com",
-    "tags": ["thriller", "psychological", "unexpected ending", "bestseller"]
+    "url": "https://www.amazon.com",
+    "tags": ["thriller", "psychological", "unexpected ending", "bestseller", "short"]
   },
   {
-    "id": "book-002",
-    "title": "Gone Girl — Short-format psychological suspense",
+    "id": "book-ebay-001",
+    "store": "general",
+    "title": "Gone Girl — Psychological suspense paperback",
     "image": "https://images.unsplash.com/photo-1512820790801-415816956e3f?w=800&q=80",
     "price": 11.50,
     "currency": "EUR",
-    "location": "Berlin, Germany",
+    "location": "Online — EU",
     "condition": "used",
     "url": "https://ebay.com",
-    "tags": ["thriller", "psychological", "twist"]
+    "tags": ["thriller", "psychological", "twist", "paperback"]
   },
   {
-    "id": "book-003",
+    "id": "book-amazon-002",
+    "store": "amazon",
     "title": "Shutter Island — Mind-bending thriller paperback",
     "image": "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=800&q=80",
     "price": 9.99,
     "currency": "EUR",
     "location": "Amazon EU",
     "condition": "new",
-    "url": "https://amazon.com",
+    "url": "https://www.amazon.com",
     "tags": ["thriller", "psychological", "short", "unexpected ending"],
     "sponsored": true
+  },
+  {
+    "id": "book-depository-001",
+    "store": "book_depository",
+    "title": "The Girl on the Train — Psychological thriller",
+    "image": "https://images.unsplash.com/photo-1589998059174-4c2c6a0c0c5e?w=800&q=80",
+    "price": 10.50,
+    "currency": "EUR",
+    "location": "Book Depository — Worldwide",
+    "condition": "new",
+    "url": "https://www.bookdepository.com",
+    "tags": ["thriller", "psychological", "twist"]
+  },
+  {
+    "id": "book-waterstones-001",
+    "store": "waterstones",
+    "title": "Before I Go to Sleep — Short psychological thriller",
+    "image": "https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=800&q=80",
+    "price": 12.99,
+    "currency": "EUR",
+    "location": "Waterstones UK",
+    "condition": "new",
+    "url": "https://www.waterstones.com",
+    "tags": ["thriller", "psychological", "short", "unexpected ending"]
+  },
+  {
+    "id": "book-dukagjini-001",
+    "store": "dukagjini",
+    "title": "Thriller psikologjik — roman i shkurtër (shqip)",
+    "image": "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=800&q=80",
+    "price": 8.50,
+    "currency": "EUR",
+    "location": "Pristina, Kosovo",
+    "country_code": "XK",
+    "condition": "new",
+    "url": "https://dukagjini.com",
+    "tags": ["thriller", "psychological", "short", "papritur", "libër"]
+  },
+  {
+    "id": "book-albas-001",
+    "store": "libraria_albas",
+    "title": "Psikologjik me fund të papritur — paperback",
+    "image": "https://images.unsplash.com/photo-1524995997942-a1fc2ecca794?w=800&q=80",
+    "price": 7.99,
+    "currency": "EUR",
+    "location": "Prishtinë, Kosovo",
+    "country_code": "XK",
+    "condition": "new",
+    "url": "https://librariaalbas.com",
+    "tags": ["thriller", "psychological", "unexpected ending", "libër"]
+  },
+  {
+    "id": "book-merrjep-001",
+    "store": "merrjep",
+    "title": "Libër thriller psikologjik — përdorur",
+    "image": "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80",
+    "price": 4.00,
+    "currency": "EUR",
+    "location": "Ferizaj, Kosovo",
+    "country_code": "XK",
+    "condition": "used",
+    "url": "https://www.merrjep.com",
+    "tags": ["thriller", "psychological", "libër", "short"]
   }
 ]

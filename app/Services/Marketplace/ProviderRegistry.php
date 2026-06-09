@@ -3,13 +3,18 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\FederatedSearchProviderInterface;
+use App\Services\Marketplace\Providers\DriloniSearchProvider;
 use App\Services\Marketplace\Providers\EbaySearchProvider;
+use App\Services\Marketplace\Providers\MelodiaPxSearchProvider;
 use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
+use App\Support\GlobalBookMarketplaces;
+use App\Support\KosovoFashionIntent;
+use App\Support\KosovoFashionLiveStores;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
@@ -25,6 +30,8 @@ class ProviderRegistry
     public function __construct(
         private EbaySearchProvider $ebay,
         private SerpApiSearchProvider $serpApi,
+        private MelodiaPxSearchProvider $melodiaPx,
+        private DriloniSearchProvider $driloni,
     ) {}
 
     /**
@@ -37,12 +44,13 @@ class ProviderRegistry
         }
 
         $this->providers = array_merge(
-            [$this->ebay, $this->serpApi],
+            [$this->ebay, $this->serpApi, $this->melodiaPx, $this->driloni],
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),
             $this->dutchAutomotiveProviders(),
             $this->germanAutomotiveProviders(),
             $this->germanElectronicsProviders(),
+            $this->globalBookProviders(),
             $this->kosovoMarketplaceProviders(),
         );
 
@@ -68,7 +76,9 @@ class ProviderRegistry
         $germanElectronics = $countryCode === 'DE'
             && CategoryCatalog::isElectronics($category)
             && ! empty($parsedQuery['search_target']);
-        $kosovoLocal = $countryCode === 'XK';
+        $bookSearch = CategoryCatalog::isBookSearch($parsedQuery);
+        $kosovoLocal = $countryCode === 'XK' && ! $bookSearch;
+        $kosovoBrandedFashion = $kosovoLocal && KosovoFashionIntent::isBrandedCatalogSearch($parsedQuery);
 
         return array_values(array_filter($this->all(), function (FederatedSearchProviderInterface $provider) use (
             $category,
@@ -78,9 +88,16 @@ class ProviderRegistry
             $dutchCar,
             $germanCar,
             $germanElectronics,
+            $bookSearch,
             $kosovoLocal,
+            $kosovoBrandedFashion,
             $geo
         ) {
+            if ($kosovoBrandedFashion) {
+                if ($provider->mode() !== 'live' || ! KosovoFashionLiveStores::isLiveStore($provider->sourceKey())) {
+                    return false;
+                }
+            }
             if ($swissCar && ! SwissCarMarketplaces::isTarget($provider->sourceKey(), $targets ?: SwissCarMarketplaces::keys())) {
                 if (! in_array($provider->sourceKey(), SwissCarMarketplaces::keys(), true)) {
                     return false;
@@ -124,6 +141,22 @@ class ProviderRegistry
                 }
             }
 
+            if ($bookSearch) {
+                $bookKeys = $targets ?: GlobalBookMarketplaces::keysForCountry($countryCode);
+                $key = $provider->sourceKey();
+                $isBookTarget = GlobalBookMarketplaces::isTarget($key, $bookKeys)
+                    || in_array($key, $bookKeys, true)
+                    || in_array($key, ['ebay', 'google_shopping', 'amazon'], true);
+
+                if (! $isBookTarget) {
+                    return false;
+                }
+
+                if (in_array($key, ['mobile.de', 'autoscout24', 'mediamarkt', 'saturn', 'driloni', 'gjirafa50', 'facebook_marketplace', 'etsy'], true)) {
+                    return false;
+                }
+            }
+
             if ($kosovoLocal) {
                 $kosovoKeys = $targets ?: KosovoMarketplaces::keysForCategory($category);
                 $key = $provider->sourceKey();
@@ -150,7 +183,7 @@ class ProviderRegistry
                 }
             }
 
-            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $germanElectronics, $kosovoLocal)) {
+            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $germanElectronics, $bookSearch, $kosovoLocal)) {
                 return false;
             }
 
@@ -161,7 +194,7 @@ class ProviderRegistry
     /**
      * @param  array<int, string>  $targets
      */
-    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $germanElectronics = false, bool $kosovoLocal = false): bool
+    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $germanElectronics = false, bool $bookSearch = false, bool $kosovoLocal = false): bool
     {
         if ($swissCar && SwissCarMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
@@ -176,6 +209,10 @@ class ProviderRegistry
         }
 
         if ($germanElectronics && GermanElectronicsMarketplaces::isTarget($sourceKey, $targets)) {
+            return true;
+        }
+
+        if ($bookSearch && GlobalBookMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
         }
 
@@ -322,6 +359,36 @@ class ProviderRegistry
                 priority: 68,
                 categories: $meta['categories'],
                 countries: ['DE'],
+            );
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array<int, MockSearchProvider>
+     */
+    private function globalBookProviders(): array
+    {
+        $providers = [];
+        $registered = array_keys(config('marketplaces.providers', []));
+
+        foreach (GlobalBookMarketplaces::keys() as $key) {
+            if (in_array($key, $registered, true)) {
+                continue;
+            }
+
+            $meta = GlobalBookMarketplaces::catalog()[$key] ?? null;
+            if ($meta === null) {
+                continue;
+            }
+
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: $meta['label'],
+                priority: 65,
+                categories: $meta['categories'],
+                countries: null,
             );
         }
 

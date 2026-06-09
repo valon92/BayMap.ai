@@ -27,6 +27,7 @@ return [
         'facebook_marketplace' => 72,
         'etsy' => 78,
         'driloni' => 82,
+        'melodiapx' => 88,
         'default' => 70,
     ],
 
@@ -39,7 +40,8 @@ return [
 
         'fashion' => [
             'agents' => [
-                ['id' => 'LocalMarketplaceAgent', 'sources' => ['driloni', 'buzz_sneakers', 'albi_online'], 'countries' => ['XK'], 'trust' => 82, 'speed' => 95],
+                ['id' => 'KosovoFashionLiveAgent', 'sources' => ['melodiapx', 'driloni'], 'countries' => ['XK'], 'trust' => 92, 'speed' => 98],
+                ['id' => 'LocalMarketplaceAgent', 'sources' => ['melodiapx', 'driloni'], 'countries' => ['XK'], 'trust' => 88, 'speed' => 95],
                 ['id' => 'BalkanScraperAgent', 'sources' => ['merrjep', 'dyqani', 'pazar3', 'gjirafa50', 'tregu'], 'countries' => ['XK', 'AL', 'MK'], 'trust' => 75, 'speed' => 88],
                 ['id' => 'ZalandoAgent', 'sources' => ['google_shopping'], 'countries' => ['DE', 'AT', 'CH', 'NL'], 'trust' => 86, 'speed' => 80],
                 ['id' => 'ASOSAgent', 'sources' => ['ebay'], 'countries' => ['GB', 'DE', 'US'], 'trust' => 84, 'speed' => 78],
@@ -81,6 +83,17 @@ return [
                 ['id' => 'EbayTechAgent', 'sources' => ['ebay'], 'countries' => ['*'], 'trust' => 90, 'speed' => 80],
                 ['id' => 'GoogleShoppingAgent', 'sources' => ['google_shopping'], 'countries' => ['*'], 'trust' => 87, 'speed' => 78],
                 ['id' => 'LocalTechAgent', 'sources' => ['gjirafa50', 'tregu', 'pcstore', 'neptun'], 'countries' => ['XK'], 'trust' => 80, 'speed' => 92],
+            ],
+        ],
+
+        'online_education' => [
+            'agents' => [
+                ['id' => 'AmazonBooksAgent', 'sources' => ['amazon'], 'countries' => ['*'], 'trust' => 90, 'speed' => 85],
+                ['id' => 'EbayBooksAgent', 'sources' => ['ebay'], 'countries' => ['*'], 'trust' => 88, 'speed' => 82],
+                ['id' => 'GoogleBooksAgent', 'sources' => ['google_shopping'], 'countries' => ['*'], 'trust' => 86, 'speed' => 80],
+                ['id' => 'BookDepositoryAgent', 'sources' => ['book_depository'], 'countries' => ['*'], 'trust' => 84, 'speed' => 78],
+                ['id' => 'WaterstonesAgent', 'sources' => ['waterstones'], 'countries' => ['GB', 'DE', 'US'], 'trust' => 82, 'speed' => 76],
+                ['id' => 'KosovoBookAgent', 'sources' => ['dukagjini', 'libraria_albas', 'merrjep'], 'countries' => ['XK', 'AL'], 'trust' => 80, 'speed' => 88],
             ],
         ],
 

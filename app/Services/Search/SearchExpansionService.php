@@ -6,6 +6,7 @@ use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
+use App\Support\GlobalBookMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
 
@@ -52,6 +53,9 @@ class SearchExpansionService
     public function expand(array $parsed, array $geo, ?string $locale = 'en'): array
     {
         $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? $geo['country_code'] ?? 'XK'));
+        if (CategoryCatalog::isBookSearch($parsed)) {
+            $parsed['category'] = 'online_education';
+        }
         $marketplaces = $this->marketplacesForCategory($parsed['category'] ?? 'marketplace', $countryCode);
 
         $expanded = [
@@ -115,13 +119,17 @@ class SearchExpansionService
             return GermanElectronicsMarketplaces::keys();
         }
 
+        if (CategoryCatalog::isBooks($category)) {
+            return GlobalBookMarketplaces::keysForCountry($countryCode);
+        }
+
         if ($countryCode === 'XK') {
             return KosovoMarketplaces::keysForCategory($category);
         }
 
         return match ($category) {
             'automotive' => ['ebay', 'mobile.de', 'autoscout24', 'facebook_marketplace'],
-            'online_education' => ['amazon', 'ebay', 'google_shopping'],
+            'online_education' => GlobalBookMarketplaces::keys(),
             'luxury_collectibles' => ['etsy', 'ebay', 'facebook_marketplace', 'google_shopping'],
             'fashion', 'sports_outdoor' => ['driloni', 'ebay', 'etsy', 'facebook_marketplace', 'google_shopping'],
             'electronics_tech', 'gaming_entertainment', 'home_appliances', 'home_furniture' => ['amazon', 'ebay', 'google_shopping'],
@@ -199,6 +207,18 @@ class SearchExpansionService
 
         if ($searchTarget && $countryCode === 'DE' && CategoryCatalog::isElectronics($category)) {
             return GermanElectronicsMarketplaces::labels();
+        }
+
+        if (CategoryCatalog::isBooks($category)) {
+            $labels = [];
+            foreach ($marketplaces as $key) {
+                $label = GlobalBookMarketplaces::label($key);
+                if ($label !== '') {
+                    $labels[] = $label;
+                }
+            }
+
+            return $labels;
         }
 
         if ($countryCode === 'XK') {

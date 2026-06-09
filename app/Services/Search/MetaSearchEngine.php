@@ -2,6 +2,8 @@
 
 namespace App\Services\Search;
 
+use App\Support\KosovoFashionLiveStores;
+
 /**
  * AI-powered meta search engine — clusters identical products across marketplaces,
  * compares prices and sellers, and surfaces the best offer.
@@ -30,7 +32,7 @@ class MetaSearchEngine
         $groups = [];
 
         foreach ($products as $product) {
-            $key = $product['fingerprint'] ?? $this->fallbackKey($product);
+            $key = $this->clusterKey($product);
             $groups[$key][] = $product;
         }
 
@@ -77,6 +79,19 @@ class MetaSearchEngine
         }
 
         return $primary;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private function clusterKey(array $product): string
+    {
+        $sourceKey = (string) ($product['source_key'] ?? '');
+        if (KosovoFashionLiveStores::isLiveStore($sourceKey) && ! empty($product['id'])) {
+            return $sourceKey.':'.(string) $product['id'];
+        }
+
+        return $product['fingerprint'] ?? $this->fallbackKey($product);
     }
 
     /**

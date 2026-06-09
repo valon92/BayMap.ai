@@ -41,6 +41,8 @@ class FashionIntentParser
     private const PRODUCT_TYPES = [
         'patika' => 'sneakers',
         'sneakers' => 'sneakers',
+        'mabthje' => 'shoes',
+        'mbathje' => 'shoes',
         'këpucë' => 'shoes',
         'kepuce' => 'shoes',
         'këpuc' => 'shoes',

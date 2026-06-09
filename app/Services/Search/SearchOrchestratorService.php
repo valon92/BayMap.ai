@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\CountryMatcher;
 use App\Support\ElectronicsIntentParser;
@@ -175,6 +176,7 @@ class SearchOrchestratorService
         $germanElectronicsSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'DE'
             && CategoryCatalog::isElectronics($parsed['category'] ?? '')
             && ! empty($parsed['search_target']);
+        $bookSearch = CategoryCatalog::isBookSearch($parsed);
         $kosovoSearch = strtoupper((string) ($parsed['search_country_code'] ?? $searchGeo['country_code'] ?? '')) === 'XK';
 
         $pipeline[] = [
@@ -186,9 +188,11 @@ class SearchOrchestratorService
                     ? 'Searched '.count($expanded['marketplaces'] ?? []).' Dutch car marketplaces'
                     : ($germanElectronicsSearch
                         ? 'Searched '.count($expanded['marketplaces'] ?? []).' German electronics retailers'
-                        : ($kosovoSearch
-                            ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
-                            : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional'))),
+                        : ($bookSearch
+                            ? 'Searched '.count($expanded['marketplaces'] ?? []).' online bookstores & retailers'
+                            : ($kosovoSearch
+                                ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
+                                : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional')))),
         ];
 
         $products = $this->applyClientFilters($products, $filters, $parsed);
@@ -282,7 +286,7 @@ class SearchOrchestratorService
             return $products;
         }
 
-        return array_values(array_filter($products, function (array $product) use ($filters) {
+        return array_values(array_filter($products, function (array $product) use ($filters, $parsed) {
             if (isset($filters['price_min']) && ($product['price'] ?? 0) < (float) $filters['price_min']) {
                 return false;
             }
@@ -385,7 +389,19 @@ class SearchOrchestratorService
                 }
             }
             if (isset($filters['product_type']) && $filters['product_type'] !== '') {
-                if (! ElectronicsIntentParser::productMatchesType($product, (string) $filters['product_type'])) {
+                $wantedType = (string) $filters['product_type'];
+                if (CategoryCatalog::isBookSearch($parsed)) {
+                    if (! BookIntentParser::productMatchesType($product, $wantedType)) {
+                        return false;
+                    }
+                } elseif (CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
+                    if (! ElectronicsIntentParser::productMatchesType($product, $wantedType)) {
+                        return false;
+                    }
+                }
+            }
+            if (isset($filters['genre']) && $filters['genre'] !== '' && CategoryCatalog::isBookSearch($parsed)) {
+                if (! BookIntentParser::productMatchesGenre($product, (string) $filters['genre'])) {
                     return false;
                 }
             }

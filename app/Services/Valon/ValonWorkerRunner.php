@@ -23,9 +23,9 @@ class ValonWorkerRunner
      */
     public function runParallel(array $workers, array $locationTiers): array
     {
-        $timeout = (int) config('valon.worker_timeout_seconds', 15);
+        $defaultTimeout = (int) config('valon.worker_timeout_seconds', 15);
         $jobs = $this->buildJobs($workers, $locationTiers);
-        $batch = $this->executeBatch($jobs, $timeout);
+        $batch = $this->executeBatch($jobs, $defaultTimeout);
 
         $results = [];
         $report = [];
@@ -114,7 +114,7 @@ class ValonWorkerRunner
      * @param  array<int, array<string, mixed>>  $jobs
      * @return array<int, array<string, mixed>>
      */
-    private function executeBatch(array $jobs, int $timeoutSeconds): array
+    private function executeBatch(array $jobs, int $defaultTimeoutSeconds): array
     {
         if ($jobs === []) {
             return [];
@@ -125,10 +125,25 @@ class ValonWorkerRunner
 
         $results = [];
         foreach (array_merge($live, $demo) as $job) {
-            $results[] = $this->runJob($job, $timeoutSeconds);
+            $timeout = $this->timeoutForJob($job, $defaultTimeoutSeconds);
+            $results[] = $this->runJob($job, $timeout);
         }
 
         return $results;
+    }
+
+    /**
+     * @param  array<string, mixed>  $job
+     */
+    private function timeoutForJob(array $job, int $defaultTimeoutSeconds): int
+    {
+        $platform = strtolower((string) ($job['platform'] ?? ''));
+
+        if (in_array($platform, ['melodiapx', 'driloni'], true)) {
+            return (int) config('valon.melodiapx_timeout_seconds', 120);
+        }
+
+        return $defaultTimeoutSeconds;
     }
 
     /**

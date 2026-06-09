@@ -93,6 +93,7 @@ Rules:
 - description: always in {$lang} when provided
 - Omit null fields or use null explicitly
 - features: array of strings e.g. long_battery, quiet_cooling, gaming
+- books: "libër"/book/novel/thriller/roman => category online_education, product_type "book", genre when clear (psychological_thriller, mystery, etc.). Never use media_streaming for physical books.
 - electronics: "laptop gaming" / "kompjuter gaming" => product_type "laptop" + features ["gaming", ...]. Never return phones for laptop queries.
 - real_estate: "banes"/apartment near a landmark (e.g. gjykata in Ferizaj) => category real_estate, city, landmark, min_sqm; nearby_streets if you know them
 - min_sqm: integer area (120m => 120)

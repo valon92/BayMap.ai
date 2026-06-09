@@ -48,7 +48,7 @@
         <p class="text-xs text-slate-400">{{ t('searched_by_photo') }}</p>
       </div>
 
-      <div class="results-insights-top mb-4">
+      <div v-if="!loading" class="results-insights-top mb-4">
         <InsightScrollSection
           v-if="platformCapabilities.length"
           :title="t('platform_engine')"
@@ -139,7 +139,12 @@
         </InsightScrollSection>
       </div>
 
-      <div class="results-main flex flex-col lg:grid lg:grid-cols-[minmax(200px,220px)_1fr] xl:grid-cols-[minmax(200px,240px)_1fr] gap-4 xl:gap-5">
+      <SearchLoadingExperience v-if="loading" :query="displayQuery" />
+
+      <div
+        v-else
+        class="results-main flex flex-col lg:grid lg:grid-cols-[minmax(200px,220px)_1fr] xl:grid-cols-[minmax(200px,240px)_1fr] gap-4 xl:gap-5"
+      >
         <DynamicFilters
           v-if="data?.filters?.length"
           :key="String(route.query.q || '')"
@@ -150,6 +155,26 @@
         />
 
         <div class="results-products order-2 lg:order-none min-w-0">
+          <InsightScrollSection
+            v-if="showBookMarketplaces"
+            :title="t('book_marketplaces')"
+            tone="sky"
+            class="mb-4"
+          >
+            <template #icon>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </template>
+            <span
+              v-for="label in bookMarketplaceLabels"
+              :key="label"
+              class="insight-chip insight-chip--sky"
+            >
+              {{ label }}
+            </span>
+          </InsightScrollSection>
+
           <InsightScrollSection
             v-if="showGermanElectronicsMarketplaces"
             :title="t('german_electronics_marketplaces')"
@@ -170,9 +195,7 @@
             </span>
           </InsightScrollSection>
 
-          <div v-if="loading" class="mb-4 text-slate-400 text-sm animate-pulse">{{ t('searching') }}</div>
-          <ResultsSkeleton v-if="loading" />
-          <p v-else-if="!results.length" class="text-center text-slate-400 py-16 glass rounded-2xl">
+          <p v-if="!results.length" class="text-center text-slate-400 py-16 glass rounded-2xl">
             {{ t('no_results') }}
           </p>
           <div v-else>
@@ -313,7 +336,7 @@ import api from '../services/api';
 import InsightScrollSection from '../components/InsightScrollSection.vue';
 import ProductCard from '../components/ProductCard.vue';
 import DynamicFilters from '../components/DynamicFilters.vue';
-import ResultsSkeleton from '../components/ResultsSkeleton.vue';
+import SearchLoadingExperience from '../components/SearchLoadingExperience.vue';
 import SearchScopeChips from '../components/SearchScopeChips.vue';
 
 const route = useRoute();
@@ -381,6 +404,19 @@ const showDutchCarMarketplaces = computed(() => {
     && String(p?.search_country_code || '').toUpperCase() === 'NL'
     && (p?.category === 'automotive' || p?.category === 'car')
   );
+});
+
+const showBookMarketplaces = computed(() => {
+  const p = data.value?.parsed;
+  const cat = String(p?.category || '');
+  const type = String(p?.product_type || '').toLowerCase();
+  return cat === 'online_education'
+    || ['book', 'libër', 'liber', 'librin', 'ebook', 'audiobook'].includes(type);
+});
+
+const bookMarketplaceLabels = computed(() => {
+  if (!showBookMarketplaces.value) return [];
+  return data.value?.meta?.marketplace_labels ?? [];
 });
 
 const showGermanElectronicsMarketplaces = computed(() => {
@@ -659,6 +695,8 @@ async function runSearch() {
 
   uploadedPreview.value = hasImage ? `data:image/jpeg;base64,${imageBase64}` : null;
   loading.value = true;
+  data.value = null;
+  visibleResults.value = [];
   currentPage.value = 1;
 
   try {

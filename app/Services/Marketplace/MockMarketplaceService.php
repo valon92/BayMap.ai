@@ -3,8 +3,10 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\MarketplaceSearchInterface;
+use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
+use App\Support\GlobalBookMarketplaces;
 use App\Support\ElectronicsIntentParser;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
@@ -46,6 +48,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             && ! DutchCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! GermanCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! GermanElectronicsMarketplaces::isTarget($this->source, $marketplaces)
+            && ! GlobalBookMarketplaces::isTarget($this->source, $marketplaces)
             && ! KosovoMarketplaces::isTarget($this->source, $marketplaces)) {
             $sourceKey = $this->mapSourceToKey();
             $allowed = false;
@@ -114,6 +117,26 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 $items,
                 fn (array $item) => ($item['store'] ?? '') === $this->source
             ));
+        }
+
+        if (GlobalBookMarketplaces::isPlatform($this->source)) {
+            return array_values(array_filter(
+                $items,
+                fn (array $item) => ($item['store'] ?? '') === $this->source
+                    || (($item['store'] ?? 'general') === 'general' && in_array($this->source, ['ebay', 'google_shopping'], true))
+            ));
+        }
+
+        if (KosovoMarketplaces::isTarget($this->source, GlobalBookMarketplaces::kosovoKeys())) {
+            return array_values(array_filter($items, function (array $item) {
+                if (($item['store'] ?? '') === $this->source) {
+                    return true;
+                }
+
+                return ($item['store'] ?? 'general') === 'general'
+                    && $this->source === 'merrjep'
+                    && $this->locationMatchesCountry($item, 'XK');
+            }));
         }
 
         if ($this->source === 'driloni') {
@@ -215,6 +238,20 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                         if (! in_array($itemGender, ['female', 'women', 'unisex'], true)) {
                             return false;
                         }
+                    }
+                }
+            }
+
+            if (CategoryCatalog::isBooks($parsed['category'] ?? '') || CategoryCatalog::isBookSearch($parsed)) {
+                if (! empty($parsed['genre']) && ! BookIntentParser::productMatchesGenre($item, (string) $parsed['genre'])) {
+                    return false;
+                }
+
+                if (! empty($parsed['format'])) {
+                    $format = mb_strtolower((string) $parsed['format']);
+                    $condition = mb_strtolower((string) ($item['condition'] ?? ''));
+                    if ($format === 'ebook' && $condition === 'used') {
+                        return false;
                     }
                 }
             }

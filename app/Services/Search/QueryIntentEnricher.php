@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Support\AutomotiveIntentParser;
+use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
@@ -48,9 +49,18 @@ class QueryIntentEnricher
             $parsed['currency'] = 'EUR';
         }
 
+        $parsed = self::mergeBookIntent($parsed, $rawQuery);
+        if (CategoryCatalog::isBookSearch($parsed)) {
+            $parsed['category'] = 'online_education';
+        }
+
         $parsed = self::mergeFashionIntent($parsed, $rawQuery);
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
+
+        if (CategoryCatalog::isBookSearch($parsed)) {
+            $parsed['category'] = 'online_education';
+        }
 
         if (! empty($parsed['model'])) {
             $parsed['model'] = ElectronicsIntentParser::normalizeIphoneModel((string) $parsed['model'])
@@ -69,6 +79,35 @@ class QueryIntentEnricher
         }
 
         return array_filter($parsed, fn ($v) => $v !== null && $v !== '' && $v !== []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    private static function mergeBookIntent(array $parsed, string $rawQuery): array
+    {
+        $book = BookIntentParser::fromQuery($rawQuery);
+        if ($book === []) {
+            $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+            if (in_array($type, ['book', 'libër', 'liber', 'librin'], true)) {
+                $parsed['category'] = 'online_education';
+                $parsed['product_type'] = 'book';
+            }
+
+            return $parsed;
+        }
+
+        foreach ($book as $key => $value) {
+            if (empty($parsed[$key])) {
+                $parsed[$key] = $value;
+            }
+        }
+
+        $parsed['category'] = 'online_education';
+        $parsed['product_type'] = 'book';
+
+        return $parsed;
     }
 
     /**

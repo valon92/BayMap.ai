@@ -39,7 +39,7 @@ class SearchResultPoolService
         }
 
         // With few real matches, show the actual pool size (no inflated marketplace estimate).
-        if ($poolSize < 24) {
+        if ($poolSize < 24 || ! empty($parsed['brand'])) {
             return $poolSize;
         }
 
@@ -78,9 +78,21 @@ class SearchResultPoolService
      */
     private function poolSize(array $parsed): int
     {
-        return match (CategoryCatalog::normalize($parsed['category'] ?? 'marketplace')) {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
+
+        if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            $brand = mb_strtolower((string) ($parsed['brand'] ?? ''));
+            $gender = mb_strtolower((string) ($parsed['gender'] ?? ''));
+            if ($brand === 'puma' || in_array($gender, ['male', 'men', 'meshkuj'], true)) {
+                return 300;
+            }
+
+            return 120;
+        }
+
+        return match ($category) {
             'automotive' => 120,
-            'fashion', 'sports_outdoor', 'luxury_collectibles' => 72,
+            'luxury_collectibles' => 72,
             default => 48,
         };
     }

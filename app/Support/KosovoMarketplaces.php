@@ -23,6 +23,7 @@ class KosovoMarketplaces
         'focus_electronics' => ['label' => 'FOCUS Electronics', 'url' => 'https://focus-ks.com', 'categories' => ['electronics_tech']],
 
         // Fashion / Sport
+        'melodiapx' => ['label' => 'Melodia Px', 'url' => 'https://www.melodiapx.com/meshkuj/', 'categories' => ['fashion', 'sports_outdoor', 'marketplace']],
         'driloni' => ['label' => 'Driloni Sportswear', 'url' => 'https://driloni-ks.com', 'categories' => ['fashion', 'sports_outdoor', 'marketplace']],
         'mona_fashion' => ['label' => 'Mona Fashion Kosovo', 'url' => 'https://mona-ks.com', 'categories' => ['fashion']],
         'fashion_group' => ['label' => 'Fashion Group Kosovo', 'url' => 'https://fashiongroup-ks.com', 'categories' => ['fashion']],
@@ -118,6 +119,13 @@ class KosovoMarketplaces
         foreach (['merrjep', 'dyqani', 'pazar3', 'gjirafa50'] as $core) {
             if (! in_array($core, $keys, true)) {
                 $keys[] = $core;
+            }
+        }
+
+        if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            $priority = array_values(array_filter(['melodiapx', 'driloni'], fn ($k) => in_array($k, $keys, true)));
+            if ($priority !== []) {
+                $keys = array_values(array_unique(array_merge($priority, $keys)));
             }
         }
 

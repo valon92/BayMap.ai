@@ -8,6 +8,10 @@ return [
 
     'timeout_seconds' => (int) env('MARKETPLACE_TIMEOUT', 15),
 
+    'melodiapx_timeout_seconds' => (int) env('MELODIA_PX_TIMEOUT', 90),
+
+    'kosovo_fashion_timeout_seconds' => (int) env('KOSOVO_FASHION_TIMEOUT', 45),
+
     'live_result_cap' => 16,
 
     'skip_mock_when_live_at_least' => 8,
@@ -44,7 +48,7 @@ return [
             'label' => 'Amazon',
             'mode' => 'demo',
             'priority' => 30,
-            'categories' => ['electronics_tech', 'gaming_entertainment', 'home_appliances', 'grocery', 'beauty', 'marketplace'],
+            'categories' => ['electronics_tech', 'gaming_entertainment', 'home_appliances', 'grocery', 'beauty', 'online_education', 'marketplace'],
         ],
         'mobile.de' => [
             'adapter' => 'mock',
@@ -74,11 +78,19 @@ return [
             'priority' => 70,
             'categories' => ['fashion', 'sports_outdoor', 'automotive', 'marketplace'],
         ],
+        'melodiapx' => [
+            'adapter' => 'melodiapx',
+            'label' => 'Melodia Px',
+            'mode' => 'live',
+            'priority' => 3,
+            'categories' => ['fashion', 'sports_outdoor', 'marketplace'],
+            'countries' => ['XK'],
+        ],
         'driloni' => [
-            'adapter' => 'mock',
+            'adapter' => 'driloni',
             'label' => 'Driloni Sportswear',
-            'mode' => 'demo',
-            'priority' => 5,
+            'mode' => 'live',
+            'priority' => 4,
             'categories' => ['fashion', 'sports_outdoor', 'marketplace'],
             'countries' => ['XK'],
         ],
