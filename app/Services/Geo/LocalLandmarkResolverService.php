@@ -16,6 +16,10 @@ class LocalLandmarkResolverService
      */
     public function enrich(array $parsed, string $rawQuery, array $geo, ?string $locale = 'en'): array
     {
+        if ($this->shouldSkipLocalLandmarks($parsed, $rawQuery)) {
+            return $parsed;
+        }
+
         $normalizedQuery = $this->normalizeText($rawQuery);
         $category = $parsed['category'] ?? 'marketplace';
 
@@ -23,7 +27,7 @@ class LocalLandmarkResolverService
             return $parsed;
         }
 
-        $cityKey = $this->detectCityKey($normalizedQuery, $geo);
+        $cityKey = $this->detectCityKey($normalizedQuery, $geo, $parsed);
         if (! $cityKey) {
             return $parsed;
         }
@@ -100,10 +104,48 @@ class LocalLandmarkResolverService
         return false;
     }
 
-    private function detectCityKey(string $query, array $geo): ?string
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function shouldSkipLocalLandmarks(array $parsed, string $rawQuery): bool
+    {
+        $targetCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+        if (! empty($parsed['search_target']) && $targetCode !== '' && $targetCode !== 'XK') {
+            return true;
+        }
+
+        $normalized = $this->normalizeText($rawQuery);
+        $foreignMarkers = [
+            'london', 'londer', 'londra', 'paris', 'berlin', 'amsterdam', 'washington',
+            'new york', 'zurich', 'bern', 'geneva', 'manchester', 'birmingham',
+            'dubai', 'miami', 'romë', 'rome', 'milano', 'milan',
+        ];
+
+        foreach ($foreignMarkers as $marker) {
+            if (str_contains($normalized, $this->normalizeText($marker))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function detectCityKey(string $query, array $geo, array $parsed = []): ?string
     {
         if (str_contains($query, 'ferizaj') || str_contains($query, 'ferizaji')) {
             return 'ferizaj';
+        }
+
+        if (str_contains($query, 'prishtin') || str_contains($query, 'pristina')) {
+            return 'prishtina';
+        }
+
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? $geo['country_code'] ?? ''));
+        if ($countryCode !== '' && $countryCode !== 'XK') {
+            return null;
         }
 
         $city = $this->normalizeText($geo['city'] ?? '');

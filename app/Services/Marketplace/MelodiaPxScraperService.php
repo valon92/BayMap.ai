@@ -79,8 +79,9 @@ class MelodiaPxScraperService
     {
         $brand = (string) ($parsedQuery['brand'] ?? '');
         $hasBrandHash = $brand !== '' && MelodiaPxCatalog::hasBrandHash($brand);
+        $footwear = \App\Support\KosovoFashionIntent::isFootwearType((string) ($parsedQuery['product_type'] ?? ''));
 
-        if ($hasBrandHash) {
+        if ($hasBrandHash || ($footwear && ! empty($parsedQuery['size']))) {
             return 5;
         }
 

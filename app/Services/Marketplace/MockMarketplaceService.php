@@ -9,6 +9,7 @@ use App\Support\DutchCarMarketplaces;
 use App\Support\GlobalBookMarketplaces;
 use App\Support\ElectronicsIntentParser;
 use App\Support\GermanCarMarketplaces;
+use App\Support\KosovoCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
@@ -49,7 +50,8 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             && ! GermanCarMarketplaces::isTarget($this->source, $marketplaces)
             && ! GermanElectronicsMarketplaces::isTarget($this->source, $marketplaces)
             && ! GlobalBookMarketplaces::isTarget($this->source, $marketplaces)
-            && ! KosovoMarketplaces::isTarget($this->source, $marketplaces)) {
+            && ! KosovoMarketplaces::isTarget($this->source, $marketplaces)
+            && ! KosovoCarMarketplaces::isTarget($this->source, $marketplaces)) {
             $sourceKey = $this->mapSourceToKey();
             $allowed = false;
             foreach ($marketplaces as $mp) {
@@ -100,6 +102,13 @@ class MockMarketplaceService implements MarketplaceSearchInterface
      */
     private function filterForSource(array $items): array
     {
+        if (KosovoCarMarketplaces::isPlatform($this->source)) {
+            return array_values(array_filter(
+                $items,
+                fn (array $item) => ($item['store'] ?? '') === $this->source
+            ));
+        }
+
         if (KosovoMarketplaces::isKosovoPlatform($this->source)) {
             return array_values(array_filter($items, function (array $item) {
                 if (($item['store'] ?? '') === $this->source) {
@@ -110,6 +119,13 @@ class MockMarketplaceService implements MarketplaceSearchInterface
 
                 return ($store === 'general' || $store === '') && $this->locationMatchesCountry($item, 'XK');
             }));
+        }
+
+        if (GermanCarMarketplaces::isPlatform($this->source)) {
+            return array_values(array_filter(
+                $items,
+                fn (array $item) => ($item['store'] ?? '') === $this->source
+            ));
         }
 
         if (GermanElectronicsMarketplaces::isPlatform($this->source)) {
@@ -415,6 +431,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
 
         if (GermanElectronicsMarketplaces::url($this->source)) {
             return GermanElectronicsMarketplaces::label($this->source);
+        }
+
+        if (KosovoCarMarketplaces::url($this->source)) {
+            return KosovoCarMarketplaces::label($this->source);
         }
 
         if (KosovoMarketplaces::url($this->source)) {

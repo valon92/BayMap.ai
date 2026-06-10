@@ -25,12 +25,19 @@ class MelodiaPxCatalog
      */
     public static function catalogUrl(array $parsed): string
     {
-        $gender = mb_strtolower((string) ($parsed['gender'] ?? ''));
-        $path = match (true) {
-            in_array($gender, ['male', 'men', 'meshkuj'], true) => '/meshkuj/',
-            in_array($gender, ['female', 'women', 'femra'], true) => '/femra/',
-            default => '/meshkuj/',
-        };
+        $productType = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+        $query = mb_strtolower((string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? ''));
+
+        if (KosovoFashionIntent::isFootwearType($productType) || KosovoFashionIntent::queryMentionsFootwear($query)) {
+            $path = '/atlete/';
+        } else {
+            $gender = mb_strtolower((string) ($parsed['gender'] ?? ''));
+            $path = match (true) {
+                in_array($gender, ['male', 'men', 'meshkuj'], true) => '/meshkuj/',
+                in_array($gender, ['female', 'women', 'femra'], true) => '/femra/',
+                default => '/meshkuj/',
+            };
+        }
 
         $brand = mb_strtolower((string) ($parsed['brand'] ?? ''));
         $query = self::BRAND_HASH[$brand] ?? '';

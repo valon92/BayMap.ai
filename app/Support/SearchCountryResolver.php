@@ -50,8 +50,26 @@ class SearchCountryResolver
         'dutch' => ['code' => 'NL', 'name' => 'Netherlands'],
         'united states' => ['code' => 'US', 'name' => 'United States'],
         'usa' => ['code' => 'US', 'name' => 'United States'],
+        'america' => ['code' => 'US', 'name' => 'United States'],
+        'amerik' => ['code' => 'US', 'name' => 'United States'],
+        'amerike' => ['code' => 'US', 'name' => 'United States'],
+        'amerikë' => ['code' => 'US', 'name' => 'United States'],
+        'shtetet e bashkuara' => ['code' => 'US', 'name' => 'United States'],
+        'new york' => ['code' => 'US', 'name' => 'United States'],
+        'newyork' => ['code' => 'US', 'name' => 'United States'],
+        'nyc' => ['code' => 'US', 'name' => 'United States'],
         'united kingdom' => ['code' => 'GB', 'name' => 'United Kingdom'],
         'england' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'london' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'londer' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'londër' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'londra' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'uk' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'britani' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'britaninë' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'britanine' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'angleze' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'angli' => ['code' => 'GB', 'name' => 'United Kingdom'],
     ];
 
     /**
@@ -59,22 +77,42 @@ class SearchCountryResolver
      */
     public static function fromQuery(string $query): array
     {
+        $all = self::allFromQuery($query);
+
+        return $all[0] ?? [];
+    }
+
+    /**
+     * All countries mentioned in a query (e.g. Germany + Netherlands + Switzerland).
+     *
+     * @return array<int, array{search_country: string, search_country_code: string}>
+     */
+    public static function allFromQuery(string $query): array
+    {
         $lower = mb_strtolower($query);
+        $found = [];
+        $seen = [];
 
         foreach (self::ALIASES as $needle => $meta) {
-            if (str_contains($lower, $needle)) {
-                return [
-                    'search_country' => $meta['name'],
-                    'search_country_code' => $meta['code'],
-                ];
+            if (! str_contains($lower, $needle)) {
+                continue;
             }
+            if (isset($seen[$meta['code']])) {
+                continue;
+            }
+            $seen[$meta['code']] = true;
+            $found[] = [
+                'search_country' => $meta['name'],
+                'search_country_code' => $meta['code'],
+            ];
         }
 
-        if (preg_match('/\b(?:in|në|ne|en|à|a)\s+([a-zëçáéíóúäöü\s]{3,30})\b/ui', $lower, $m)) {
+        if ($found === [] && preg_match('/\b(?:in|në|ne|en|à|a)\s+([a-zëçáéíóúäöü\s,]{3,80})\b/ui', $lower, $m)) {
             $phrase = trim($m[1]);
             foreach (self::ALIASES as $needle => $meta) {
-                if (str_contains($phrase, $needle) || str_contains($needle, $phrase)) {
-                    return [
+                if ((str_contains($phrase, $needle) || str_contains($needle, $phrase)) && ! isset($seen[$meta['code']])) {
+                    $seen[$meta['code']] = true;
+                    $found[] = [
                         'search_country' => $meta['name'],
                         'search_country_code' => $meta['code'],
                     ];
@@ -82,6 +120,6 @@ class SearchCountryResolver
             }
         }
 
-        return [];
+        return $found;
     }
 }

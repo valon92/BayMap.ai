@@ -74,6 +74,12 @@ class WooCommerceFashionScraperService
      */
     private function maxPages(array $parsedQuery): int
     {
+        $footwear = \App\Support\KosovoFashionIntent::isFootwearType((string) ($parsedQuery['product_type'] ?? ''));
+
+        if ($footwear && (! empty($parsedQuery['size']) || ! empty($parsedQuery['brand']))) {
+            return 5;
+        }
+
         if (! empty($parsedQuery['size']) || ! empty($parsedQuery['max_price'])) {
             return 3;
         }

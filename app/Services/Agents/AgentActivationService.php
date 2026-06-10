@@ -6,9 +6,12 @@ use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\ProviderRegistry;
 use App\Support\CategoryCatalog;
 use App\Support\KosovoFashionIntent;
+use App\Support\LivePlatformRegistry;
 
 /**
- * Dynamically selects top 3–6 relevant agents per query — never mass-activates all providers.
+ * Activates Valon Workers per query.
+ * When country + category has registered platforms → one worker per store (universal fan-out).
+ * Otherwise scores and picks top agents from the pool.
  */
 class AgentActivationService
 {
@@ -29,7 +32,16 @@ class AgentActivationService
      */
     public function activate(array $parsed, array $expanded, array $geo = []): array
     {
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? $geo['country_code'] ?? 'XK'));
         $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
+        $parsedForFanOut = $parsed;
+        if (empty($parsedForFanOut['search_country_code']) && ! empty($geo['country_code'])) {
+            $parsedForFanOut['search_country_code'] = strtoupper((string) $geo['country_code']);
+        }
+
+        if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {
+            return $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+        }
         $poolAgents = $this->pools->poolForCategory($category);
         $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
         $providerMap = [];
@@ -37,7 +49,6 @@ class AgentActivationService
             $providerMap[$provider->sourceKey()] = $provider;
         }
 
-        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? $geo['country_code'] ?? 'XK'));
         $scored = [];
 
         foreach ($poolAgents as $agent) {
@@ -107,6 +118,59 @@ class AgentActivationService
     }
 
     /**
+     * One Valon Worker per live platform in country+category (parallel scraping).
+     *
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $expanded
+     * @param  array<string, mixed>  $geo
+     * @return array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }
+     */
+    private function activateLivePlatforms(array $parsed, array $expanded, array $geo, string $countryCode, string $category): array
+    {
+        $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
+        $wanted = LivePlatformRegistry::keysFromParsed($parsed);
+        $byKey = [];
+
+        foreach ($allProviders as $provider) {
+            $key = $provider->sourceKey();
+            if (in_array($key, $wanted, true)) {
+                $byKey[$key] = $provider;
+            }
+        }
+
+        $ordered = [];
+        foreach ($wanted as $key) {
+            if (isset($byKey[$key])) {
+                $ordered[] = $byKey[$key];
+            }
+        }
+
+        $agents = [];
+        $sourceKeys = [];
+
+        foreach ($ordered as $provider) {
+            $key = $provider->sourceKey();
+            $sourceKeys[] = $key;
+            $agents[] = [
+                'id' => 'LivePlatformAgent',
+                'score' => 100.0,
+                'sources' => [$key],
+                'trust' => (int) ($this->pools->trustScore($key) ?: 85),
+            ];
+        }
+
+        return [
+            'agents' => $agents,
+            'source_keys' => $sourceKeys,
+            'providers' => $ordered,
+        ];
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $scored
      * @param  array<int, FederatedSearchProviderInterface>  $allProviders
      * @return array<int, array<string, mixed>>
@@ -158,9 +222,8 @@ class AgentActivationService
      */
     private function scoreAgent(array $agent, array $parsed, array $geo, string $countryCode, array $providers): float
     {
-        if (strtoupper($countryCode) === 'XK'
-            && KosovoFashionIntent::isBrandedCatalogSearch($parsed)
-            && in_array((string) ($agent['id'] ?? ''), ['BalkanScraperAgent', 'EUAggregatorAgent', 'AboutYouAgent', 'ASOSAgent', 'ZalandoAgent'], true)) {
+        if (LivePlatformRegistry::shouldFanOut($parsed, $countryCode)
+            && in_array((string) ($agent['id'] ?? ''), ['BalkanScraperAgent', 'EUAggregatorAgent', 'AboutYouAgent', 'ASOSAgent', 'ZalandoAgent', 'LocalMarketplaceAgent'], true)) {
             return 0.0;
         }
 

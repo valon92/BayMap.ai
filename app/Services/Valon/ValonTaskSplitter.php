@@ -3,6 +3,8 @@
 namespace App\Services\Valon;
 
 use App\Contracts\FederatedSearchProviderInterface;
+use App\Support\CategoryCatalog;
+use App\Support\LivePlatformRegistry;
 
 /**
  * Splits Valon intent into stateless Valon Worker execution units.
@@ -19,7 +21,13 @@ class ValonTaskSplitter
     {
         $workers = [];
         $index = 1;
-        $max = (int) config('valon.max_workers', config('agent_pools.max_agents', 6));
+        $parsed = $intent['parsed'] ?? [];
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+        $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
+        $liveFanOut = LivePlatformRegistry::shouldFanOut($parsed, $countryCode);
+        $max = $liveFanOut
+            ? LivePlatformRegistry::maxWorkersFor($parsed)
+            : (int) config('valon.max_workers', config('agent_pools.max_agents', 6));
         $prefix = config('valon.worker_prefix', 'ValonWorker');
         $providers = $activation['providers'] ?? [];
         $agents = $activation['agents'] ?? [];
@@ -64,6 +72,28 @@ class ValonTaskSplitter
                     "{$prefix}-{$index}",
                     $role,
                     $agentId,
+                    $provider,
+                    $intent,
+                    $expanded,
+                );
+                $index++;
+            }
+        }
+
+        if ($liveFanOut && $providers !== []) {
+            foreach ($providers as $provider) {
+                if ($index > $max) {
+                    break;
+                }
+                $platformKey = $this->normalizePlatform($provider->sourceKey());
+                if (isset($usedPlatforms[$platformKey])) {
+                    continue;
+                }
+                $usedPlatforms[$platformKey] = true;
+                $workers[] = $this->buildWorkerSpec(
+                    "{$prefix}-{$index}",
+                    $this->roleLabel('LivePlatformAgent'),
+                    'LivePlatformAgent',
                     $provider,
                     $intent,
                     $expanded,

@@ -55,6 +55,11 @@ class ListingNormalizer
             store: $listing->store,
             priceEur: $priceEur,
             fingerprint: $fingerprint,
+            fuel: $listing->fuel,
+            color: $listing->color,
+            transmission: $listing->transmission,
+            engineLiters: $listing->engineLiters,
+            countryCode: $listing->countryCode,
         );
     }
 

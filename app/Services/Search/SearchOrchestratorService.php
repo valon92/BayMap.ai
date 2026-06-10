@@ -2,6 +2,9 @@
 
 namespace App\Services\Search;
 
+use App\Support\AutomotiveColorResolver;
+use App\Support\AutomotiveEngineResolver;
+use App\Support\AutomotiveIntentParser;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\CountryMatcher;
@@ -197,6 +200,7 @@ class SearchOrchestratorService
 
         $products = $this->applyClientFilters($products, $filters, $parsed);
         $products = $this->ranking->rank($products, $this->intentEnricher->rankingContext($parsed, $geo));
+        $products = $this->balanceMultiCountryResults($products, $parsed);
         $products = $this->dedupeListings($products);
         $pool = $this->resultPool->expand($products, $parsed);
         $pool = $this->applyClientFilters($pool, $filters, $parsed);
@@ -326,17 +330,18 @@ class SearchOrchestratorService
                 }
             }
             if (isset($filters['color']) && $filters['color'] !== '') {
-                if (! $this->productMatchesColor($product, (string) $filters['color'])) {
+                $wantedColors = (array) ($filters['colors'] ?? $parsed['colors'] ?? []);
+                if (! $this->productMatchesColor($product, (string) $filters['color'], $wantedColors)) {
                     return false;
                 }
             }
             if (isset($filters['fuel']) && $filters['fuel'] !== '') {
-                $fuel = mb_strtolower((string) $filters['fuel']);
+                $fuel = AutomotiveIntentParser::normalizeFuel((string) $filters['fuel']);
                 $title = mb_strtolower($product['title'] ?? '');
                 $tags = array_map('mb_strtolower', $product['tags'] ?? []);
                 $needles = match ($fuel) {
-                    'diesel' => ['diesel', 'tdi', 'dizell'],
-                    'petrol' => ['petrol', 'benzin', 'tfsi', 'gasoline'],
+                    'diesel' => ['diesel', 'tdi', 'dizell', 'disel'],
+                    'petrol' => ['petrol', 'benzin', 'tfsi', 'gasoline', 'tsi'],
                     'electric' => ['electric', 'ev', 'elektrik'],
                     default => [$fuel],
                 };
@@ -347,16 +352,45 @@ class SearchOrchestratorService
                         break;
                     }
                 }
+                if (! $matchesFuel && ! empty($product['fuel'])) {
+                    $productFuel = AutomotiveIntentParser::normalizeFuel((string) $product['fuel']);
+                    $matchesFuel = $productFuel === $fuel;
+                }
                 if (! $matchesFuel) {
                     return false;
                 }
             }
+            if (isset($filters['engine_liters']) && (float) $filters['engine_liters'] > 0) {
+                $wantedEngine = (float) $filters['engine_liters'];
+                $productEngine = isset($product['engine_liters']) ? (float) $product['engine_liters'] : null;
+                if (! AutomotiveEngineResolver::matchesWanted(
+                    $productEngine,
+                    $wantedEngine,
+                    (string) ($product['title'] ?? ''),
+                    isset($filters['fuel']) ? (string) $filters['fuel'] : null,
+                )) {
+                    return false;
+                }
+            }
             if (isset($filters['country']) && $filters['country'] !== '') {
-                if (! CountryMatcher::locationMatchesFilter(
+                $countryMatch = CountryMatcher::locationMatchesFilter(
                     (string) ($product['location'] ?? ''),
                     (string) $filters['country'],
                     isset($product['country_code']) ? (string) $product['country_code'] : null,
-                )) {
+                );
+                if (! $countryMatch && ! empty($parsed['search_countries']) && is_array($parsed['search_countries'])) {
+                    foreach ($parsed['search_countries'] as $country) {
+                        if (CountryMatcher::locationMatchesFilter(
+                            (string) ($product['location'] ?? ''),
+                            (string) ($country['search_country'] ?? ''),
+                            isset($product['country_code']) ? (string) $product['country_code'] : null,
+                        )) {
+                            $countryMatch = true;
+                            break;
+                        }
+                    }
+                }
+                if (! $countryMatch) {
                     return false;
                 }
             }
@@ -514,16 +548,25 @@ class SearchOrchestratorService
     /**
      * @param  array<string, mixed>  $product
      */
-    private function productMatchesColor(array $product, string $color): bool
+    /**
+     * @param  array<int, string>  $wantedColors
+     */
+    private function productMatchesColor(array $product, string $color, array $wantedColors = []): bool
     {
         $color = mb_strtolower(trim($color));
-        $title = mb_strtolower($product['title'] ?? '');
-        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+        $title = (string) ($product['title'] ?? '');
+        $productColor = isset($product['color']) ? (string) $product['color'] : null;
+
+        $store = strtolower((string) ($product['store'] ?? $product['source_key'] ?? ''));
+        $allowUnknown = str_contains($store, 'kleinanzeigen') || $color === 'multicolor';
 
         if ($color === 'multicolor') {
-            $tones = ['black', 'white', 'grey', 'gray', 'blue', 'red', 'green', 'silver', 'graphite', 'pearl', 'ivory'];
+            $tones = $wantedColors !== []
+                ? array_map('mb_strtolower', $wantedColors)
+                : ['black', 'white'];
+
             foreach ($tones as $tone) {
-                if ($this->colorToneInProduct($tone, $title, $tags)) {
+                if (AutomotiveColorResolver::matchesWanted($productColor, $tone, $title, $allowUnknown)) {
                     return true;
                 }
             }
@@ -531,7 +574,7 @@ class SearchOrchestratorService
             return false;
         }
 
-        return $this->colorToneInProduct($color, $title, $tags);
+        return AutomotiveColorResolver::matchesWanted($productColor, $color, $title, $allowUnknown);
     }
 
     /**
@@ -554,6 +597,73 @@ class SearchOrchestratorService
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $products
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, array<string, mixed>>
+     */
+    private function balanceMultiCountryResults(array $products, array $parsed): array
+    {
+        $countries = $parsed['search_countries'] ?? [];
+        if (! is_array($countries) || count($countries) <= 1 || $products === []) {
+            return $products;
+        }
+
+        $buckets = [];
+        foreach ($countries as $country) {
+            $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+            if ($code !== '') {
+                $buckets[$code] = [];
+            }
+        }
+
+        if ($buckets === []) {
+            return $products;
+        }
+
+        $overflow = [];
+
+        foreach ($products as $product) {
+            $placed = false;
+            foreach ($countries as $country) {
+                $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+                if ($code === '' || ! isset($buckets[$code])) {
+                    continue;
+                }
+
+                if (CountryMatcher::locationMatchesFilter(
+                    (string) ($product['location'] ?? ''),
+                    (string) ($country['search_country'] ?? ''),
+                    isset($product['country_code']) ? (string) $product['country_code'] : null,
+                )) {
+                    $buckets[$code][] = $product;
+                    $placed = true;
+                    break;
+                }
+            }
+
+            if (! $placed) {
+                $overflow[] = $product;
+            }
+        }
+
+        $balanced = [];
+        $codes = array_keys($buckets);
+        $hasItems = true;
+
+        while ($hasItems) {
+            $hasItems = false;
+            foreach ($codes as $code) {
+                if ($buckets[$code] !== []) {
+                    $balanced[] = array_shift($buckets[$code]);
+                    $hasItems = true;
+                }
+            }
+        }
+
+        return array_merge($balanced, $overflow);
     }
 
     /**

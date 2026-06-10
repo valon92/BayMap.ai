@@ -132,6 +132,29 @@ class ValonWorkerRunner
         return $results;
     }
 
+    private function resolveWorkerStatus(string $platform, int $count, string $mode): string
+    {
+        if ($count > 0) {
+            return 'ok';
+        }
+
+        if ($mode === 'live' && $this->isAntiBotPlatform($platform)) {
+            return 'blocked';
+        }
+
+        return 'ok';
+    }
+
+    private function isAntiBotPlatform(string $platform): bool
+    {
+        return in_array(strtolower($platform), [
+            'mobile_de',
+            'heycar_de',
+            'facebook_marketplace_de',
+            'wirkaufendeinauto',
+        ], true);
+    }
+
     /**
      * @param  array<string, mixed>  $job
      */
@@ -139,7 +162,7 @@ class ValonWorkerRunner
     {
         $platform = strtolower((string) ($job['platform'] ?? ''));
 
-        if (in_array($platform, ['melodiapx', 'driloni'], true)) {
+        if (\App\Support\LivePlatformRegistry::isLivePlatform($platform)) {
             return (int) config('valon.melodiapx_timeout_seconds', 120);
         }
 
@@ -177,6 +200,8 @@ class ValonWorkerRunner
         try {
             $items = $provider->search($job['parsed_query'], $job['expanded_filters']);
 
+            $count = is_array($items) ? count($items) : 0;
+
             return [
                 'worker_id' => $job['worker_id'],
                 'role' => $job['role'],
@@ -184,10 +209,10 @@ class ValonWorkerRunner
                 'platform_label' => $job['platform_label'],
                 'items' => is_array($items) ? $items : [],
                 'mode' => $provider->mode() === 'live' ? 'live' : 'demo',
-                'status' => 'ok',
+                'status' => $this->resolveWorkerStatus((string) $job['platform'], $count, $provider->mode()),
                 'latency_ms' => (int) round((microtime(true) - $started) * 1000),
                 'tier_label' => $job['tier_label'] ?? '',
-                'error' => null,
+                'error' => $count === 0 && $this->isAntiBotPlatform((string) $job['platform']) ? 'anti_bot' : null,
             ];
         } catch (\Throwable $e) {
             Log::warning('Valon worker failed', [

@@ -3,20 +3,20 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\FederatedSearchProviderInterface;
-use App\Services\Marketplace\Providers\DriloniSearchProvider;
 use App\Services\Marketplace\Providers\EbaySearchProvider;
-use App\Services\Marketplace\Providers\MelodiaPxSearchProvider;
 use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
+use App\Support\LivePlatformRegistry;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
 use App\Support\GlobalBookMarketplaces;
-use App\Support\KosovoFashionIntent;
-use App\Support\KosovoFashionLiveStores;
+use App\Support\KosovoCarMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\SwissCarMarketplaces;
+use App\Support\SwissRealEstateMarketplaces;
+use App\Support\UKRealEstateMarketplaces;
 
 /**
  * Registry of all federated search connectors.
@@ -30,8 +30,7 @@ class ProviderRegistry
     public function __construct(
         private EbaySearchProvider $ebay,
         private SerpApiSearchProvider $serpApi,
-        private MelodiaPxSearchProvider $melodiaPx,
-        private DriloniSearchProvider $driloni,
+        private LiveSearchProviderFactory $liveFactory,
     ) {}
 
     /**
@@ -44,9 +43,12 @@ class ProviderRegistry
         }
 
         $this->providers = array_merge(
-            [$this->ebay, $this->serpApi, $this->melodiaPx, $this->driloni],
+            [$this->ebay, $this->serpApi],
+            $this->liveFactory->all(),
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),
+            $this->swissRealEstateProviders(),
+            $this->ukRealEstateProviders(),
             $this->dutchAutomotiveProviders(),
             $this->germanAutomotiveProviders(),
             $this->germanElectronicsProviders(),
@@ -54,6 +56,7 @@ class ProviderRegistry
             $this->kosovoMarketplaceProviders(),
         );
 
+        $this->providers = $this->dedupeProviders($this->providers);
         usort($this->providers, fn ($a, $b) => $a->priority() <=> $b->priority());
 
         return $this->providers;
@@ -77,10 +80,17 @@ class ProviderRegistry
             && CategoryCatalog::isElectronics($category)
             && ! empty($parsedQuery['search_target']);
         $bookSearch = CategoryCatalog::isBookSearch($parsedQuery);
-        $kosovoLocal = $countryCode === 'XK' && ! $bookSearch;
-        $kosovoBrandedFashion = $kosovoLocal && KosovoFashionIntent::isBrandedCatalogSearch($parsedQuery);
+        $kosovoLocal = $countryCode === 'XK' && ! $bookSearch && empty($parsedQuery['search_target'])
+            && ! CategoryCatalog::isAutomotive($category);
+        $parsedForFanOut = $parsedQuery;
+        if (empty($parsedForFanOut['search_country_code']) && ! empty($geo['country_code'])) {
+            $parsedForFanOut['search_country_code'] = strtoupper((string) $geo['country_code']);
+        }
+        $liveFanOut = LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode);
 
         return array_values(array_filter($this->all(), function (FederatedSearchProviderInterface $provider) use (
+            $parsedForFanOut,
+            $parsedQuery,
             $category,
             $countryCode,
             $targets,
@@ -90,11 +100,12 @@ class ProviderRegistry
             $germanElectronics,
             $bookSearch,
             $kosovoLocal,
-            $kosovoBrandedFashion,
+            $liveFanOut,
             $geo
         ) {
-            if ($kosovoBrandedFashion) {
-                if ($provider->mode() !== 'live' || ! KosovoFashionLiveStores::isLiveStore($provider->sourceKey())) {
+            if ($liveFanOut) {
+                $allowed = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
+                if (! in_array($provider->sourceKey(), $allowed, true)) {
                     return false;
                 }
             }
@@ -125,7 +136,10 @@ class ProviderRegistry
                     && ! in_array($provider->sourceKey(), $germanKeys, true)) {
                     return false;
                 }
-                if (in_array($provider->sourceKey(), ['ebay', 'google_shopping', 'facebook_marketplace', 'amazon', 'etsy'], true)) {
+                if (in_array($provider->sourceKey(), ['google_shopping', 'facebook_marketplace', 'amazon', 'etsy'], true)) {
+                    return false;
+                }
+                if ($provider->sourceKey() === 'ebay' && ! $provider->isAvailable()) {
                     return false;
                 }
             }
@@ -220,6 +234,10 @@ class ProviderRegistry
             return true;
         }
 
+        if (KosovoCarMarketplaces::isTarget($sourceKey, $targets)) {
+            return true;
+        }
+
         if (DutchCarMarketplaces::isTarget($sourceKey, $targets) && ! $dutchCar) {
             return false;
         }
@@ -228,7 +246,8 @@ class ProviderRegistry
             return false;
         }
 
-        if (KosovoMarketplaces::isTarget($sourceKey, $targets) && ! $kosovoLocal) {
+        if (KosovoMarketplaces::isTarget($sourceKey, $targets) && ! $kosovoLocal
+            && ! KosovoCarMarketplaces::isTarget($sourceKey, $targets)) {
             return false;
         }
 
@@ -276,7 +295,11 @@ class ProviderRegistry
         $providers = [];
 
         foreach (SwissCarMarketplaces::keys() as $key) {
-            if (isset(config('marketplaces.providers', [])[$key])) {
+            if (isset(config('marketplaces.providers', [])[$key]) || LivePlatformRegistry::isLivePlatform($key)) {
+                continue;
+            }
+
+            if (! config('live_platforms.automotive_demo_fallback', false)) {
                 continue;
             }
 
@@ -295,12 +318,64 @@ class ProviderRegistry
     /**
      * @return array<int, MockSearchProvider>
      */
+    private function swissRealEstateProviders(): array
+    {
+        $providers = [];
+
+        foreach (SwissRealEstateMarketplaces::keys() as $key) {
+            if (isset(config('marketplaces.providers', [])[$key]) || LivePlatformRegistry::isLivePlatform($key)) {
+                continue;
+            }
+
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: SwissRealEstateMarketplaces::label($key),
+                priority: 78,
+                categories: ['real_estate'],
+                countries: ['CH'],
+            );
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array<int, MockSearchProvider>
+     */
+    private function ukRealEstateProviders(): array
+    {
+        $providers = [];
+
+        foreach (UKRealEstateMarketplaces::keys() as $key) {
+            if (isset(config('marketplaces.providers', [])[$key]) || LivePlatformRegistry::isLivePlatform($key)) {
+                continue;
+            }
+
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: UKRealEstateMarketplaces::label($key),
+                priority: 76,
+                categories: ['real_estate'],
+                countries: ['GB'],
+            );
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array<int, MockSearchProvider>
+     */
     private function dutchAutomotiveProviders(): array
     {
         $providers = [];
 
         foreach (DutchCarMarketplaces::keys() as $key) {
-            if (isset(config('marketplaces.providers', [])[$key])) {
+            if (isset(config('marketplaces.providers', [])[$key]) || LivePlatformRegistry::isLivePlatform($key)) {
+                continue;
+            }
+
+            if (! config('live_platforms.automotive_demo_fallback', false)) {
                 continue;
             }
 
@@ -324,7 +399,11 @@ class ProviderRegistry
         $providers = [];
 
         foreach (GermanCarMarketplaces::keys() as $key) {
-            if (isset(config('marketplaces.providers', [])[$key])) {
+            if (isset(config('marketplaces.providers', [])[$key]) || LivePlatformRegistry::isLivePlatform($key)) {
+                continue;
+            }
+
+            if (! config('live_platforms.automotive_demo_fallback', false)) {
                 continue;
             }
 
@@ -404,7 +483,7 @@ class ProviderRegistry
         $registered = array_keys(config('marketplaces.providers', []));
 
         foreach (KosovoMarketplaces::keys() as $key) {
-            if (in_array($key, $registered, true)) {
+            if (in_array($key, $registered, true) || LivePlatformRegistry::isLivePlatform($key)) {
                 continue;
             }
 
@@ -419,5 +498,34 @@ class ProviderRegistry
         }
 
         return $providers;
+    }
+
+    /**
+     * @param  array<int, FederatedSearchProviderInterface>  $providers
+     * @return array<int, FederatedSearchProviderInterface>
+     */
+    private function dedupeProviders(array $providers): array
+    {
+        $byKey = [];
+
+        foreach ($providers as $provider) {
+            $key = $provider->sourceKey();
+            $existing = $byKey[$key] ?? null;
+
+            if ($existing === null) {
+                $byKey[$key] = $provider;
+
+                continue;
+            }
+
+            $preferNew = ($provider->mode() === 'live' && $existing->mode() !== 'live')
+                || ($provider->mode() === $existing->mode() && $provider->priority() < $existing->priority());
+
+            if ($preferNew) {
+                $byKey[$key] = $provider;
+            }
+        }
+
+        return array_values($byKey);
     }
 }

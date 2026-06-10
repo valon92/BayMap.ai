@@ -2,10 +2,11 @@
   <article class="product-card group/card">
     <div class="relative aspect-square sm:aspect-[4/3] overflow-hidden bg-slate-100 shrink-0">
       <img
-        :src="product.image"
+        :src="displayImage"
         :alt="displayTitle"
         class="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-[1.04]"
         loading="lazy"
+        @error="onImageError"
       />
       <div class="absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-transparent pointer-events-none" />
 
@@ -81,13 +82,35 @@
 </template>
 
 <script setup>
-import { computed, inject } from 'vue';
+import { computed, inject, ref, watch } from 'vue';
 
 const props = defineProps({
   product: { type: Object, required: true },
 });
 
 const { t } = inject('i18n');
+
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800&q=80';
+const imageBroken = ref(false);
+
+const displayImage = computed(() => {
+  if (imageBroken.value || !props.product.image) {
+    return FALLBACK_IMAGE;
+  }
+
+  return props.product.image;
+});
+
+function onImageError() {
+  imageBroken.value = true;
+}
+
+watch(
+  () => props.product?.id ?? props.product?.image,
+  () => {
+    imageBroken.value = false;
+  },
+);
 
 const scoreClass = computed(() => {
   const s = props.product.match_score || 0;

@@ -25,6 +25,13 @@ class KosovoMarketplaces
         // Fashion / Sport
         'melodiapx' => ['label' => 'Melodia Px', 'url' => 'https://www.melodiapx.com/meshkuj/', 'categories' => ['fashion', 'sports_outdoor', 'marketplace']],
         'driloni' => ['label' => 'Driloni Sportswear', 'url' => 'https://driloni-ks.com', 'categories' => ['fashion', 'sports_outdoor', 'marketplace']],
+        'butiku_regina' => ['label' => 'Butiku Regina', 'url' => 'https://www.butikuregina.com', 'categories' => ['fashion', 'sports_outdoor']],
+        'vedude_fashion' => ['label' => 'Vedude Fashion', 'url' => 'https://vedudefashion.com', 'categories' => ['fashion']],
+        'arjana_shop' => ['label' => 'Arjana Shop', 'url' => 'https://arjanashop.com', 'categories' => ['fashion']],
+        'ssprint_fashion' => ['label' => "S'Sprint Fashion", 'url' => 'https://ssprintfashion.com', 'categories' => ['fashion', 'sports_outdoor']],
+        'am_fashion' => ['label' => 'A&M Fashion', 'url' => 'https://amfashion-ks.com', 'categories' => ['fashion']],
+        'waikiki_kosovo' => ['label' => 'Waikiki Kosovo', 'url' => 'https://www.lcwaikiki.com/en-XK', 'categories' => ['fashion', 'sports_outdoor']],
+        'minimax_fashion' => ['label' => 'Minimax Fashion', 'url' => 'https://www.minimax-ks.com', 'categories' => ['fashion', 'marketplace']],
         'mona_fashion' => ['label' => 'Mona Fashion Kosovo', 'url' => 'https://mona-ks.com', 'categories' => ['fashion']],
         'fashion_group' => ['label' => 'Fashion Group Kosovo', 'url' => 'https://fashiongroup-ks.com', 'categories' => ['fashion']],
         'sport_vision' => ['label' => 'Sport Vision Kosovo', 'url' => 'https://sportvision-ks.com', 'categories' => ['fashion', 'sports_outdoor']],
@@ -122,8 +129,12 @@ class KosovoMarketplaces
             }
         }
 
+        if (CategoryCatalog::isAutomotive($category)) {
+            return KosovoCarMarketplaces::keys();
+        }
+
         if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
-            $priority = array_values(array_filter(['melodiapx', 'driloni'], fn ($k) => in_array($k, $keys, true)));
+            $priority = array_values(array_filter(KosovoFashionPlatforms::keys(), fn ($k) => in_array($k, $keys, true)));
             if ($priority !== []) {
                 $keys = array_values(array_unique(array_merge($priority, $keys)));
             }

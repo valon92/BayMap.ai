@@ -131,7 +131,8 @@
           <span
             v-for="chip in valonWorkerChips"
             :key="chip.id"
-            class="insight-chip insight-chip--violet"
+            class="insight-chip"
+            :class="chip.blocked ? 'insight-chip--muted' : 'insight-chip--violet'"
             :title="chip.role"
           >
             {{ chip.label }}
@@ -357,11 +358,20 @@ const platformCapabilities = computed(() => data.value?.platform?.positioning ??
 
 const valonWorkerChips = computed(() => {
   const workers = data.value?.meta?.valon?.workers ?? [];
-  return workers.map((w) => ({
-    id: w.id,
-    role: w.role,
-    label: `${w.id} → ${w.platform_label || w.platform}${w.results != null ? ` (${w.results})` : ''}`,
-  }));
+  return workers.map((w) => {
+    const count =
+      w.status === 'blocked'
+        ? t('worker_blocked')
+        : w.results != null
+          ? ` (${w.results})`
+          : '';
+    return {
+      id: w.id,
+      role: w.role,
+      label: `${w.id} → ${w.platform_label || w.platform}${count}`,
+      blocked: w.status === 'blocked',
+    };
+  });
 });
 
 const displayQuery = computed(() => {
@@ -578,7 +588,15 @@ function fieldLabel(key) {
 }
 
 function formatTagValue(val, key) {
-  if (Array.isArray(val)) return val.join(', ');
+  if (Array.isArray(val)) {
+    if (key === 'search_countries') {
+      return val
+        .map((c) => (typeof c === 'object' && c ? (c.search_country || c.search_country_code) : c))
+        .filter(Boolean)
+        .join(', ');
+    }
+    return val.join(', ');
+  }
   if (typeof val === 'boolean') return val ? '✓' : '—';
   if (key === 'gender') {
     const gk = `gender_values.${val}`;

@@ -18,13 +18,67 @@ class MarketplaceAggregator
      */
     public function searchAll(array $parsedQuery, array $expandedFilters, array $geo = []): array
     {
-        $result = $this->coordinator->search($parsedQuery, $expandedFilters, $geo);
+        $countries = $parsedQuery['search_countries'] ?? [];
+        if (! is_array($countries) || count($countries) <= 1) {
+            $result = $this->coordinator->search($parsedQuery, $expandedFilters, $geo);
+
+            return [
+                'results' => $result['results'] ?? [],
+                'report' => $result['report'] ?? [],
+                'agent_plan' => $result['agent_plan'] ?? null,
+                'valon' => $result['valon'] ?? null,
+            ];
+        }
+
+        $results = [];
+        $report = [];
+        $workers = [];
+        $agentPlans = [];
+
+        foreach ($countries as $country) {
+            if (empty($country['search_country_code'])) {
+                continue;
+            }
+
+            $perCountry = $parsedQuery;
+            $perCountry['search_country_code'] = $country['search_country_code'];
+            $perCountry['search_country'] = $country['search_country'] ?? '';
+            unset($perCountry['search_countries']);
+
+            $expanded = $expandedFilters;
+            $expanded['search_country_code'] = $country['search_country_code'];
+            $expanded['marketplaces'] = \App\Support\LivePlatformRegistry::keysFromParsed($perCountry);
+
+            $batch = $this->coordinator->search($perCountry, $expanded, $geo);
+            $results = array_merge($results, $batch['results'] ?? []);
+            $report = array_merge($report, $batch['report'] ?? []);
+            $workers = array_merge($workers, $batch['valon']['workers'] ?? []);
+            $agentPlans[] = $batch['agent_plan'] ?? [];
+        }
+
+        $activated = [];
+        $sourceKeys = [];
+        foreach ($agentPlans as $plan) {
+            $activated = array_merge($activated, $plan['activated'] ?? []);
+            $sourceKeys = array_merge($sourceKeys, $plan['source_keys'] ?? []);
+        }
 
         return [
-            'results' => $result['results'] ?? [],
-            'report' => $result['report'] ?? [],
-            'agent_plan' => $result['agent_plan'] ?? null,
-            'valon' => $result['valon'] ?? null,
+            'results' => $results,
+            'report' => $report,
+            'agent_plan' => [
+                'activated' => $activated,
+                'source_keys' => array_values(array_unique($sourceKeys)),
+                'count' => count($workers),
+                'multi_country' => true,
+            ],
+            'valon' => [
+                'workers_spawned' => count($workers),
+                'workers' => $workers,
+                'results_merged' => count($results),
+                'multi_country' => true,
+                'countries' => array_column($countries, 'search_country'),
+            ],
         ];
     }
 }

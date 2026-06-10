@@ -35,6 +35,11 @@ final class SearchListing
         public readonly ?string $store = null,
         public readonly ?float $priceEur = null,
         public readonly ?string $fingerprint = null,
+        public readonly ?string $fuel = null,
+        public readonly ?string $color = null,
+        public readonly ?string $transmission = null,
+        public readonly ?float $engineLiters = null,
+        public readonly ?string $countryCode = null,
     ) {}
 
     /**
@@ -66,6 +71,11 @@ final class SearchListing
             store: isset($data['store']) ? (string) $data['store'] : null,
             priceEur: isset($data['price_eur']) ? (float) $data['price_eur'] : null,
             fingerprint: isset($data['fingerprint']) ? (string) $data['fingerprint'] : null,
+            fuel: isset($data['fuel']) ? (string) $data['fuel'] : null,
+            color: isset($data['color']) ? (string) $data['color'] : null,
+            transmission: isset($data['transmission']) ? (string) $data['transmission'] : null,
+            engineLiters: isset($data['engine_liters']) ? (float) $data['engine_liters'] : null,
+            countryCode: isset($data['country_code']) ? (string) $data['country_code'] : null,
         );
     }
 
@@ -98,6 +108,11 @@ final class SearchListing
             'seller_type' => $this->sellerType,
             'store' => $this->store,
             'fingerprint' => $this->fingerprint,
+            'fuel' => $this->fuel,
+            'color' => $this->color,
+            'transmission' => $this->transmission,
+            'engine_liters' => $this->engineLiters,
+            'country_code' => $this->countryCode,
         ], fn ($v) => $v !== null && $v !== '');
     }
 
@@ -127,6 +142,11 @@ final class SearchListing
             store: $this->store,
             priceEur: $this->priceEur,
             fingerprint: $fingerprint,
+            fuel: $this->fuel,
+            color: $this->color,
+            transmission: $this->transmission,
+            engineLiters: $this->engineLiters,
+            countryCode: $this->countryCode,
         );
     }
 }

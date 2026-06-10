@@ -119,6 +119,7 @@
   "search_pipeline": "Si kërkoi BuyMap",
   "platform_engine": "Motori BuyMap.ai",
   "valon_workers": "Valon Workers (paralel)",
+  "worker_blocked": " (bllokuar)",
   "valon_orchestrator": "Valon AI Orchestrator",
   "platform_caps": {
     "ai_semantic_search": "Motor Kërkimi Semantik AI",

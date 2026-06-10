@@ -130,6 +130,17 @@ class WeightedRankingEngine
             isset($product['country_code']) ? (string) $product['country_code'] : null,
         )) {
             $score = 95.0;
+        } elseif (! empty($parsed['search_countries']) && is_array($parsed['search_countries'])) {
+            foreach ($parsed['search_countries'] as $country) {
+                if (CountryMatcher::locationMatchesFilter(
+                    (string) ($product['location'] ?? ''),
+                    (string) ($country['search_country'] ?? ''),
+                    isset($product['country_code']) ? (string) $product['country_code'] : null,
+                )) {
+                    $score = 95.0;
+                    break;
+                }
+            }
         }
 
         if (! empty($parsed['city']) && str_contains($location, mb_strtolower($parsed['city']))) {

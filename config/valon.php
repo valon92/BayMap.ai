@@ -9,7 +9,7 @@ return [
 
     'worker_prefix' => 'ValonWorker',
 
-    'max_workers' => (int) env('VALON_MAX_WORKERS', 6),
+    'max_workers' => (int) env('VALON_MAX_WORKERS', 10),
 
     'worker_timeout_seconds' => (int) env('VALON_WORKER_TIMEOUT', 15),
 
@@ -21,6 +21,8 @@ return [
     |--------------------------------------------------------------------------
     */
     'role_labels' => [
+        'LivePlatformAgent' => 'Live platform catalog search',
+        'KosovoFashionPlatformAgent' => 'Kosovo fashion platform search',
         'KosovoFashionLiveAgent' => 'Kosovo fashion live catalog search',
         'LocalMarketplaceAgent' => 'Local marketplace search',
         'BalkanScraperAgent' => 'Balkan marketplace search',

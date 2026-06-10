@@ -17,6 +17,16 @@ class CountryMatcher
             return true;
         }
 
+        if (str_contains($needle, ',')) {
+            foreach (array_map('trim', explode(',', $needle)) as $part) {
+                if ($part !== '' && self::locationMatchesFilter($location, $part, $productCountryCode)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         $loc = mb_strtolower($location);
         if (str_contains($loc, $needle)) {
             return true;

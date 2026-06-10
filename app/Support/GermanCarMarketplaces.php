@@ -100,6 +100,11 @@ class GermanCarMarketplaces
     /**
      * @param  array<int, string>  $targets
      */
+    public static function isPlatform(string $source): bool
+    {
+        return isset(self::CATALOG[self::normalizeKey($source)]);
+    }
+
     public static function isTarget(string $source, array $targets): bool
     {
         $key = self::normalizeKey($source);

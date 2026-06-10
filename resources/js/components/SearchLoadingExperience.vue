@@ -137,16 +137,31 @@ const activeStepHint = computed(() => steps.value[activeStepIndex.value]?.hint ?
 
 const ringOffset = computed(() => ringCircumference - (progress.value / 100) * ringCircumference);
 
+const kosovoFashionWorkers = [
+  { name: 'Melodia Px', initial: 'MP' },
+  { name: 'Albi Online', initial: 'AO' },
+  { name: 'Driloni Sportswear', initial: 'DS' },
+  { name: 'Butiku Regina', initial: 'BR' },
+  { name: 'Vedude Fashion', initial: 'VF' },
+  { name: 'Arjana Shop', initial: 'AS' },
+  { name: "S'Sprint Fashion", initial: 'SS' },
+  { name: 'A&M Fashion', initial: 'AM' },
+  { name: 'Waikiki Kosovo', initial: 'WK' },
+  { name: 'Minimax Fashion', initial: 'MX' },
+];
+
 const workerPreviews = computed(() => {
   const q = (props.query || '').toLowerCase();
-  const kosovo = /\b(kosov|kosove|prishtin|xk)\b/u.test(q);
-  const fashion = /\b(nike|puma|adidas|patika|këpuc|kepuce|mabthje|mbathje|meshkuj|atlete|fashion|sneaker)\b/u.test(q);
+  const kosovo = /\b(kosov|kosove|prishtin|ferizaj|xk)\b/u.test(q);
+  const fashion = /\b(nike|puma|adidas|patika|këpuc|kepuce|mabthje|mbathje|meshkuj|atlete|fashion|sneaker|shoes|qanta|çant|veshje|veshmbathje)\b/u.test(q)
+    || /\b(numer|nr|madh[eë]sia|size)\s*\d{2}/u.test(q);
 
   if (kosovo && fashion) {
-    return [
-      { id: 'ValonWorker-1', name: 'Melodia Px', initial: 'MP' },
-      { id: 'ValonWorker-2', name: 'Driloni Sportswear', initial: 'DS' },
-    ];
+    return kosovoFashionWorkers.map((worker, idx) => ({
+      id: `ValonWorker-${idx + 1}`,
+      name: worker.name,
+      initial: worker.initial,
+    }));
   }
 
   if (kosovo) {
@@ -239,11 +254,12 @@ onMounted(() => {
     }
   }, 4200);
 
+  const workerTickMs = workerPreviews.value.length > 4 ? 2600 : 5500;
   workerTimer = setInterval(() => {
     if (activeWorkerIndex.value < workerPreviews.value.length - 1) {
       activeWorkerIndex.value += 1;
     }
-  }, 5500);
+  }, workerTickMs);
 
   activeWorkerIndex.value = 0;
 });

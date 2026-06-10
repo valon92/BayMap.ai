@@ -2,7 +2,7 @@
 
 namespace App\Services\Search;
 
-use App\Support\KosovoFashionLiveStores;
+use App\Support\LivePlatformRegistry;
 
 /**
  * AI-powered meta search engine — clusters identical products across marketplaces,
@@ -45,7 +45,15 @@ class MetaSearchEngine
      */
     private function buildMetaListing(array $cluster): array
     {
-        usort($cluster, fn ($a, $b) => ($a['price_eur'] ?? $a['price'] ?? PHP_INT_MAX) <=> ($b['price_eur'] ?? $b['price'] ?? PHP_INT_MAX));
+        usort($cluster, function ($a, $b) {
+            $priceA = (float) ($a['price_eur'] ?? $a['price'] ?? PHP_INT_MAX);
+            $priceB = (float) ($b['price_eur'] ?? $b['price'] ?? PHP_INT_MAX);
+            if ($priceA !== $priceB) {
+                return $priceA <=> $priceB;
+            }
+
+            return strcmp((string) ($a['source_key'] ?? ''), (string) ($b['source_key'] ?? ''));
+        });
 
         $best = $cluster[0];
         $prices = array_map(fn ($p) => (float) ($p['price_eur'] ?? $p['price'] ?? 0), $cluster);
@@ -87,7 +95,7 @@ class MetaSearchEngine
     private function clusterKey(array $product): string
     {
         $sourceKey = (string) ($product['source_key'] ?? '');
-        if (KosovoFashionLiveStores::isLiveStore($sourceKey) && ! empty($product['id'])) {
+        if (LivePlatformRegistry::isLivePlatform($sourceKey) && ! empty($product['id'])) {
             return $sourceKey.':'.(string) $product['id'];
         }
 

@@ -119,6 +119,7 @@
   "search_pipeline": "How BuyMap searched",
   "platform_engine": "BuyMap.ai engine",
   "valon_workers": "Valon Workers (parallel)",
+  "worker_blocked": " (blocked)",
   "valon_orchestrator": "Valon AI Orchestrator",
   "platform_caps": {
     "ai_semantic_search": "AI Semantic Search Engine",

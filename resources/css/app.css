@@ -284,6 +284,10 @@
     @apply bg-violet-50 text-violet-800 border-violet-200;
   }
 
+  .insight-chip--muted {
+    @apply bg-slate-100 text-slate-500 border-slate-200 line-through decoration-slate-400/70;
+  }
+
   .insight-chip--emerald {
     @apply bg-emerald-50 text-emerald-800 border-emerald-200;
   }
@@ -708,7 +712,7 @@
 }
 
 .search-loading__workers-grid {
-  @apply grid grid-cols-1 sm:grid-cols-2 gap-2.5;
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5;
 }
 
 .search-loading__worker {

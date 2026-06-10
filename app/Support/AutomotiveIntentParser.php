@@ -15,8 +15,10 @@ class AutomotiveIntentParser
         'zeze' => 'black',
         'e bardhë' => 'white',
         'e bardhe' => 'white',
+        'e bardh' => 'white',
         'bardhë' => 'white',
         'bardhe' => 'white',
+        'bardh' => 'white',
         'hiri' => 'grey',
         'gri' => 'grey',
         'grey' => 'grey',
@@ -25,6 +27,16 @@ class AutomotiveIntentParser
         'white' => 'white',
     ];
 
+    public static function isCarQuery(string $query): bool
+    {
+        $lower = mb_strtolower(trim($query));
+
+        return (bool) preg_match(
+            '/\b(vetur[aëe]?|vetura|veture|makina|automobil|automotive|car|cars|vehicle|vehicles|auto)\b/u',
+            $lower
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -32,6 +44,10 @@ class AutomotiveIntentParser
     {
         $lower = mb_strtolower(trim($query));
         $result = [];
+
+        if (self::isCarQuery($query)) {
+            $result['product_type'] = 'car';
+        }
 
         if (preg_match('/\b(audi|bmw|mercedes|mercedes-benz|volkswagen|vw|toyota|honda|ford|porsche|skoda|seat)\b/u', $lower, $m)) {
             $brand = strtolower($m[1]);
@@ -48,6 +64,15 @@ class AutomotiveIntentParser
             $result['model'] = strtoupper($m[1]);
         } elseif (preg_match('/\b([ecsa])[-\s]?class\b/i', $query, $m)) {
             $result['model'] = strtoupper($m[1]).'-Class';
+        } elseif (preg_match('/\bgolf[t]?\s*([0-9]{1,2}|i{1,3}|iv|v|vi{1,3}|vii{0,3})\b/i', $query, $m)) {
+            $gen = strtolower($m[1]);
+            $gen = match ($gen) {
+                'vii', '7' => '7',
+                'viii', '8' => '8',
+                'vi', '6' => '6',
+                default => $gen,
+            };
+            $result['model'] = 'golf '.$gen;
         }
 
         $result = array_merge($result, self::parseYearFields($query));
@@ -59,12 +84,17 @@ class AutomotiveIntentParser
             $result['max_km'] = $km < 1000 ? $km * 1000 : $km;
         }
 
-        if (preg_match('/\b(dizell|diesel|tdi)\b/ui', $lower)) {
+        if (preg_match('/\b(dizell|diesel|dizel|disel|tdi)\b/ui', $lower)) {
             $result['fuel'] = 'diesel';
         } elseif (preg_match('/\b(benzin|petrol|benzinë|benzine|tfsi)\b/ui', $lower)) {
             $result['fuel'] = 'petrol';
         } elseif (preg_match('/\b(elektrik|electric|ev)\b/ui', $lower)) {
             $result['fuel'] = 'electric';
+        }
+
+        $engineLiters = AutomotiveEngineResolver::parseFromQuery($query);
+        if ($engineLiters !== null) {
+            $result['engine_liters'] = $engineLiters;
         }
 
         $colors = [];
@@ -96,7 +126,21 @@ class AutomotiveIntentParser
             return ['year' => $min, 'year_min' => $min, 'year_max' => $max];
         }
 
+        if (preg_match('/\b(20\d{2}|19\d{2})\s*(?:deri|to|until|bis)\s*(?:ne|në|in)?\s*(20\d{2}|19\d{2})\b/ui', $query, $m)) {
+            $min = min((int) $m[1], (int) $m[2]);
+            $max = max((int) $m[1], (int) $m[2]);
+
+            return ['year' => $min, 'year_min' => $min, 'year_max' => $max];
+        }
+
         if (preg_match('/\b(?:viti|vitit|year)\s*(20\d{2}|19\d{2})\s*(?:deri|to|until|bis)\s*(20\d{2}|19\d{2})\b/ui', $query, $m)) {
+            $min = min((int) $m[1], (int) $m[2]);
+            $max = max((int) $m[1], (int) $m[2]);
+
+            return ['year' => $min, 'year_min' => $min, 'year_max' => $max];
+        }
+
+        if (preg_match('/\b(?:viti(?:i|t)?\s*(?:i\s*)?prodhimit|viti|vitit)\b.*?(20\d{2}|19\d{2}).*?(?:deri|deri\s+ne|deri\s+në|to|until|bis)\s*(?:ne|në|in)?\s*(20\d{2}|19\d{2})\b/ui', $query, $m)) {
             $min = min((int) $m[1], (int) $m[2]);
             $max = max((int) $m[1], (int) $m[2]);
 
@@ -138,5 +182,18 @@ class AutomotiveIntentParser
         }
 
         return $parsed;
+    }
+
+    public static function normalizeFuel(string $fuel): string
+    {
+        $fuel = mb_strtolower(trim($fuel));
+
+        return match (true) {
+            in_array($fuel, ['benzin', 'benzinë', 'benzine', 'petrol', 'gasoline', 'tfsi', 'tsi'], true) => 'petrol',
+            in_array($fuel, ['diesel', 'dizel', 'disel', 'tdi'], true) => 'diesel',
+            in_array($fuel, ['elektrik', 'electric', 'ev'], true) => 'electric',
+            in_array($fuel, ['hybrid', 'hibrid'], true) => 'hybrid',
+            default => $fuel,
+        };
     }
 }

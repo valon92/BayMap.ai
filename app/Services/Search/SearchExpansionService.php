@@ -3,12 +3,9 @@
 namespace App\Services\Search;
 
 use App\Support\CategoryCatalog;
-use App\Support\DutchCarMarketplaces;
-use App\Support\GermanCarMarketplaces;
-use App\Support\GermanElectronicsMarketplaces;
 use App\Support\GlobalBookMarketplaces;
 use App\Support\KosovoMarketplaces;
-use App\Support\SwissCarMarketplaces;
+use App\Support\LivePlatformRegistry;
 
 /**
  * Expands parsed AI attributes into broader search filters (nearby countries, similar colors, etc.).
@@ -56,16 +53,25 @@ class SearchExpansionService
         if (CategoryCatalog::isBookSearch($parsed)) {
             $parsed['category'] = 'online_education';
         }
-        $marketplaces = $this->marketplacesForCategory($parsed['category'] ?? 'marketplace', $countryCode);
+        $parsedForDiscovery = $parsed;
+        if (empty($parsedForDiscovery['search_country_code']) && ! empty($geo['country_code'])) {
+            $parsedForDiscovery['search_country_code'] = strtoupper((string) $geo['country_code']);
+        }
+        $discovery = LivePlatformRegistry::discover($parsedForDiscovery);
+        $marketplaces = $discovery['keys'] !== []
+            ? $discovery['keys']
+            : $this->marketplacesForCategory($parsed['category'] ?? 'marketplace', $countryCode);
 
         $expanded = [
             'original' => $parsed,
-            'search_country_code' => $countryCode,
+            'search_country_code' => $discovery['country_code'] ?: $countryCode,
+            'search_scope' => $discovery['scope'],
+            'discovered_platforms' => $discovery['platforms'],
             'nearby_countries' => $this->nearbyCountryLabels($countryCode),
             'marketplaces' => $marketplaces,
             'marketplace_labels' => $this->marketplaceLabels(
                 $marketplaces,
-                $countryCode,
+                $discovery['country_code'] ?: $countryCode,
                 $parsed['category'] ?? '',
                 ! empty($parsed['search_target']),
             ),
@@ -103,24 +109,13 @@ class SearchExpansionService
     {
         $category = CategoryCatalog::normalize($category);
 
-        if ($countryCode === 'CH' && CategoryCatalog::isAutomotive($category)) {
-            return SwissCarMarketplaces::keys();
-        }
-
-        if ($countryCode === 'NL' && CategoryCatalog::isAutomotive($category)) {
-            return DutchCarMarketplaces::keys();
-        }
-
-        if ($countryCode === 'DE' && CategoryCatalog::isAutomotive($category)) {
-            return GermanCarMarketplaces::keys();
-        }
-
-        if ($countryCode === 'DE' && CategoryCatalog::isElectronics($category)) {
-            return GermanElectronicsMarketplaces::keys();
-        }
-
         if (CategoryCatalog::isBooks($category)) {
             return GlobalBookMarketplaces::keysForCountry($countryCode);
+        }
+
+        $registryKeys = LivePlatformRegistry::keysFor($countryCode, $category);
+        if ($registryKeys !== []) {
+            return $registryKeys;
         }
 
         if ($countryCode === 'XK') {
@@ -193,26 +188,22 @@ class SearchExpansionService
      */
     private function marketplaceLabels(array $marketplaces, string $countryCode, string $category, bool $searchTarget): array
     {
-        if ($searchTarget && $countryCode === 'CH' && CategoryCatalog::isAutomotive($category)) {
-            return SwissCarMarketplaces::labels();
-        }
-
-        if ($searchTarget && $countryCode === 'NL' && CategoryCatalog::isAutomotive($category)) {
-            return DutchCarMarketplaces::labels();
-        }
-
-        if ($searchTarget && $countryCode === 'DE' && CategoryCatalog::isAutomotive($category)) {
-            return GermanCarMarketplaces::labels();
-        }
-
-        if ($searchTarget && $countryCode === 'DE' && CategoryCatalog::isElectronics($category)) {
-            return GermanElectronicsMarketplaces::labels();
-        }
-
         if (CategoryCatalog::isBooks($category)) {
             $labels = [];
             foreach ($marketplaces as $key) {
                 $label = GlobalBookMarketplaces::label($key);
+                if ($label !== '') {
+                    $labels[] = $label;
+                }
+            }
+
+            return $labels;
+        }
+
+        if (LivePlatformRegistry::keysFor($countryCode, $category) !== []) {
+            $labels = [];
+            foreach ($marketplaces as $key) {
+                $label = LivePlatformRegistry::label($key);
                 if ($label !== '') {
                     $labels[] = $label;
                 }

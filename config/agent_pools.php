@@ -40,6 +40,7 @@ return [
 
         'fashion' => [
             'agents' => [
+                ['id' => 'KosovoFashionPlatformAgent', 'sources' => ['melodiapx', 'albi_online', 'driloni', 'butiku_regina', 'vedude_fashion', 'arjana_shop', 'ssprint_fashion', 'am_fashion', 'waikiki_kosovo', 'minimax_fashion'], 'countries' => ['XK'], 'trust' => 90, 'speed' => 95],
                 ['id' => 'KosovoFashionLiveAgent', 'sources' => ['melodiapx', 'driloni'], 'countries' => ['XK'], 'trust' => 92, 'speed' => 98],
                 ['id' => 'LocalMarketplaceAgent', 'sources' => ['melodiapx', 'driloni'], 'countries' => ['XK'], 'trust' => 88, 'speed' => 95],
                 ['id' => 'BalkanScraperAgent', 'sources' => ['merrjep', 'dyqani', 'pazar3', 'gjirafa50', 'tregu'], 'countries' => ['XK', 'AL', 'MK'], 'trust' => 75, 'speed' => 88],

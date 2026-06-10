@@ -9,7 +9,9 @@ use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
+use App\Support\KosovoFashionPlatforms;
 use App\Support\KosovoMarketplaces;
+use App\Support\LivePlatformRegistry;
 use App\Support\SwissCarMarketplaces;
 
 /**
@@ -121,6 +123,56 @@ class ValonOrchestrator
     }
 
     /**
+     * Surface blocked DE automotive platforms in the worker panel (anti-bot / no public API).
+     *
+     * @param  array<int, array<string, mixed>>  $workerMeta
+     * @param  array<int, array<string, mixed>>  $workerSpecs
+     * @return array<int, array<string, mixed>>
+     */
+    private function appendUnavailableGermanAutomotiveWorkers(
+        array $workerMeta,
+        array $parsedQuery,
+        array $workerSpecs,
+    ): array {
+        $country = strtoupper((string) ($parsedQuery['search_country_code'] ?? ''));
+        $category = CategoryCatalog::normalize($parsedQuery['category'] ?? '');
+
+        if ($country !== 'DE' || ! CategoryCatalog::isAutomotive($category)) {
+            return $workerMeta;
+        }
+
+        $wanted = LivePlatformRegistry::keysFromParsed($parsedQuery);
+        $active = array_map(
+            fn (array $spec) => strtolower((string) ($spec['platform'] ?? '')),
+            $workerSpecs,
+        );
+        $prefix = config('valon.worker_prefix', 'ValonWorker');
+        $index = count($workerMeta) + 1;
+
+        foreach ($wanted as $key) {
+            if (in_array(strtolower($key), $active, true)) {
+                continue;
+            }
+            if (! GermanCarMarketplaces::isPlatform($key)) {
+                continue;
+            }
+
+            $workerMeta[] = [
+                'id' => "{$prefix}-{$index}",
+                'role' => 'Platform blocked (anti-bot)',
+                'platform' => $key,
+                'platform_label' => GermanCarMarketplaces::label($key),
+                'status' => 'blocked',
+                'results' => 0,
+                'latency_ms' => 0,
+            ];
+            $index++;
+        }
+
+        return $workerMeta;
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $workerReports
      * @return array<int, array<string, mixed>>
      */
@@ -146,7 +198,8 @@ class ValonOrchestrator
 
             return [
                 'source' => $platform,
-                'label' => KosovoMarketplaces::label($platform)
+                'label' => KosovoFashionPlatforms::label($platform)
+                    ?: KosovoMarketplaces::label($platform)
                     ?: GermanElectronicsMarketplaces::label($platform)
                     ?: DutchCarMarketplaces::label($platform)
                     ?: SwissCarMarketplaces::label($platform)

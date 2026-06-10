@@ -15,8 +15,16 @@ class PriceIntentParser
         $lower = mb_strtolower($query);
         $currency = self::detectCurrency($lower);
 
-        if (preg_match('/\b(?:deri|under|bis|up to)\s*([\d\s.,\']+?)\s*(mij(?:e)?|mil|k|tys|tausend|thousand)?\s*(?:euro|eur|ero|€|franga|franc|chf|usd|\$)\b/ui', $lower, $m)) {
+        if (preg_match('/\b(?:deri|under|bis|up to)\s*([\d\s.,\']+?)\s*(mij(?:e)?|mil|million|milion|mili|k|tys|tausend|thousand)?\s*(?:euro|eur|ero|€|franga|franc|chf|usd|\$|funta|funt|funte|pound|pounds|gbp|£)\b/ui', $lower, $m)) {
             return self::buildLimit($m[1], $m[2] ?? '', $currency, $m[0]);
+        }
+
+        if (preg_match('/\b([\d\s.,\']+)\s*(mij(?:e)?|mil|million|mili|milion)\s*(?:funta|funt|funte|pound|pounds|gbp|£)\b/ui', $lower, $m)) {
+            return self::buildLimit($m[1], $m[2], 'GBP', 'pound');
+        }
+
+        if (preg_match('/\b(\d+)(milion|million|mili)\s*(?:funta|funt|funte|pound|pounds|gbp|£)/ui', $lower, $m)) {
+            return self::buildLimit($m[1], $m[2], 'GBP', 'pound');
         }
 
         if (preg_match('/(?:qmim\w*|çmim\w*|price|budget)\s+max\s*([\d\s.,\']+?)(?:\s*(mij(?:e)?|mil|k|tys))?\b/ui', $lower, $m)) {
@@ -49,6 +57,9 @@ class PriceIntentParser
         if (preg_match('/\b(usd|\$|dollar)\b/ui', $lower)) {
             return 'USD';
         }
+        if (preg_match('/\b(gbp|£|pound|pounds|funta|funt|funte)\b/ui', $lower)) {
+            return 'GBP';
+        }
 
         return 'EUR';
     }
@@ -69,7 +80,9 @@ class PriceIntentParser
 
         $amount = (int) $digits;
         $multiplierHint = mb_strtolower(trim($amountRaw.' '.$kSuffix.' '.$token));
-        if (self::hasThousandsMultiplier($multiplierHint) && $amount < 1000) {
+        if (self::hasMillionMultiplier($multiplierHint)) {
+            $amount *= 1_000_000;
+        } elseif (self::hasThousandsMultiplier($multiplierHint) && $amount < 1000) {
             $amount *= 1000;
         } elseif ($kSuffix !== '' || preg_match('/\d\s*k\b/i', $amountRaw)) {
             $amount *= 1000;
@@ -86,6 +99,11 @@ class PriceIntentParser
         return (bool) preg_match('/\b(mij(?:e)?|mil|tys|tsd|tausend|thousand)\b/u', $text);
     }
 
+    private static function hasMillionMultiplier(string $text): bool
+    {
+        return (bool) preg_match('/\b(milion|million|mili)\b/u', $text);
+    }
+
     private static function normalizeCurrencyToken(string $token): string
     {
         $t = mb_strtolower(trim($token));
@@ -96,6 +114,8 @@ class PriceIntentParser
             str_contains($t, 'chf'),
             str_contains($t, 'franga') => 'CHF',
             str_contains($t, 'usd'), $t === '$' => 'USD',
+            str_contains($t, 'gbp'), str_contains($t, 'pound'), str_contains($t, 'funta'),
+            str_contains($t, 'funt'), $t === '£' => 'GBP',
             default => 'EUR',
         };
     }
