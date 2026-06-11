@@ -179,6 +179,9 @@ class SearchOrchestratorService
         $germanElectronicsSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'DE'
             && CategoryCatalog::isElectronics($parsed['category'] ?? '')
             && ! empty($parsed['search_target']);
+        $swissElectronicsSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH'
+            && CategoryCatalog::isElectronics($parsed['category'] ?? '')
+            && ! empty($parsed['search_target']);
         $bookSearch = CategoryCatalog::isBookSearch($parsed);
         $kosovoSearch = strtoupper((string) ($parsed['search_country_code'] ?? $searchGeo['country_code'] ?? '')) === 'XK';
 
@@ -189,13 +192,15 @@ class SearchOrchestratorService
                 ? 'Searched '.count($expanded['marketplaces'] ?? []).' Swiss car marketplaces'
                 : ($dutchCarSearch
                     ? 'Searched '.count($expanded['marketplaces'] ?? []).' Dutch car marketplaces'
-                    : ($germanElectronicsSearch
-                        ? 'Searched '.count($expanded['marketplaces'] ?? []).' German electronics retailers'
-                        : ($bookSearch
+                    : ($swissElectronicsSearch
+                        ? 'Searched '.count($expanded['marketplaces'] ?? []).' Swiss electronics retailers'
+                        : ($germanElectronicsSearch
+                            ? 'Searched '.count($expanded['marketplaces'] ?? []).' German electronics retailers'
+                            : ($bookSearch
                             ? 'Searched '.count($expanded['marketplaces'] ?? []).' online bookstores & retailers'
                             : ($kosovoSearch
                                 ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
-                                : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional')))),
+                                : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional'))))),
         ];
 
         $products = $this->applyClientFilters($products, $filters, $parsed);
@@ -240,6 +245,7 @@ class SearchOrchestratorService
                 'returned' => count($pageResults),
                 'sources_queried' => $expanded['marketplaces'] ?? [],
                 'marketplace_labels' => $expanded['marketplace_labels'] ?? [],
+                'marketplace_labels_by_country' => $expanded['marketplace_labels_by_country'] ?? [],
                 'source_report' => $sourceReport,
                 'location_tiers' => $locationTiers,
                 'location_scope' => $locationScope,

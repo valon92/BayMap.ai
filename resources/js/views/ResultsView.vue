@@ -196,6 +196,26 @@
             </span>
           </InsightScrollSection>
 
+          <InsightScrollSection
+            v-if="showSwissElectronicsMarketplaces"
+            :title="t('swiss_electronics_marketplaces')"
+            tone="orange"
+            class="mb-4"
+          >
+            <template #icon>
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </template>
+            <span
+              v-for="label in swissElectronicsLabels"
+              :key="label"
+              class="insight-chip insight-chip--orange"
+            >
+              {{ label }}
+            </span>
+          </InsightScrollSection>
+
           <p v-if="!results.length" class="text-center text-slate-400 py-16 glass rounded-2xl">
             {{ t('no_results') }}
           </p>
@@ -431,17 +451,54 @@ const bookMarketplaceLabels = computed(() => {
 
 const showGermanElectronicsMarketplaces = computed(() => {
   const p = data.value?.parsed;
-  return Boolean(
-    p?.search_target
-    && String(p?.search_country_code || '').toUpperCase() === 'DE'
-    && (p?.category === 'electronics_tech' || p?.category === 'gaming_entertainment')
-  );
+  const isElectronics = p?.category === 'electronics_tech' || p?.category === 'gaming_entertainment';
+  if (!p?.search_target || !isElectronics) return false;
+
+  return hasTargetCountry('DE');
 });
 
 const germanElectronicsLabels = computed(() => {
   if (!showGermanElectronicsMarketplaces.value) return [];
-  return data.value?.meta?.marketplace_labels ?? [];
+  return marketplaceLabelsForCountry('DE');
 });
+
+const showSwissElectronicsMarketplaces = computed(() => {
+  const p = data.value?.parsed;
+  const isElectronics = p?.category === 'electronics_tech' || p?.category === 'gaming_entertainment';
+  if (!p?.search_target || !isElectronics) return false;
+
+  return hasTargetCountry('CH');
+});
+
+const swissElectronicsLabels = computed(() => {
+  if (!showSwissElectronicsMarketplaces.value) return [];
+  return marketplaceLabelsForCountry('CH');
+});
+
+function hasTargetCountry(code) {
+  const p = data.value?.parsed;
+  const normalized = String(code || '').toUpperCase();
+  const multi = p?.search_countries;
+  if (Array.isArray(multi) && multi.length > 0) {
+    return multi.some((c) => String(c?.search_country_code || '').toUpperCase() === normalized);
+  }
+
+  return String(p?.search_country_code || '').toUpperCase() === normalized;
+}
+
+function marketplaceLabelsForCountry(code) {
+  const normalized = String(code || '').toUpperCase();
+  const byCountry = data.value?.meta?.marketplace_labels_by_country ?? {};
+  if (Array.isArray(byCountry[normalized]) && byCountry[normalized].length) {
+    return byCountry[normalized];
+  }
+
+  if (!hasTargetCountry(normalized)) {
+    return [];
+  }
+
+  return data.value?.meta?.marketplace_labels ?? [];
+}
 
 const showGermanCarMarketplaces = computed(() => {
   const p = data.value?.parsed;

@@ -6,6 +6,7 @@ use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveModelResolver;
 use App\Support\CategoryCatalog;
+use App\Support\ElectronicsIntentParser;
 
 class ProductListingNormalizer
 {
@@ -138,14 +139,21 @@ class ProductListingNormalizer
         $wantedEngine = isset($parsed['engine_liters']) ? (float) $parsed['engine_liters'] : null;
 
         $isAutomotive = CategoryCatalog::isAutomotive($parsed['category'] ?? '');
+        $productType = mb_strtolower((string) ($parsed['product_type'] ?? ''));
 
-        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive) {
+        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $productType) {
+            if (! $isAutomotive && $productType !== '' && ! ElectronicsIntentParser::productMatchesType($item, $productType)) {
+                return false;
+            }
             if ($brand !== '') {
                 $title = mb_strtolower($item['title'] ?? '');
                 $itemBrand = mb_strtolower((string) ($item['brand'] ?? ''));
                 $brandAliases = [$brand];
                 if ($brand === 'volkswagen') {
                     $brandAliases[] = 'vw';
+                }
+                if ($brand === 'apple') {
+                    $brandAliases = array_merge($brandAliases, ['macbook', 'iphone', 'ipad', 'airpods', 'imac', 'mac mini', 'mac studio']);
                 }
                 $brandMatch = false;
                 foreach ($brandAliases as $alias) {

@@ -13,6 +13,7 @@ use App\Support\KosovoFashionPlatforms;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
 use App\Support\SwissCarMarketplaces;
+use App\Support\SwissElectronicsMarketplaces;
 
 /**
  * Valon AI — role-based multi-agent orchestrator.
@@ -186,7 +187,9 @@ class ValonOrchestrator
 
             if ($status === 'ok' && ($row['mode'] ?? '') === 'demo') {
                 $status = match ($code) {
-                    'CH' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'swiss_car_marketplace' : 'mock_data',
+                    'CH' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '')
+                        ? 'swiss_car_marketplace'
+                        : (CategoryCatalog::isElectronics($parsedQuery['category'] ?? '') ? 'swiss_electronics_marketplace' : 'mock_data'),
                     'NL' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'dutch_car_marketplace' : 'mock_data',
                     'DE' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '')
                         ? 'german_car_marketplace'
@@ -200,6 +203,7 @@ class ValonOrchestrator
                 'source' => $platform,
                 'label' => KosovoFashionPlatforms::label($platform)
                     ?: KosovoMarketplaces::label($platform)
+                    ?: SwissElectronicsMarketplaces::label($platform)
                     ?: GermanElectronicsMarketplaces::label($platform)
                     ?: DutchCarMarketplaces::label($platform)
                     ?: SwissCarMarketplaces::label($platform)

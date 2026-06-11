@@ -21,6 +21,7 @@ class PlatformCatalogBridge
         return match ($countryCode) {
             'CH' => match (true) {
                 CategoryCatalog::isAutomotive($category) => SwissCarMarketplaces::keys(),
+                CategoryCatalog::isElectronics($category) => SwissElectronicsMarketplaces::keys(),
                 $category === 'real_estate' => SwissRealEstateMarketplaces::keys(),
                 default => [],
             },
@@ -48,6 +49,7 @@ class PlatformCatalogBridge
             ?: DutchElectronicsMarketplaces::label($key)
             ?: GermanCarMarketplaces::label($key)
             ?: GermanElectronicsMarketplaces::label($key)
+            ?: SwissElectronicsMarketplaces::label($key)
             ?: '';
     }
 

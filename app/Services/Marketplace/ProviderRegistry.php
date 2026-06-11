@@ -11,6 +11,7 @@ use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
+use App\Support\SwissElectronicsMarketplaces;
 use App\Support\GlobalBookMarketplaces;
 use App\Support\KosovoCarMarketplaces;
 use App\Support\KosovoMarketplaces;
@@ -79,6 +80,9 @@ class ProviderRegistry
         $germanElectronics = $countryCode === 'DE'
             && CategoryCatalog::isElectronics($category)
             && ! empty($parsedQuery['search_target']);
+        $swissElectronics = $countryCode === 'CH'
+            && CategoryCatalog::isElectronics($category)
+            && ! empty($parsedQuery['search_target']);
         $bookSearch = CategoryCatalog::isBookSearch($parsedQuery);
         $kosovoLocal = $countryCode === 'XK' && ! $bookSearch && empty($parsedQuery['search_target'])
             && ! CategoryCatalog::isAutomotive($category);
@@ -98,6 +102,7 @@ class ProviderRegistry
             $dutchCar,
             $germanCar,
             $germanElectronics,
+            $swissElectronics,
             $bookSearch,
             $kosovoLocal,
             $liveFanOut,
@@ -155,6 +160,17 @@ class ProviderRegistry
                 }
             }
 
+            if ($swissElectronics) {
+                $swissKeys = $targets ?: SwissElectronicsMarketplaces::keys();
+                if (! SwissElectronicsMarketplaces::isTarget($provider->sourceKey(), $swissKeys)
+                    && ! in_array($provider->sourceKey(), $swissKeys, true)) {
+                    return false;
+                }
+                if (in_array($provider->sourceKey(), ['ebay', 'google_shopping', 'facebook_marketplace', 'amazon', 'etsy'], true)) {
+                    return false;
+                }
+            }
+
             if ($bookSearch) {
                 $bookKeys = $targets ?: GlobalBookMarketplaces::keysForCountry($countryCode);
                 $key = $provider->sourceKey();
@@ -197,7 +213,7 @@ class ProviderRegistry
                 }
             }
 
-            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $germanElectronics, $bookSearch, $kosovoLocal)) {
+            if ($targets !== [] && ! $this->matchesTarget($provider->sourceKey(), $targets, $swissCar, $dutchCar, $germanCar, $germanElectronics, $swissElectronics, $bookSearch, $kosovoLocal)) {
                 return false;
             }
 
@@ -208,7 +224,7 @@ class ProviderRegistry
     /**
      * @param  array<int, string>  $targets
      */
-    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $germanElectronics = false, bool $bookSearch = false, bool $kosovoLocal = false): bool
+    private function matchesTarget(string $sourceKey, array $targets, bool $swissCar = false, bool $dutchCar = false, bool $germanCar = false, bool $germanElectronics = false, bool $swissElectronics = false, bool $bookSearch = false, bool $kosovoLocal = false): bool
     {
         if ($swissCar && SwissCarMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
@@ -223,6 +239,10 @@ class ProviderRegistry
         }
 
         if ($germanElectronics && GermanElectronicsMarketplaces::isTarget($sourceKey, $targets)) {
+            return true;
+        }
+
+        if ($swissElectronics && SwissElectronicsMarketplaces::isTarget($sourceKey, $targets)) {
             return true;
         }
 

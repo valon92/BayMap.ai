@@ -99,6 +99,12 @@ class GermanElectronicsMarketplaces
             'focus' => 'general_electronics',
             'categories' => ['electronics_tech'],
         ],
+        'apple_de' => [
+            'label' => 'Apple Store Germany',
+            'url' => 'https://www.apple.com/de',
+            'focus' => 'apple_devices',
+            'categories' => ['electronics_tech'],
+        ],
     ];
 
     /** @var array<string, string> */

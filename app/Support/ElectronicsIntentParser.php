@@ -65,13 +65,18 @@ class ElectronicsIntentParser
             $result['brand'] = 'samsung';
             $result['product_type'] = 'phone';
             $result['model'] = trim($m[0]);
-        } elseif (preg_match('/\b(macbook|ipad|airpods)\b/u', $lower, $m)) {
+        } elseif (preg_match('/\b(macbook\s*(?:air|pro)?)\b/u', $lower, $m)) {
             $result['brand'] = 'apple';
-            $result['product_type'] = match ($m[1]) {
-                'macbook' => 'laptop',
-                'ipad' => 'tablet',
-                default => 'headphones',
-            };
+            $result['product_type'] = 'laptop';
+            $result['model'] = trim(preg_replace('/\s+/', ' ', $m[1]));
+        } elseif (preg_match('/\b(ipad\s*(?:pro|air|mini)?)\b/u', $lower, $m)) {
+            $result['brand'] = 'apple';
+            $result['product_type'] = 'tablet';
+            $result['model'] = trim(preg_replace('/\s+/', ' ', $m[1]));
+        } elseif (preg_match('/\b(airpods(?:\s*(?:pro|max|3|2))?)\b/u', $lower, $m)) {
+            $result['brand'] = 'apple';
+            $result['product_type'] = 'headphones';
+            $result['model'] = trim(preg_replace('/\s+/', ' ', $m[1]));
         } elseif (self::mentionsLaptop($lower)) {
             $result['product_type'] = 'laptop';
         }

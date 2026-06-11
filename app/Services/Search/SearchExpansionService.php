@@ -62,6 +62,41 @@ class SearchExpansionService
             ? $discovery['keys']
             : $this->marketplacesForCategory($parsed['category'] ?? 'marketplace', $countryCode);
 
+        $marketplaceLabels = $this->marketplaceLabels(
+            $marketplaces,
+            $discovery['country_code'] ?: $countryCode,
+            $parsed['category'] ?? '',
+            ! empty($parsed['search_target']),
+        );
+
+        if (! empty($parsed['search_countries']) && is_array($parsed['search_countries']) && count($parsed['search_countries']) > 1) {
+            $allKeys = $marketplaces;
+            $allLabels = $marketplaceLabels;
+
+            foreach ($parsed['search_countries'] as $country) {
+                $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+                if ($code === '') {
+                    continue;
+                }
+
+                $perParsed = array_merge($parsed, $country);
+                unset($perParsed['search_countries']);
+                $keys = LivePlatformRegistry::keysFromParsed($perParsed);
+                $allKeys = array_merge($allKeys, $keys);
+                $allLabels = array_merge($allLabels, $this->marketplaceLabels(
+                    $keys,
+                    $code,
+                    $parsed['category'] ?? '',
+                    ! empty($parsed['search_target']),
+                ));
+            }
+
+            $marketplaces = array_values(array_unique($allKeys));
+            $marketplaceLabels = array_values(array_unique(array_filter($allLabels)));
+        }
+
+        $marketplaceLabelsByCountry = $this->marketplaceLabelsByCountry($parsed);
+
         $expanded = [
             'original' => $parsed,
             'search_country_code' => $discovery['country_code'] ?: $countryCode,
@@ -69,12 +104,8 @@ class SearchExpansionService
             'discovered_platforms' => $discovery['platforms'],
             'nearby_countries' => $this->nearbyCountryLabels($countryCode),
             'marketplaces' => $marketplaces,
-            'marketplace_labels' => $this->marketplaceLabels(
-                $marketplaces,
-                $discovery['country_code'] ?: $countryCode,
-                $parsed['category'] ?? '',
-                ! empty($parsed['search_target']),
-            ),
+            'marketplace_labels' => $marketplaceLabels,
+            'marketplace_labels_by_country' => $marketplaceLabelsByCountry,
             'smart_filters' => $this->buildSmartFilters($parsed),
         ];
 
@@ -225,5 +256,39 @@ class SearchExpansionService
         }
 
         return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, array<int, string>>
+     */
+    private function marketplaceLabelsByCountry(array $parsed): array
+    {
+        $countries = $parsed['search_countries'] ?? [];
+        if (! is_array($countries) || count($countries) <= 1) {
+            return [];
+        }
+
+        $byCountry = [];
+        $category = $parsed['category'] ?? '';
+
+        foreach ($countries as $country) {
+            $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+
+            $perParsed = array_merge($parsed, $country);
+            unset($perParsed['search_countries']);
+            $keys = LivePlatformRegistry::keysFromParsed($perParsed);
+            $byCountry[$code] = $this->marketplaceLabels(
+                $keys,
+                $code,
+                $category,
+                ! empty($parsed['search_target']),
+            );
+        }
+
+        return $byCountry;
     }
 }

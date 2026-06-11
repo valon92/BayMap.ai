@@ -27,15 +27,28 @@ class PlatformCatalogUrlBuilder
     public static function searchTerm(array $platform, array $parsed): string
     {
         if (CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
-            $parts = array_filter([
-                $parsed['brand'] ?? null,
-                $parsed['model'] ?? null,
-            ]);
-            if ($parts !== []) {
-                return implode(' ', $parts);
+            $brand = trim((string) ($parsed['brand'] ?? ''));
+            $model = trim((string) ($parsed['model'] ?? ''));
+            $raw = trim((string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? ''));
+
+            if ($model !== '') {
+                if (preg_match('/\b(macbook|iphone|ipad|airpods)\b/i', $model)) {
+                    return $model;
+                }
+
+                return $brand !== '' ? trim($brand.' '.$model) : $model;
             }
+
+            if ($raw !== '' && preg_match('/\b(macbook\s*(?:air|pro)?|iphone\s*[\d\w\s]*|ipad\s*[\w\s]*|airpods(?:\s*(?:pro|max|3|2))?)\b/ui', $raw, $m)) {
+                return trim($m[0]);
+            }
+
+            if ($brand !== '') {
+                return $brand;
+            }
+
             $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
-            if (str_contains($type, 'phone') || preg_match('/iphone|telefon/i', (string) ($parsed['raw_query'] ?? ''))) {
+            if (str_contains($type, 'phone') || preg_match('/iphone|telefon/i', $raw)) {
                 return (string) ($platform['default_query'] ?? 'iphone');
             }
 
@@ -138,12 +151,20 @@ class PlatformCatalogUrlBuilder
      */
     private static function genericSearchUrl(array $platform, array $parsed): string
     {
+        $scraper = (string) ($platform['scraper'] ?? $platform['_key'] ?? '');
+
+        if (str_contains($scraper, 'apple')) {
+            return self::appleStoreUrl($platform, $parsed);
+        }
+
         $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
         $template = (string) ($platform['search_template'] ?? '/?s={query}');
         $query = rawurlencode(self::searchTerm($platform, $parsed));
+        $slug = rawurlencode(self::appleSearchSlug(self::searchTerm($platform, $parsed)));
         $zip = rawurlencode((string) ($parsed['search_zip'] ?? $platform['default_zip'] ?? ''));
 
         $url = str_replace('{query}', $query, $template);
+        $url = str_replace('{slug}', $slug, $url);
         $url = str_replace('{zip}', $zip, $url);
 
         return $base.$url;
@@ -153,11 +174,67 @@ class PlatformCatalogUrlBuilder
      * @param  array<string, mixed>  $platform
      * @param  array<string, mixed>  $parsed
      */
+    private static function appleStoreUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://www.apple.com'), '/');
+        $shopPrefix = trim((string) ($platform['shop_prefix'] ?? 'ch-de'), '/');
+        $query = mb_strtolower(self::searchTerm($platform, $parsed));
+
+        if (str_contains($query, 'macbook')) {
+            if (str_contains($query, 'pro')) {
+                return $base.'/'.$shopPrefix.'/shop/buy-mac/macbook-pro';
+            }
+
+            return $base.'/'.$shopPrefix.'/shop/buy-mac/macbook-air';
+        }
+
+        if (str_contains($query, 'iphone')) {
+            return $base.'/'.$shopPrefix.'/shop/buy-iphone';
+        }
+
+        if (str_contains($query, 'ipad')) {
+            return $base.'/'.$shopPrefix.'/shop/buy-ipad';
+        }
+
+        if (str_contains($query, 'watch')) {
+            return $base.'/'.$shopPrefix.'/shop/buy-watch';
+        }
+
+        $slug = self::appleSearchSlug(self::searchTerm($platform, $parsed));
+
+        return $base.'/'.$shopPrefix.'/shop/search/'.$slug;
+    }
+
+    private static function appleSearchSlug(string $query): string
+    {
+        $parts = preg_split('/\s+/', trim($query)) ?: [];
+        $slugParts = array_map(fn (string $part) => ucfirst(mb_strtolower($part)), $parts);
+
+        return implode('-', $slugParts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
     private static function automotiveUrl(array $platform, array $parsed): string
     {
+        $scraper = (string) ($platform['scraper'] ?? $platform['_key'] ?? '');
+
+        if (str_contains($scraper, 'autolina')) {
+            return self::autolinaUrl($platform, $parsed);
+        }
+
+        if (str_contains($scraper, 'autogrid')) {
+            return self::autogridUrl($platform, $parsed);
+        }
+
+        if (str_contains($scraper, 'swiss_html')) {
+            return self::swissCatalogUrl($platform, $parsed);
+        }
+
         $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
         $template = (string) ($platform['search_template'] ?? '/lst/{make}/{model}');
-        $scraper = (string) ($platform['scraper'] ?? $platform['_key'] ?? '');
         [$make, $model] = AutomotiveModelResolver::makeModelSlugs(
             (string) ($parsed['brand'] ?? 'car'),
             (string) ($parsed['model'] ?? ''),
@@ -169,10 +246,99 @@ class PlatformCatalogUrlBuilder
         $url = str_replace('{model}', $model, $url);
         $url = str_replace('{query}', $query, $url);
 
-        $params = self::automotiveSearchParams($parsed, (string) ($platform['scraper'] ?? $platform['_key'] ?? ''));
+        $params = self::automotiveSearchParams($parsed, $scraper);
         if ($params !== []) {
             $url .= (str_contains($url, '?') ? '&' : '?').http_build_query($params);
         }
+
+        return $base.$url;
+    }
+
+    /**
+     * Autolina uses /{make}/{model} paths (e.g. /audi/q7) with SSR listing cards.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function autolinaUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://www.autolina.ch'), '/');
+        [$make, $model] = AutomotiveModelResolver::makeModelSlugs(
+            (string) ($parsed['brand'] ?? ''),
+            (string) ($parsed['model'] ?? ''),
+        );
+        $make = self::autolinaMakeSlug($make);
+
+        if ($make === '' || $make === 'car' || $make === 'all') {
+            return $base.'/de/fahrzeuge';
+        }
+
+        if ($model === '' || $model === 'all') {
+            return $base.'/'.$make;
+        }
+
+        return $base.'/'.$make.'/'.$model;
+    }
+
+    private static function autolinaMakeSlug(string $make): string
+    {
+        return match (mb_strtolower(trim($make))) {
+            'volkswagen', 'vw' => 'vw',
+            'mercedes', 'mercedes-benz', 'mercedes benz' => 'mercedes-benz',
+            default => str_replace(' ', '-', mb_strtolower(trim($make))),
+        };
+    }
+
+    /**
+     * Autogrid uses /inserate/marke/{make}-occasionen or /inserate?q=bmw+x5.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function autogridUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://www.autogrid.ch'), '/');
+        [$make, $model] = AutomotiveModelResolver::makeModelSlugs(
+            (string) ($parsed['brand'] ?? ''),
+            (string) ($parsed['model'] ?? ''),
+        );
+        $make = self::autolinaMakeSlug($make);
+
+        if ($make !== '' && $make !== 'car' && $make !== 'all') {
+            return $base.'/inserate/marke/'.$make.'-occasionen';
+        }
+
+        if ($model !== '' && $model !== 'all') {
+            $query = rawurlencode(trim($make.' '.$model));
+
+            return $base.'/inserate?q='.$query;
+        }
+
+        return $base.'/inserate';
+    }
+
+    /**
+     * Generic Swiss catalog URL from platform search_template.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function swissCatalogUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $template = (string) ($platform['search_template'] ?? '/?q={query}');
+        [$make, $model] = AutomotiveModelResolver::makeModelSlugs(
+            (string) ($parsed['brand'] ?? ''),
+            (string) ($parsed['model'] ?? ''),
+        );
+        $make = self::autolinaMakeSlug($make);
+        $query = self::searchTerm($platform, $parsed);
+        $slugQuery = str_replace(' ', '-', mb_strtolower(trim($make.($model !== '' && $model !== 'all' ? '-'.$model : ''))));
+
+        $url = str_replace('{make}', $make, $template);
+        $url = str_replace('{model}', $model === 'all' ? '' : $model, $url);
+        $url = str_replace('{query}', rawurlencode($query), $url);
+        $url = str_replace('{slug}', $slugQuery, $url);
 
         return $base.$url;
     }

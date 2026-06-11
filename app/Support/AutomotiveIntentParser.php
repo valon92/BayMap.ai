@@ -119,6 +119,13 @@ class AutomotiveIntentParser
      */
     public static function parseYearFields(string $query): array
     {
+        if (preg_match('/\b(?:prej|nga|from)\s*(20\d{2}|19\d{2})\s*[-–—]\s*(20\d{2}|19\d{2})\b/ui', $query, $m)) {
+            $min = min((int) $m[1], (int) $m[2]);
+            $max = max((int) $m[1], (int) $m[2]);
+
+            return ['year' => $min, 'year_min' => $min, 'year_max' => $max];
+        }
+
         if (preg_match('/\b(20\d{2}|19\d{2})\s*[-–—]\s*(20\d{2}|19\d{2})\b/u', $query, $m)) {
             $min = min((int) $m[1], (int) $m[2]);
             $max = max((int) $m[1], (int) $m[2]);

@@ -38,6 +38,9 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             str_contains($scraper, 'autoscout') => $this->parseAutoScout24($html, $storeKey, $platform),
             str_contains($scraper, 'kleinanzeigen') => $this->parseKleinanzeigen($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'autouncle') => $this->parseAutoUncle($html, $storeKey, $platform),
+            str_contains($scraper, 'autolina') => $this->parseAutolina($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'autogrid') => $this->parseAutogrid($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'swiss_html') => $this->parseSwissAutomotive($html, $storeKey, $platform, $parsedQuery),
             default => $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery),
         };
 
@@ -203,6 +206,238 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 
     /**
      * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseAutolina(string $html, string $storeKey, array $platform, array $parsedQuery = []): array
+    {
+        if ($html === '' || $this->isBlockedHtml($html)) {
+            return [];
+        }
+
+        if (! preg_match_all('/<app-car-row\b.*?<\/app-car-row>/is', $html, $rows)) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.autolina.ch'), '/');
+        $items = [];
+        $seen = [];
+
+        foreach ($rows[0] as $row) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            if (! preg_match('/href="(\/auto\/[^"]+)"/i', $row, $hrefMatch)) {
+                continue;
+            }
+
+            $path = html_entity_decode($hrefMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (isset($seen[$path])) {
+                continue;
+            }
+            $seen[$path] = true;
+
+            preg_match_all('/title="([^"]+)"/i', $row, $titleMatches);
+            $brand = trim((string) ($titleMatches[1][0] ?? ''));
+            $variant = trim((string) ($titleMatches[1][1] ?? ''));
+            $title = trim($brand.($variant !== '' ? ' '.$variant : ''));
+            if ($title === '') {
+                if (preg_match('/\/auto\/([^\/]+)\//', $path, $slugMatch)) {
+                    $title = str_replace('-', ' ', $slugMatch[1]);
+                } else {
+                    continue;
+                }
+            }
+
+            $price = $this->extractAutolinaPrice($row);
+
+            if ($price < 1000) {
+                continue;
+            }
+
+            $year = null;
+            if (preg_match_all('/>(\d{4})</', $row, $yearMatches)) {
+                foreach ($yearMatches[1] as $candidate) {
+                    $candidateYear = (int) $candidate;
+                    if ($candidateYear >= 1990 && $candidateYear <= (int) date('Y') + 1) {
+                        $year = $candidateYear;
+                        break;
+                    }
+                }
+            }
+            if ($year === null) {
+                $year = $this->yearFromTitle($title);
+            }
+
+            $locationLabel = (string) ($platform['location'] ?? 'Switzerland');
+            if (preg_match('/translate="no"[^>]*>(\d{4}\s+[^<]+)</i', $row, $locMatch)) {
+                $loc = trim(html_entity_decode($locMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if ($loc !== '' && ! preg_match('/^[A-Z]{2,}$/u', $loc)) {
+                    $locationLabel = $loc.', Switzerland';
+                }
+            }
+
+            $image = null;
+            if (preg_match('/src="(https:\/\/[^"]+autolina[^"]+)"/i', $row, $imgMatch)) {
+                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            $url = str_starts_with($path, 'http') ? $path : $baseUrl.$path;
+            $productId = '';
+            if (preg_match('/\/(\d+)$/', $path, $idMatch)) {
+                $productId = $idMatch[1];
+            }
+
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => $productId !== '' ? $productId : md5($title.$url),
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $url,
+                'location' => $locationLabel,
+                'brand' => $this->brandFromTitle($title) ?? mb_strtolower($brand),
+                'model' => $this->modelFromTitle($title) ?? mb_strtolower($variant),
+                'year' => $year,
+                'condition' => 'used',
+                'color' => AutomotiveColorResolver::extractFromText($title),
+                'engine_liters' => AutomotiveEngineResolver::extractFromTitle(
+                    $title,
+                    isset($parsedQuery['fuel']) ? (string) $parsedQuery['fuel'] : null,
+                ),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseAutogrid(string $html, string $storeKey, array $platform, array $parsedQuery = []): array
+    {
+        if ($html === '' || $this->isBlockedHtml($html)) {
+            return [];
+        }
+
+        if (! preg_match_all('/<article class="ag-listing-card\b.*?<\/article>/is', $html, $articles)) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.autogrid.ch'), '/');
+        $items = [];
+        $seen = [];
+
+        foreach ($articles[0] as $article) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            if (! preg_match('/ag-listing-card-title[\s\S]*?<a[^>]+href="([^"]+)"[^>]*>([^<]+)</is', $article, $titleMatch)) {
+                continue;
+            }
+
+            $url = html_entity_decode(trim($titleMatch[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (isset($seen[$url])) {
+                continue;
+            }
+            $seen[$url] = true;
+
+            $title = trim(html_entity_decode($titleMatch[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($title === '') {
+                continue;
+            }
+
+            $price = 0.0;
+            if (preg_match('/>\s*(\d{1,3}(?:&#039;\d{3})*)\s*<\/div>\s*<div[^>]*>\s*CHF/is', $article, $priceMatch)) {
+                $price = $this->parseSwissPrice(html_entity_decode($priceMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            } elseif (preg_match('/text-\[#d1b371\][^>]*>(\d{1,3}(?:&#039;\d{3})*)</', $article, $priceMatch)) {
+                $price = $this->parseSwissPrice(html_entity_decode($priceMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            }
+
+            if ($price < 1000) {
+                continue;
+            }
+
+            $year = null;
+            if (preg_match('/title="Jahr"[\s\S]*?ag-listing-card-spec-chip-value[^>]*>(\d{4})</is', $article, $yearMatch)) {
+                $year = (int) $yearMatch[1];
+            }
+            if ($year === null) {
+                $year = $this->yearFromTitle($title);
+            }
+
+            $mileage = null;
+            if (preg_match('/title="Kilometerstand"[\s\S]*?ag-listing-card-spec-chip-value[^>]*>([^<]+)</is', $article, $kmMatch)) {
+                $kmDigits = preg_replace('/[^\d]/', '', html_entity_decode($kmMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '';
+                $mileage = $kmDigits !== '' ? (int) $kmDigits : null;
+            }
+
+            $locationLabel = (string) ($platform['location'] ?? 'Switzerland');
+            if (preg_match('/ag-listing-card-footer[\s\S]*?<span>(\d{4}\s+[^<]+)<\/span>/is', $article, $locMatch)) {
+                $loc = trim(html_entity_decode($locMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if ($loc !== '') {
+                    $locationLabel = $loc.', Switzerland';
+                }
+            }
+
+            $image = null;
+            if (preg_match('/class="ag-listing-card-image"[^>]+src="([^"]+)"/i', $article, $imgMatch)) {
+                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            if (! str_starts_with($url, 'http')) {
+                $url = $baseUrl.$url;
+            }
+
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => md5($url),
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $url,
+                'location' => $locationLabel,
+                'brand' => $this->brandFromTitle($title),
+                'model' => $this->modelFromTitle($title),
+                'year' => $year,
+                'mileage' => $mileage,
+                'condition' => 'used',
+                'color' => AutomotiveColorResolver::extractFromText($title),
+                'engine_liters' => AutomotiveEngineResolver::extractFromTitle(
+                    $title,
+                    isset($parsedQuery['fuel']) ? (string) $parsedQuery['fuel'] : null,
+                ),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseSwissAutomotive(string $html, string $storeKey, array $platform, array $parsedQuery = []): array
+    {
+        foreach ([
+            fn () => $this->parseAutolina($html, $storeKey, $platform, $parsedQuery),
+            fn () => $this->parseAutogrid($html, $storeKey, $platform, $parsedQuery),
+            fn () => $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery),
+        ] as $parser) {
+            $items = $parser();
+            if ($items !== []) {
+                return $items;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
      * @return array<int, array<string, mixed>>
      */
     private function parseAutoUncle(string $html, string $storeKey, array $platform): array
@@ -345,12 +580,25 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 
     private function isBlockedHtml(string $html): bool
     {
+        if (preg_match('/<app-car-row\b/i', $html) && preg_match('/href="\/auto\//i', $html)) {
+            return false;
+        }
+
+        if (preg_match('/<article class="ag-listing-card\b/i', $html)) {
+            return false;
+        }
+
         $lower = mb_strtolower($html);
 
+        if (preg_match('/<title>[^<]*(captcha|attention required|access denied|just a moment)[^<]*<\/title>/i', $html)) {
+            return true;
+        }
+
         return str_contains($lower, 'access denied')
-            || str_contains($lower, 'captcha')
             || str_contains($lower, 'cf-challenge')
-            || str_contains($lower, 'bot detection');
+            || str_contains($lower, 'bot detection')
+            || str_contains($lower, 'vercel security checkpoint')
+            || (str_contains($lower, 'captcha') && ! str_contains($lower, 'recaptcha'));
     }
 
     private function extractKleinanzeigenImage(string $body): ?string
@@ -371,6 +619,35 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
         $digits = preg_replace('/[^\d]/', '', $raw) ?? '';
 
         return $digits !== '' ? (float) $digits : 0.0;
+    }
+
+    private function parseSwissPrice(string $raw): float
+    {
+        $normalized = str_replace(["'", '’', ' '], '', $raw);
+        $digits = preg_replace('/[^\d]/', '', $normalized) ?? '';
+
+        return $digits !== '' ? (float) $digits : 0.0;
+    }
+
+    private function extractAutolinaPrice(string $row): float
+    {
+        if (preg_match('/CHF<\/span>\s*<span[^>]*>([^<]+)</i', $row, $priceMatch)) {
+            return $this->parseSwissPrice($priceMatch[1]);
+        }
+
+        if (preg_match('/CHF(.*?)class="middle-row/s', $row, $section)) {
+            $priceText = html_entity_decode(strip_tags($section[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $price = $this->parseSwissPrice($priceText);
+            if ($price >= 1000) {
+                return $price;
+            }
+        }
+
+        if (preg_match('/translate="no">(\d{1,3})(?:<span[^>]*>\'<\/span>)?(\d{3})/s', $row, $priceMatch)) {
+            return (float) ($priceMatch[1].$priceMatch[2]);
+        }
+
+        return 0.0;
     }
 
     /**
@@ -441,8 +718,14 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 
     private function modelFromTitle(string $title): ?string
     {
-        if (preg_match('/\bq\s*5\b/i', $title)) {
-            return 'q5';
+        if (preg_match('/\bx\s*([1-7])\b/i', $title, $match)) {
+            return 'x'.$match[1];
+        }
+        if (preg_match('/\bq\s*([2-8])\b/i', $title, $match)) {
+            return 'q'.$match[1];
+        }
+        if (preg_match('/\ba\s*([1-8])\b/i', $title, $match)) {
+            return 'a'.$match[1];
         }
         if (preg_match('/\bgolf\b/i', $title)) {
             return 'golf';
