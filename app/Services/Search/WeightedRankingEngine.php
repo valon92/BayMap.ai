@@ -8,7 +8,7 @@ use App\Support\CountryMatcher;
 use App\Support\ShoeSize;
 
 /**
- * Weighted ranking: 40% exact match, 25% price, 15% location, 10% availability, 10% trust.
+ * Weighted ranking: 40% specification, 25% semantic, 15% location, 10% price, 10% trust.
  */
 class WeightedRankingEngine
 {
@@ -25,21 +25,62 @@ class WeightedRankingEngine
     {
         $weights = $this->agentPools->rankingWeights();
 
-        $exact = $this->exactMatchScore($product, $parsed);
-        $price = $this->priceScore($product, $parsed);
+        $specification = $this->exactMatchScore($product, $parsed);
+        $semantic = $this->semanticSimilarityScore($product, $parsed);
         $location = $this->locationScore($product, $parsed);
-        $availability = $this->availabilityScore($product);
+        $price = $this->priceScore($product, $parsed);
         $trust = $this->trustScore($product);
 
         $weighted = (
-            ($exact * ($weights['exact_match'] ?? 0.40)) +
-            ($price * ($weights['price_relevance'] ?? 0.25)) +
-            ($location * ($weights['location_proximity'] ?? 0.15)) +
-            ($availability * ($weights['availability'] ?? 0.10)) +
-            ($trust * ($weights['platform_trust'] ?? 0.10))
+            ($specification * ($weights['specification_match'] ?? $weights['exact_match'] ?? 0.40)) +
+            ($semantic * ($weights['semantic_similarity'] ?? 0.25)) +
+            ($location * ($weights['location_relevance'] ?? $weights['location_proximity'] ?? 0.15)) +
+            ($price * ($weights['price_relevance'] ?? 0.10)) +
+            ($trust * ($weights['provider_trust'] ?? $weights['platform_trust'] ?? 0.10))
         );
 
         return min(99, max(35, (int) round($weighted)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     */
+    private function semanticSimilarityScore(array $product, array $parsed): float
+    {
+        $parts = array_filter([
+            $parsed['brand'] ?? null,
+            $parsed['model'] ?? null,
+            $parsed['product_type'] ?? null,
+            $parsed['color'] ?? null,
+            ...($parsed['keywords'] ?? []),
+        ], fn ($v) => is_string($v) && trim($v) !== '');
+
+        if ($parts === []) {
+            return 55.0;
+        }
+
+        $title = mb_strtolower((string) ($product['title'] ?? ''));
+        $tags = mb_strtolower(implode(' ', array_map('strval', $product['tags'] ?? [])));
+        $haystack = trim($title.' '.$tags);
+
+        $tokens = array_values(array_unique(array_filter(
+            preg_split('/\s+/u', mb_strtolower(implode(' ', $parts))) ?: [],
+            fn ($t) => mb_strlen($t) > 2,
+        )));
+
+        if ($tokens === []) {
+            return 55.0;
+        }
+
+        $hits = 0;
+        foreach ($tokens as $token) {
+            if (str_contains($haystack, $token)) {
+                $hits++;
+            }
+        }
+
+        return min(100.0, 35.0 + ($hits / count($tokens)) * 65.0);
     }
 
     /**

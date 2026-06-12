@@ -407,8 +407,13 @@ class QueryIntentEnricher
     {
         $defaults = [];
 
-        if (! empty($parsed['search_target']) && ! empty($parsed['search_country'])) {
-            $defaults['country'] = $parsed['search_country'];
+        if (! empty($parsed['search_target'])) {
+            $multi = $parsed['search_countries'] ?? [];
+            if (! is_array($multi) || count($multi) <= 1) {
+                if (! empty($parsed['search_country'])) {
+                    $defaults['country'] = $parsed['search_country'];
+                }
+            }
         }
 
         if (! empty($parsed['max_price'])

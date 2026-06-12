@@ -12,6 +12,8 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 {
     private const MAX_LISTINGS = 20;
 
+    private const MAX_SCAN_ROWS = 180;
+
     public function __construct(private ScraperHttpClient $http) {}
 
     public function adapterKey(): string
@@ -222,8 +224,10 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
         $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.autolina.ch'), '/');
         $items = [];
         $seen = [];
+        $yearFiltered = $this->hasYearFilter($parsedQuery);
+        $maxScan = $yearFiltered ? self::MAX_SCAN_ROWS : count($rows[0]);
 
-        foreach ($rows[0] as $row) {
+        foreach (array_slice($rows[0], 0, $maxScan) as $row) {
             if (count($items) >= self::MAX_LISTINGS) {
                 break;
             }
@@ -287,6 +291,16 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             $productId = '';
             if (preg_match('/\/(\d+)$/', $path, $idMatch)) {
                 $productId = $idMatch[1];
+            }
+
+            $model = $this->modelFromTitle($title) ?? mb_strtolower($variant);
+            if (! AutomotiveModelResolver::matchesListing(
+                $title,
+                $model,
+                (string) ($parsedQuery['model'] ?? ''),
+                array_merge($parsedQuery, ['year' => $year]),
+            )) {
+                continue;
             }
 
             $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
@@ -781,5 +795,15 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             '/^(vw|volkswagen|audi|bmw|mercedes|opel|ford|skoda|seat|golf)\b/i',
             trim($title),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsedQuery
+     */
+    private function hasYearFilter(array $parsedQuery): bool
+    {
+        return ! empty($parsedQuery['year_min'])
+            || ! empty($parsedQuery['year_max'])
+            || ! empty($parsedQuery['year']);
     }
 }

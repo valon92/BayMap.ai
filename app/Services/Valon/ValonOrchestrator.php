@@ -4,16 +4,14 @@ namespace App\Services\Valon;
 
 use App\Services\Agents\AgentActivationService;
 use App\Services\Marketplace\ProviderRegistry;
+use App\Services\Orchestration\ProviderDiscoveryEngine;
+use App\Services\Orchestration\SearchIntentFactory;
 use App\Services\Search\LocationExpansionEngine;
 use App\Support\CategoryCatalog;
-use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
-use App\Support\GermanElectronicsMarketplaces;
-use App\Support\KosovoFashionPlatforms;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
-use App\Support\SwissCarMarketplaces;
-use App\Support\SwissElectronicsMarketplaces;
+use App\Support\LocalMarketplaceResolver;
 
 /**
  * Valon AI — role-based multi-agent orchestrator.
@@ -48,6 +46,8 @@ class ValonOrchestrator
         ];
 
         $intent = $this->intentEngine->analyze($parsedQuery, $expandedFilters, $geo);
+        $searchIntent = SearchIntentFactory::fromParsed($parsedQuery, $expandedFilters, $geo);
+        $providerDiscovery = app(ProviderDiscoveryEngine::class)->discover($searchIntent);
         $activation = $this->agentActivation->activate($parsedQuery, $expandedFilters, $geo);
 
         if (($activation['providers'] ?? []) === []) {
@@ -103,6 +103,14 @@ class ValonOrchestrator
             ],
             'valon' => [
                 'orchestrator' => config('valon.orchestrator_name', 'Valon AI'),
+                'search_intent' => $intent['search_intent'] ?? $searchIntent->toArray(),
+                'provider_discovery' => [
+                    'scope' => $providerDiscovery['scope'],
+                    'country_code' => $providerDiscovery['country_code'],
+                    'category' => $providerDiscovery['category'],
+                    'providers_found' => count($providerDiscovery['keys']),
+                    'platforms' => array_slice($providerDiscovery['platforms'], 0, 12),
+                ],
                 'intent' => [
                     'category' => $intent['category'],
                     'attributes' => $intent['attributes'],
@@ -186,28 +194,15 @@ class ValonOrchestrator
             $status = $row['status'] ?? 'ok';
 
             if ($status === 'ok' && ($row['mode'] ?? '') === 'demo') {
-                $status = match ($code) {
-                    'CH' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '')
-                        ? 'swiss_car_marketplace'
-                        : (CategoryCatalog::isElectronics($parsedQuery['category'] ?? '') ? 'swiss_electronics_marketplace' : 'mock_data'),
-                    'NL' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '') ? 'dutch_car_marketplace' : 'mock_data',
-                    'DE' => CategoryCatalog::isAutomotive($parsedQuery['category'] ?? '')
-                        ? 'german_car_marketplace'
-                        : (CategoryCatalog::isElectronics($parsedQuery['category'] ?? '') ? 'german_electronics_marketplace' : 'mock_data'),
-                    'XK' => KosovoMarketplaces::isKosovoPlatform($platform) ? 'kosovo_marketplace' : 'mock_data',
-                    default => 'mock_data',
-                };
+                $status = LocalMarketplaceResolver::hasLocalPlatforms($parsedQuery)
+                    ? 'local_marketplace'
+                    : (KosovoMarketplaces::isKosovoPlatform($platform) ? 'kosovo_marketplace' : 'mock_data');
             }
 
             return [
                 'source' => $platform,
-                'label' => KosovoFashionPlatforms::label($platform)
+                'label' => LivePlatformRegistry::label($platform)
                     ?: KosovoMarketplaces::label($platform)
-                    ?: SwissElectronicsMarketplaces::label($platform)
-                    ?: GermanElectronicsMarketplaces::label($platform)
-                    ?: DutchCarMarketplaces::label($platform)
-                    ?: SwissCarMarketplaces::label($platform)
-                    ?: GermanCarMarketplaces::label($platform)
                     ?: ($row['platform_label'] ?? $platform),
                 'mode' => $row['mode'] ?? 'demo',
                 'count' => $row['count'] ?? 0,

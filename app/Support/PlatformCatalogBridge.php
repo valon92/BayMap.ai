@@ -6,7 +6,14 @@ use App\Services\Marketplace\EbayOAuthService;
 
 /**
  * Bridges legacy per-country marketplace catalogs into the universal live fan-out registry.
- * Any country + category with platforms here gets one Valon Worker per store automatically.
+ *
+ * Unified model (same for every country + category):
+ * 1. Register platforms in config/live_platforms.php (country + categories)
+ * 2. PlatformDiscoveryService / LivePlatformRegistry discover keys from parsed intent
+ * 3. LocalMarketplaceResolver filters providers and excludes global connectors
+ * 4. One Valon Worker per platform runs in parallel
+ *
+ * Legacy *Marketplaces.php classes remain as label/mock fallbacks until fully migrated to live_platforms.
  */
 class PlatformCatalogBridge
 {

@@ -94,12 +94,45 @@ class MetaSearchEngine
      */
     private function clusterKey(array $product): string
     {
+        if (! empty($product['fingerprint'])) {
+            return 'fp:'.(string) $product['fingerprint'];
+        }
+
+        $brand = $this->tagValue($product, 'brand');
+        $model = $this->tagValue($product, 'model') ?? $this->tagValue($product, 'series');
+        if ($brand !== null && $model !== null) {
+            return 'bm:'.substr(md5(mb_strtolower($brand.'|'.$model)), 0, 16);
+        }
+
         $sourceKey = (string) ($product['source_key'] ?? '');
         if (LivePlatformRegistry::isLivePlatform($sourceKey) && ! empty($product['id'])) {
             return $sourceKey.':'.(string) $product['id'];
         }
 
-        return $product['fingerprint'] ?? $this->fallbackKey($product);
+        return $this->fallbackKey($product);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private function tagValue(array $product, string $needle): ?string
+    {
+        $tags = $product['tags'] ?? [];
+        if (! is_array($tags)) {
+            return null;
+        }
+
+        foreach ($tags as $tag) {
+            $tag = trim((string) $tag);
+            if ($tag === '') {
+                continue;
+            }
+            if (str_starts_with(mb_strtolower($tag), mb_strtolower($needle).':')) {
+                return trim(substr($tag, strlen($needle) + 1));
+            }
+        }
+
+        return null;
     }
 
     /**

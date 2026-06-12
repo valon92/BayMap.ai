@@ -3,6 +3,7 @@
 namespace App\Services\Valon;
 
 use App\Contracts\FederatedSearchProviderInterface;
+use App\Services\Orchestration\ParallelWorkerExecutor;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -10,7 +11,10 @@ use Illuminate\Support\Facades\Log;
  */
 class ValonWorkerRunner
 {
-    public function __construct(private ValonResultNormalizer $normalizer) {}
+    public function __construct(
+        private ValonResultNormalizer $normalizer,
+        private ParallelWorkerExecutor $executor,
+    ) {}
 
     /**
      * @param  array<int, array<string, mixed>>  $workers
@@ -120,16 +124,10 @@ class ValonWorkerRunner
             return [];
         }
 
-        $live = array_values(array_filter($jobs, fn ($j) => $j['provider']->mode() === 'live'));
-        $demo = array_values(array_filter($jobs, fn ($j) => $j['provider']->mode() !== 'live'));
-
-        $results = [];
-        foreach (array_merge($live, $demo) as $job) {
-            $timeout = $this->timeoutForJob($job, $defaultTimeoutSeconds);
-            $results[] = $this->runJob($job, $timeout);
-        }
-
-        return $results;
+        return $this->executor->execute(
+            $jobs,
+            fn (array $job) => $this->runJob($job, $this->timeoutForJob($job, $defaultTimeoutSeconds)),
+        );
     }
 
     private function resolveWorkerStatus(string $platform, int $count, string $mode): string

@@ -2,6 +2,7 @@
 
 namespace App\Services\Valon;
 
+use App\Services\Orchestration\SearchIntentFactory;
 use App\Support\CategoryCatalog;
 
 /**
@@ -18,6 +19,7 @@ class ValonIntentEngine
     public function analyze(array $parsed, array $expanded, array $geo = []): array
     {
         $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
+        $searchIntent = SearchIntentFactory::fromParsed($parsed, $expanded, $geo);
 
         return [
             'orchestrator' => config('valon.orchestrator_name', 'Valon AI'),
@@ -27,6 +29,7 @@ class ValonIntentEngine
             'location_priority' => $this->extractLocationPriority($parsed, $expanded, $geo),
             'keywords' => $this->extractKeywords($parsed),
             'search_query' => $parsed['raw_query'] ?? $parsed['search_query'] ?? '',
+            'search_intent' => $searchIntent->toArray(),
             'parsed' => $parsed,
         ];
     }

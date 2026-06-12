@@ -177,8 +177,9 @@
           </InsightScrollSection>
 
           <InsightScrollSection
-            v-if="showGermanElectronicsMarketplaces"
-            :title="t('german_electronics_marketplaces')"
+            v-for="section in localMarketplaceSections"
+            :key="section.code"
+            :title="section.title"
             tone="orange"
             class="mb-4"
           >
@@ -188,28 +189,8 @@
               </svg>
             </template>
             <span
-              v-for="label in germanElectronicsLabels"
-              :key="label"
-              class="insight-chip insight-chip--orange"
-            >
-              {{ label }}
-            </span>
-          </InsightScrollSection>
-
-          <InsightScrollSection
-            v-if="showSwissElectronicsMarketplaces"
-            :title="t('swiss_electronics_marketplaces')"
-            tone="orange"
-            class="mb-4"
-          >
-            <template #icon>
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-            </template>
-            <span
-              v-for="label in swissElectronicsLabels"
-              :key="label"
+              v-for="label in section.labels"
+              :key="`${section.code}-${label}`"
               class="insight-chip insight-chip--orange"
             >
               {{ label }}
@@ -284,63 +265,6 @@
             v-for="label in kosovoMarketplaceLabels"
             :key="label"
             class="insight-chip insight-chip--emerald"
-          >
-            {{ label }}
-          </span>
-        </InsightScrollSection>
-
-        <InsightScrollSection
-          v-if="showGermanCarMarketplaces"
-          :title="t('german_car_marketplaces')"
-          tone="orange"
-        >
-          <template #icon>
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-          </template>
-          <span
-            v-for="label in germanMarketplaceLabels"
-            :key="label"
-            class="insight-chip insight-chip--orange"
-          >
-            {{ label }}
-          </span>
-        </InsightScrollSection>
-
-        <InsightScrollSection
-          v-if="showDutchCarMarketplaces"
-          :title="t('dutch_car_marketplaces')"
-          tone="orange"
-        >
-          <template #icon>
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-          </template>
-          <span
-            v-for="label in dutchMarketplaceLabels"
-            :key="label"
-            class="insight-chip insight-chip--orange"
-          >
-            {{ label }}
-          </span>
-        </InsightScrollSection>
-
-        <InsightScrollSection
-          v-if="showSwissCarMarketplaces"
-          :title="t('swiss_car_marketplaces')"
-          tone="sky"
-        >
-          <template #icon>
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-          </template>
-          <span
-            v-for="label in swissMarketplaceLabels"
-            :key="label"
-            class="insight-chip insight-chip--sky"
           >
             {{ label }}
           </span>
@@ -427,15 +351,6 @@ const kosovoMarketplaceLabels = computed(() => {
   return data.value?.meta?.marketplace_labels ?? [];
 });
 
-const showDutchCarMarketplaces = computed(() => {
-  const p = data.value?.parsed;
-  return Boolean(
-    p?.search_target
-    && String(p?.search_country_code || '').toUpperCase() === 'NL'
-    && (p?.category === 'automotive' || p?.category === 'car')
-  );
-});
-
 const showBookMarketplaces = computed(() => {
   const p = data.value?.parsed;
   const cat = String(p?.category || '');
@@ -449,88 +364,56 @@ const bookMarketplaceLabels = computed(() => {
   return data.value?.meta?.marketplace_labels ?? [];
 });
 
-const showGermanElectronicsMarketplaces = computed(() => {
-  const p = data.value?.parsed;
-  const isElectronics = p?.category === 'electronics_tech' || p?.category === 'gaming_entertainment';
-  if (!p?.search_target || !isElectronics) return false;
+const COUNTRY_DISPLAY = {
+  CH: 'Switzerland',
+  DE: 'Germany',
+  NL: 'Netherlands',
+  XK: 'Kosovo',
+  GB: 'United Kingdom',
+  US: 'United States',
+  AL: 'Albania',
+  FR: 'France',
+  IT: 'Italy',
+  AT: 'Austria',
+};
 
-  return hasTargetCountry('DE');
-});
-
-const germanElectronicsLabels = computed(() => {
-  if (!showGermanElectronicsMarketplaces.value) return [];
-  return marketplaceLabelsForCountry('DE');
-});
-
-const showSwissElectronicsMarketplaces = computed(() => {
-  const p = data.value?.parsed;
-  const isElectronics = p?.category === 'electronics_tech' || p?.category === 'gaming_entertainment';
-  if (!p?.search_target || !isElectronics) return false;
-
-  return hasTargetCountry('CH');
-});
-
-const swissElectronicsLabels = computed(() => {
-  if (!showSwissElectronicsMarketplaces.value) return [];
-  return marketplaceLabelsForCountry('CH');
-});
-
-function hasTargetCountry(code) {
-  const p = data.value?.parsed;
+function countryDisplayName(code, parsed) {
   const normalized = String(code || '').toUpperCase();
-  const multi = p?.search_countries;
-  if (Array.isArray(multi) && multi.length > 0) {
-    return multi.some((c) => String(c?.search_country_code || '').toUpperCase() === normalized);
+  const multi = parsed?.search_countries;
+  if (Array.isArray(multi)) {
+    const match = multi.find((c) => String(c?.search_country_code || '').toUpperCase() === normalized);
+    if (match?.search_country) return match.search_country;
   }
-
-  return String(p?.search_country_code || '').toUpperCase() === normalized;
+  if (parsed?.search_country && String(parsed?.search_country_code || '').toUpperCase() === normalized) {
+    return parsed.search_country;
+  }
+  return COUNTRY_DISPLAY[normalized] || normalized;
 }
 
-function marketplaceLabelsForCountry(code) {
-  const normalized = String(code || '').toUpperCase();
+const localMarketplaceSections = computed(() => {
+  const p = data.value?.parsed;
+  if (!p?.search_target || showBookMarketplaces.value) return [];
+
   const byCountry = data.value?.meta?.marketplace_labels_by_country ?? {};
-  if (Array.isArray(byCountry[normalized]) && byCountry[normalized].length) {
-    return byCountry[normalized];
+  const entries = Object.entries(byCountry).filter(([, labels]) => Array.isArray(labels) && labels.length);
+
+  if (entries.length) {
+    return entries.map(([code, labels]) => ({
+      code,
+      title: t('local_marketplaces_searched', { country: countryDisplayName(code, p) }),
+      labels,
+    }));
   }
 
-  if (!hasTargetCountry(normalized)) {
-    return [];
-  }
+  const labels = data.value?.meta?.marketplace_labels ?? [];
+  const code = String(p.search_country_code || '').toUpperCase();
+  if (!labels.length || !code || code === 'XK') return [];
 
-  return data.value?.meta?.marketplace_labels ?? [];
-}
-
-const showGermanCarMarketplaces = computed(() => {
-  const p = data.value?.parsed;
-  return Boolean(
-    p?.search_target
-    && String(p?.search_country_code || '').toUpperCase() === 'DE'
-    && (p?.category === 'automotive' || p?.category === 'car')
-  );
-});
-
-const germanMarketplaceLabels = computed(() => {
-  if (!showGermanCarMarketplaces.value) return [];
-  return data.value?.meta?.marketplace_labels ?? [];
-});
-
-const dutchMarketplaceLabels = computed(() => {
-  if (!showDutchCarMarketplaces.value) return [];
-  return data.value?.meta?.marketplace_labels ?? [];
-});
-
-const showSwissCarMarketplaces = computed(() => {
-  const p = data.value?.parsed;
-  return Boolean(
-    p?.search_target
-    && String(p?.search_country_code || '').toUpperCase() === 'CH'
-    && (p?.category === 'automotive' || p?.category === 'car')
-  );
-});
-
-const swissMarketplaceLabels = computed(() => {
-  if (!showSwissCarMarketplaces.value) return [];
-  return data.value?.meta?.marketplace_labels ?? [];
+  return [{
+    code,
+    title: t('local_marketplaces_searched', { country: countryDisplayName(code, p) }),
+    labels,
+  }];
 });
 
 const locationBanner = computed(() => {
@@ -606,9 +489,6 @@ const parsedChipItems = computed(() => {
 const hasDetailInsights = computed(() => Boolean(
   data.value?.location_context?.summary
   || showKosovoMarketplaces.value
-  || showGermanCarMarketplaces.value
-  || showDutchCarMarketplaces.value
-  || showSwissCarMarketplaces.value
 ));
 
 const uploadedPreview = ref(null);

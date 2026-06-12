@@ -7,6 +7,7 @@ use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveIntentParser;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
+use App\Support\LocalMarketplaceResolver;
 use App\Support\CountryMatcher;
 use App\Support\ElectronicsIntentParser;
 use App\Support\KosovoMarketplaces;
@@ -18,6 +19,7 @@ use App\Services\Geo\LocalLandmarkResolverService;
 use App\Services\Marketplace\EbayOAuthService;
 use App\Services\Marketplace\MarketplaceAggregator;
 use App\Services\Marketplace\SerpApiShoppingService;
+use App\Services\Orchestration\SearchIntentFactory;
 
 /**
  * Unified search pipeline: AI intent → federated multi-source search → aggregation → meta compare → exact rank.
@@ -120,6 +122,7 @@ class SearchOrchestratorService
         $expanded['location_tiers'] = $locationTiers;
         $expanded['location_scope'] = $locationScope;
         $dynamicFilters = $this->expansion->buildDynamicFilters($parsed, $locale);
+        $searchIntent = SearchIntentFactory::fromParsed($parsed, $expanded, $searchGeo);
 
         // Step 3: Federated search — dynamic agent pool (3–6 agents), parallel execution
         $search = $this->aggregator->searchAll($parsed, $expanded, $searchGeo);
@@ -171,36 +174,10 @@ class SearchOrchestratorService
             'label' => 'Compared prices and sellers across marketplaces',
         ];
 
-        $swissCarSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH'
-            && CategoryCatalog::isAutomotive($parsed['category'] ?? '');
-        $dutchCarSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'NL'
-            && CategoryCatalog::isAutomotive($parsed['category'] ?? '')
-            && ! empty($parsed['search_target']);
-        $germanElectronicsSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'DE'
-            && CategoryCatalog::isElectronics($parsed['category'] ?? '')
-            && ! empty($parsed['search_target']);
-        $swissElectronicsSearch = strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH'
-            && CategoryCatalog::isElectronics($parsed['category'] ?? '')
-            && ! empty($parsed['search_target']);
-        $bookSearch = CategoryCatalog::isBookSearch($parsed);
-        $kosovoSearch = strtoupper((string) ($parsed['search_country_code'] ?? $searchGeo['country_code'] ?? '')) === 'XK';
-
         $pipeline[] = [
             'step' => 'internet_search',
             'status' => 'completed',
-            'label' => $swissCarSearch
-                ? 'Searched '.count($expanded['marketplaces'] ?? []).' Swiss car marketplaces'
-                : ($dutchCarSearch
-                    ? 'Searched '.count($expanded['marketplaces'] ?? []).' Dutch car marketplaces'
-                    : ($swissElectronicsSearch
-                        ? 'Searched '.count($expanded['marketplaces'] ?? []).' Swiss electronics retailers'
-                        : ($germanElectronicsSearch
-                            ? 'Searched '.count($expanded['marketplaces'] ?? []).' German electronics retailers'
-                            : ($bookSearch
-                            ? 'Searched '.count($expanded['marketplaces'] ?? []).' online bookstores & retailers'
-                            : ($kosovoSearch
-                                ? 'Searched '.count($expanded['marketplaces'] ?? []).' Kosovo online stores & marketplaces'
-                                : 'Searched web: '.($parsed['search_country'] ?? $searchGeo['country'] ?? 'local').' → regional'))))),
+            'label' => LocalMarketplaceResolver::pipelineLabel($parsed, $expanded, $searchGeo),
         ];
 
         $products = $this->applyClientFilters($products, $filters, $parsed);
@@ -243,6 +220,7 @@ class SearchOrchestratorService
                 'per_page' => $perPage,
                 'has_more' => $returnedSoFar < count($pool),
                 'returned' => count($pageResults),
+                'search_intent' => $searchIntent->toArray(),
                 'sources_queried' => $expanded['marketplaces'] ?? [],
                 'marketplace_labels' => $expanded['marketplace_labels'] ?? [],
                 'marketplace_labels_by_country' => $expanded['marketplace_labels_by_country'] ?? [],
@@ -268,6 +246,8 @@ class SearchOrchestratorService
                     'workers_spawned' => $valonPlan['workers_spawned'] ?? 0,
                     'workers' => $valonPlan['workers'] ?? [],
                     'results_merged' => $valonPlan['results_merged'] ?? 0,
+                    'search_intent' => $valonPlan['search_intent'] ?? $searchIntent->toArray(),
+                    'provider_discovery' => $valonPlan['provider_discovery'] ?? null,
                     'intent' => $valonPlan['intent'] ?? null,
                 ] : null,
             ],
@@ -394,6 +374,21 @@ class SearchOrchestratorService
                             $countryMatch = true;
                             break;
                         }
+                    }
+                }
+                if (! $countryMatch) {
+                    return false;
+                }
+            } elseif (! empty($parsed['search_countries']) && is_array($parsed['search_countries']) && count($parsed['search_countries']) > 1) {
+                $countryMatch = false;
+                foreach ($parsed['search_countries'] as $country) {
+                    if (CountryMatcher::locationMatchesFilter(
+                        (string) ($product['location'] ?? ''),
+                        (string) ($country['search_country'] ?? ''),
+                        isset($product['country_code']) ? (string) $product['country_code'] : null,
+                    )) {
+                        $countryMatch = true;
+                        break;
                     }
                 }
                 if (! $countryMatch) {

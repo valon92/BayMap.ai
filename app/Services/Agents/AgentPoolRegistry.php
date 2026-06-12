@@ -83,12 +83,17 @@ class AgentPoolRegistry
      */
     public function rankingWeights(): array
     {
+        $orchestration = config('orchestration.ranking_weights', []);
+        if ($orchestration !== []) {
+            return $orchestration;
+        }
+
         return config('agent_pools.ranking_weights', [
-            'exact_match' => 0.40,
-            'price_relevance' => 0.25,
-            'location_proximity' => 0.15,
-            'availability' => 0.10,
-            'platform_trust' => 0.10,
+            'specification_match' => 0.40,
+            'semantic_similarity' => 0.25,
+            'location_relevance' => 0.15,
+            'price_relevance' => 0.10,
+            'provider_trust' => 0.10,
         ]);
     }
 }

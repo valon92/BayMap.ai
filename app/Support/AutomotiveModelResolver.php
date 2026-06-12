@@ -68,6 +68,15 @@ class AutomotiveModelResolver
             }
         }
 
+        $year = isset($parsed['year']) ? (int) $parsed['year'] : null;
+        if ($year === null && preg_match('/\b(19|20)\d{2}\b/', $title, $yearMatch)) {
+            $year = (int) $yearMatch[0];
+        }
+
+        if (! self::matchesYearRange($year, $title, $parsed)) {
+            return false;
+        }
+
         if ($generation === null) {
             return true;
         }
@@ -80,18 +89,6 @@ class AutomotiveModelResolver
             return true;
         }
 
-        $year = isset($parsed['year']) ? (int) $parsed['year'] : null;
-        if ($year === null && preg_match('/\b(19|20)\d{2}\b/', $title, $yearMatch)) {
-            $year = (int) $yearMatch[0];
-        }
-
-        $minYear = ! empty($parsed['year_min']) ? (int) $parsed['year_min'] : null;
-        $maxYear = ! empty($parsed['year_max']) ? (int) $parsed['year_max'] : null;
-
-        if ($year !== null && $minYear !== null && $maxYear !== null) {
-            return $year >= $minYear && $year <= $maxYear;
-        }
-
         if ($year !== null) {
             $range = self::generationYearRange($base, $generation);
 
@@ -99,6 +96,32 @@ class AutomotiveModelResolver
         }
 
         if ($itemModelLower !== '' && $base !== '' && str_contains($itemModelLower, $base)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    public static function matchesYearRange(?int $year, string $title, array $parsed): bool
+    {
+        $minYear = ! empty($parsed['year_min']) ? (int) $parsed['year_min'] : null;
+        $maxYear = ! empty($parsed['year_max']) ? (int) $parsed['year_max'] : null;
+
+        if ($minYear === null && $maxYear === null) {
+            return true;
+        }
+
+        $min = $minYear ?? $maxYear;
+        $max = $maxYear ?? $minYear;
+
+        if ($year !== null) {
+            return $year >= $min && $year <= $max;
+        }
+
+        if ($min === $max && preg_match('/\b'.$min.'\b/', $title) === 1) {
             return true;
         }
 

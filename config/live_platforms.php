@@ -17,6 +17,26 @@ return [
 
     'max_workers_cap' => (int) env('LIVE_PLATFORM_MAX_WORKERS', 24),
 
+    /**
+     * Unified local-search policy — same rules for every country + category.
+     * When a query targets a country with registered local platforms, global connectors are skipped.
+     */
+    'local_search' => [
+        'exclude_global' => ['amazon', 'etsy', 'facebook_marketplace'],
+        'allow_ebay_categories' => ['DE:automotive'],
+        'by_country' => [
+            'CH' => [
+                'exclude_global' => ['ebay', 'google_shopping'],
+            ],
+            'DE' => [
+                'exclude_global' => ['google_shopping'],
+            ],
+            'NL' => [
+                'exclude_global' => ['ebay', 'google_shopping', 'mobile_de', 'autoscout24'],
+            ],
+        ],
+    ],
+
     'platforms' => [
 
         // ── Kosovo · Fashion ─────────────────────────────────────────────
