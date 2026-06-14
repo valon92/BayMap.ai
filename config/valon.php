@@ -22,6 +22,7 @@ return [
     */
     'role_labels' => [
         'LivePlatformAgent' => 'Live platform catalog search',
+        'UniversalBridgeAgent' => 'Global marketplace bridge (Google Shopping / eBay)',
         'KosovoFashionPlatformAgent' => 'Kosovo fashion platform search',
         'KosovoFashionLiveAgent' => 'Kosovo fashion live catalog search',
         'LocalMarketplaceAgent' => 'Local marketplace search',

@@ -201,7 +201,23 @@
             {{ t('no_results') }}
           </p>
           <div v-else>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">
+            <TravelRouteSummary v-if="isTravelResults" :parsed="data?.parsed" class="mb-4" />
+
+            <div
+              v-if="isTravelResults"
+              class="travel-results-list space-y-3"
+            >
+              <TravelCard
+                v-for="product in results"
+                :key="product.id + (product.source_key || '')"
+                :product="product"
+              />
+            </div>
+
+            <div
+              v-else
+              class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3"
+            >
               <ProductCard
                 v-for="product in results"
                 :key="product.id + (product.source_key || '')"
@@ -280,6 +296,8 @@ import { useRoute, useRouter } from 'vue-router';
 import api from '../services/api';
 import InsightScrollSection from '../components/InsightScrollSection.vue';
 import ProductCard from '../components/ProductCard.vue';
+import TravelCard from '../components/TravelCard.vue';
+import TravelRouteSummary from '../components/TravelRouteSummary.vue';
 import DynamicFilters from '../components/DynamicFilters.vue';
 import SearchLoadingExperience from '../components/SearchLoadingExperience.vue';
 import SearchScopeChips from '../components/SearchScopeChips.vue';
@@ -349,6 +367,11 @@ const showKosovoMarketplaces = computed(() => {
 const kosovoMarketplaceLabels = computed(() => {
   if (!showKosovoMarketplaces.value) return [];
   return data.value?.meta?.marketplace_labels ?? [];
+});
+
+const isTravelResults = computed(() => {
+  const cat = String(data.value?.parsed?.category || '').toLowerCase();
+  return cat === 'travel' || cat === 'travel & tourism';
 });
 
 const showBookMarketplaces = computed(() => {
@@ -421,6 +444,12 @@ const locationBanner = computed(() => {
   if (!loc?.label) return null;
 
   if (loc.mode === 'query') {
+    if (loc.travel_route) {
+      return {
+        mode: 'query',
+        text: t('travel_route_scope', { route: loc.label }),
+      };
+    }
     return {
       mode: 'query',
       text: t('location_from_query', { country: loc.label }),

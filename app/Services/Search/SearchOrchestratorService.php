@@ -279,6 +279,8 @@ class SearchOrchestratorService
         }
 
         return array_values(array_filter($products, function (array $product) use ($filters, $parsed) {
+            $isTravel = CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel';
+
             if (isset($filters['price_min']) && ($product['price'] ?? 0) < (float) $filters['price_min']) {
                 return false;
             }
@@ -360,7 +362,7 @@ class SearchOrchestratorService
                     return false;
                 }
             }
-            if (isset($filters['country']) && $filters['country'] !== '') {
+            if (! $isTravel && isset($filters['country']) && $filters['country'] !== '') {
                 $countryMatch = CountryMatcher::locationMatchesFilter(
                     (string) ($product['location'] ?? ''),
                     (string) $filters['country'],
@@ -381,7 +383,7 @@ class SearchOrchestratorService
                 if (! $countryMatch) {
                     return false;
                 }
-            } elseif (! empty($parsed['search_countries']) && is_array($parsed['search_countries']) && count($parsed['search_countries']) > 1) {
+            } elseif (! $isTravel && ! empty($parsed['search_countries']) && is_array($parsed['search_countries']) && count($parsed['search_countries']) > 1) {
                 $countryMatch = false;
                 foreach ($parsed['search_countries'] as $country) {
                     if (CountryMatcher::locationMatchesFilter(
@@ -426,7 +428,7 @@ class SearchOrchestratorService
                 }
             }
             if (isset($filters['product_type']) && $filters['product_type'] !== '') {
-                $wantedType = (string) $filters['product_type'];
+                $wantedType = FashionIntentParser::normalizeType((string) $filters['product_type']);
                 if (CategoryCatalog::isBookSearch($parsed)) {
                     if (! BookIntentParser::productMatchesType($product, $wantedType)) {
                         return false;
@@ -454,7 +456,7 @@ class SearchOrchestratorService
                     }
                 }
             }
-            if (! empty($parsed['search_target'])) {
+            if (! $isTravel && ! empty($parsed['search_target'])) {
                 $targetCountries = $parsed['search_countries'] ?? [];
                 if (is_array($targetCountries) && count($targetCountries) > 1) {
                     $countryMatch = false;

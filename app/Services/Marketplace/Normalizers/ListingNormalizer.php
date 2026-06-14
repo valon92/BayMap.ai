@@ -60,6 +60,7 @@ class ListingNormalizer
             transmission: $listing->transmission,
             engineLiters: $listing->engineLiters,
             countryCode: $listing->countryCode,
+            extensions: $listing->extensions,
         );
     }
 

@@ -18,6 +18,16 @@ return [
     'max_workers_cap' => (int) env('LIVE_PLATFORM_MAX_WORKERS', 24),
 
     /**
+     * Universal connector — SerpAPI Google Shopping + eBay for any country (bridge layer).
+     */
+    'universal_bridge' => [
+        'enabled' => (bool) env('UNIVERSAL_BRIDGE_ENABLED', true),
+        'providers' => ['google_shopping', 'google_flights', 'ebay'],
+        'always_with_local' => true,
+        'when_no_local' => true,
+    ],
+
+    /**
      * Unified local-search policy — same rules for every country + category.
      * When a query targets a country with registered local platforms, global connectors are skipped.
      */

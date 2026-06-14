@@ -6,6 +6,7 @@ use App\Support\CategoryCatalog;
 use App\Support\GlobalBookMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
+use App\Support\UniversalMarketplaceBridge;
 
 /**
  * Expands parsed AI attributes into broader search filters (nearby countries, similar colors, etc.).
@@ -21,6 +22,7 @@ class SearchExpansionService
         'NL' => ['DE', 'BE', 'FR', 'GB'],
         'US' => ['CA', 'MX'],
         'GB' => ['IE', 'FR', 'DE'],
+        'IN' => ['PK', 'BD', 'NP', 'LK', 'AE'],
     ];
 
     /** @var array<string, array<string, string>> */
@@ -33,6 +35,9 @@ class SearchExpansionService
         'FR' => 'France',
         'AT' => 'Austria',
         'NL' => 'Netherlands',
+        'IN' => 'India',
+        'US' => 'United States',
+        'GB' => 'United Kingdom',
     ];
 
     /** @var array<string, array<string>> */
@@ -147,6 +152,10 @@ class SearchExpansionService
         $registryKeys = LivePlatformRegistry::keysFor($countryCode, $category);
         if ($registryKeys !== []) {
             return $registryKeys;
+        }
+
+        if (UniversalMarketplaceBridge::enabled()) {
+            return UniversalMarketplaceBridge::providerKeys();
         }
 
         if ($countryCode === 'XK') {

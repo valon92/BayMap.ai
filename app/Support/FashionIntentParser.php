@@ -40,7 +40,13 @@ class FashionIntentParser
     /** @var array<string, string> */
     private const PRODUCT_TYPES = [
         'patika' => 'sneakers',
+        'atlete' => 'sneakers',
         'sneakers' => 'sneakers',
+        'sneaker' => 'sneakers',
+        'këpucë sportive' => 'sneakers',
+        'kepuce sportive' => 'sneakers',
+        'këpuc sportive' => 'sneakers',
+        'kepuc sportive' => 'sneakers',
         'mabthje' => 'shoes',
         'mbathje' => 'shoes',
         'këpucë' => 'shoes',
@@ -121,8 +127,31 @@ class FashionIntentParser
     public static function normalizeType(string $type): string
     {
         $type = mb_strtolower(trim($type));
+        if ($type === '') {
+            return '';
+        }
 
-        return self::PRODUCT_TYPES[$type] ?? $type;
+        if (isset(self::PRODUCT_TYPES[$type])) {
+            return self::PRODUCT_TYPES[$type];
+        }
+
+        if (preg_match('/\b(sneaker|patika|atlete|trainer|këpucë sportive|kepuce sportive|sportive)\b/u', $type)) {
+            return 'sneakers';
+        }
+
+        if (preg_match('/\b(këpuc|kepuc|shoe|mbathje|mabthje)\b/u', $type)) {
+            return str_contains($type, 'sport') || str_contains($type, 'sneaker') || str_contains($type, 'atlete')
+                ? 'sneakers'
+                : 'shoes';
+        }
+
+        foreach (self::PRODUCT_TYPES as $needle => $canonical) {
+            if (str_contains($type, $needle)) {
+                return $canonical;
+            }
+        }
+
+        return $type;
     }
 
     public static function isFashionQuery(string $query): bool

@@ -11,6 +11,7 @@ use App\Support\PriceIntentParser;
 use App\Support\ProductCategoryResolver;
 use App\Support\SearchCountryResolver;
 use App\Support\SearchScopeResolver;
+use App\Support\TravelIntentParser;
 
 /**
  * Location policy: query-named country wins; otherwise visitor IP geo.
@@ -80,6 +81,7 @@ class QueryIntentEnricher
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
         $parsed = self::mergeRealEstateIntent($parsed, $rawQuery);
+        $parsed = TravelIntentParser::fromQuery($rawQuery, $parsed);
 
         if (CategoryCatalog::isBookSearch($parsed)) {
             $parsed['category'] = 'online_education';
@@ -102,6 +104,10 @@ class QueryIntentEnricher
         if (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)
             && ! empty($parsed['product_type'])) {
             $parsed['product_type'] = FashionIntentParser::normalizeType((string) $parsed['product_type']);
+        }
+
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
+            unset($parsed['gender'], $parsed['year'], $parsed['year_min'], $parsed['year_max']);
         }
 
         if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
@@ -166,6 +172,10 @@ class QueryIntentEnricher
      */
     private static function mergeAutomotiveIntent(array $parsed, string $rawQuery): array
     {
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
+            return $parsed;
+        }
+
         if (AutomotiveIntentParser::isCarQuery($rawQuery)) {
             $parsed['category'] = 'automotive';
         }
@@ -183,12 +193,13 @@ class QueryIntentEnricher
 
         $yearFromQuery = AutomotiveIntentParser::parseYearFields($rawQuery);
         if (
-            ! empty($yearFromQuery['year_min'])
+            CategoryCatalog::isAutomotive($parsed['category'] ?? '')
+            && ! empty($yearFromQuery['year_min'])
             && ! empty($yearFromQuery['year_max'])
             && $yearFromQuery['year_max'] !== $yearFromQuery['year_min']
         ) {
             $parsed = array_merge($parsed, $yearFromQuery);
-        } elseif ($yearFromQuery !== [] && empty($parsed['year_min'])) {
+        } elseif (CategoryCatalog::isAutomotive($parsed['category'] ?? '') && $yearFromQuery !== [] && empty($parsed['year_min'])) {
             $parsed = array_merge($parsed, $yearFromQuery);
         }
 
@@ -314,6 +325,10 @@ class QueryIntentEnricher
      */
     private static function mergeFashionIntent(array $parsed, string $rawQuery): array
     {
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
+            return $parsed;
+        }
+
         $fashion = FashionIntentParser::fromQuery($rawQuery);
         if ($fashion === []) {
             return $parsed;
@@ -381,6 +396,25 @@ class QueryIntentEnricher
     public function locationMeta(array $parsed, array $visitorGeo, array $searchGeo): array
     {
         if (! empty($parsed['search_target'])) {
+            if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
+                $origin = (string) ($parsed['origin_city'] ?? $parsed['search_country'] ?? '');
+                $destination = (string) ($parsed['destination_city'] ?? $parsed['destination'] ?? '');
+                $routeLabel = trim($origin.' → '.$destination, " →\t");
+
+                if ($routeLabel !== '') {
+                    return [
+                        'mode' => 'query',
+                        'label' => $routeLabel,
+                        'target_country' => $routeLabel,
+                        'target_country_code' => $parsed['origin_country_code'] ?? $parsed['search_country_code'] ?? null,
+                        'search_countries' => $parsed['search_countries'] ?? null,
+                        'visitor_city' => $visitorGeo['city'] ?? null,
+                        'visitor_country' => $visitorGeo['country'] ?? null,
+                        'travel_route' => true,
+                    ];
+                }
+            }
+
             $multiCountries = ! empty($parsed['search_countries']) && is_array($parsed['search_countries'])
                 ? implode(', ', array_column($parsed['search_countries'], 'search_country'))
                 : null;
@@ -420,7 +454,7 @@ class QueryIntentEnricher
     {
         $defaults = [];
 
-        if (! empty($parsed['search_target'])) {
+        if (! empty($parsed['search_target']) && CategoryCatalog::normalize($parsed['category'] ?? '') !== 'travel') {
             $multi = $parsed['search_countries'] ?? [];
             if (! is_array($multi) || count($multi) <= 1) {
                 if (! empty($parsed['search_country'])) {

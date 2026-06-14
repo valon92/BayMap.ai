@@ -8,6 +8,7 @@ use App\Support\CategoryCatalog;
 use App\Support\KosovoFashionIntent;
 use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
+use App\Support\UniversalMarketplaceBridge;
 
 /**
  * Activates Valon Workers per query.
@@ -42,11 +43,18 @@ class AgentActivationService
 
         if (LocalMarketplaceResolver::isTargeted($parsed)) {
             $keys = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
-            if ($keys !== []) {
-                return $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+            $live = $keys !== []
+                ? $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category)
+                : ['agents' => [], 'source_keys' => [], 'providers' => []];
+
+            if (UniversalMarketplaceBridge::enabled()
+                && ($keys === [] ? UniversalMarketplaceBridge::useWhenNoLocalPlatforms() : UniversalMarketplaceBridge::shouldAugmentLocalSearch())) {
+                $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+
+                return $this->mergeActivation($live, $bridge);
             }
 
-            return [
+            return $keys !== [] ? $live : [
                 'agents' => [],
                 'source_keys' => [],
                 'providers' => [],
@@ -54,7 +62,14 @@ class AgentActivationService
         }
 
         if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {
-            return $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+            $live = $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+            if (UniversalMarketplaceBridge::shouldAugmentLocalSearch()) {
+                $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+
+                return $this->mergeActivation($live, $bridge);
+            }
+
+            return $live;
         }
         $poolAgents = $this->pools->poolForCategory($category);
         $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
@@ -181,6 +196,117 @@ class AgentActivationService
             'agents' => $agents,
             'source_keys' => $sourceKeys,
             'providers' => $ordered,
+        ];
+    }
+
+    /**
+     * SerpAPI + eBay bridge workers for any country (automatic marketplace discovery).
+     *
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $expanded
+     * @param  array<string, mixed>  $geo
+     * @return array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }
+     */
+    private function activateUniversalBridge(array $parsed, array $expanded, array $geo, string $countryCode, string $category): array
+    {
+        $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
+        $wanted = UniversalMarketplaceBridge::providerKeys();
+        $ordered = [];
+        $agents = [];
+        $sourceKeys = [];
+
+        foreach ($allProviders as $provider) {
+            $key = $provider->sourceKey();
+            if (! in_array($key, $wanted, true)) {
+                continue;
+            }
+            if (! UniversalMarketplaceBridge::allowsBridge($key, $countryCode, $category)) {
+                continue;
+            }
+            if (! $provider->isAvailable()) {
+                continue;
+            }
+
+            $ordered[] = $provider;
+            $sourceKeys[] = $key;
+            $agents[] = [
+                'id' => 'UniversalBridgeAgent',
+                'score' => 88.0,
+                'sources' => [$key],
+                'trust' => (int) ($this->pools->trustScore($key) ?: 88),
+            ];
+        }
+
+        return [
+            'agents' => $agents,
+            'source_keys' => $sourceKeys,
+            'providers' => $ordered,
+        ];
+    }
+
+    /**
+     * @param  array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }  $primary
+     * @param  array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }  $secondary
+     * @return array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }
+     */
+    private function mergeActivation(array $primary, array $secondary): array
+    {
+        $providers = [];
+        $sourceKeys = [];
+        $agents = $primary['agents'];
+        $seenSources = [];
+        foreach ($primary['agents'] as $agent) {
+            foreach ((array) ($agent['sources'] ?? []) as $source) {
+                $seenSources[(string) $source] = true;
+            }
+        }
+
+        foreach ([$primary, $secondary] as $batch) {
+            foreach ($batch['providers'] as $provider) {
+                $key = $provider->sourceKey();
+                if (isset($providers[$key])) {
+                    continue;
+                }
+                $providers[$key] = $provider;
+                $sourceKeys[] = $key;
+            }
+        }
+
+        foreach ($secondary['agents'] as $agent) {
+            $sources = array_values(array_filter(
+                (array) ($agent['sources'] ?? []),
+                fn (string $source) => ! isset($seenSources[$source]),
+            ));
+            if ($sources === []) {
+                continue;
+            }
+            foreach ($sources as $source) {
+                $seenSources[$source] = true;
+            }
+            $agent['sources'] = $sources;
+            $agents[] = $agent;
+        }
+
+        return [
+            'agents' => $agents,
+            'source_keys' => array_values(array_unique(array_merge($primary['source_keys'], $sourceKeys))),
+            'providers' => array_values($providers),
         ];
     }
 

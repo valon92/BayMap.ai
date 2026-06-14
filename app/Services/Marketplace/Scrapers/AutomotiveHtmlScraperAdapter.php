@@ -2,6 +2,7 @@
 
 namespace App\Services\Marketplace\Scrapers;
 
+use App\Services\Marketplace\BrowseAiScrapeService;
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
@@ -14,7 +15,10 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 
     private const MAX_SCAN_ROWS = 180;
 
-    public function __construct(private ScraperHttpClient $http) {}
+    public function __construct(
+        private ScraperHttpClient $http,
+        private BrowseAiScrapeService $browseAi,
+    ) {}
 
     public function adapterKey(): string
     {
@@ -30,7 +34,15 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
         $storeKey = (string) ($platform['_key'] ?? 'automotive');
         $scraper = (string) ($platform['scraper'] ?? $storeKey);
         $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
-        $html = $this->http->get($searchUrl, $platform['locale'] ?? 'de-DE');
+
+        if ($this->browseAi->shouldUse($storeKey)) {
+            $structured = $this->browseAi->scrapeListings($storeKey, $searchUrl, $platform, $parsedQuery);
+            if ($structured !== []) {
+                return $structured;
+            }
+        }
+
+        $html = $this->http->get($searchUrl, $platform['locale'] ?? 'de-DE', null, $storeKey);
 
         if ($html === '') {
             return [];
@@ -43,6 +55,8 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             str_contains($scraper, 'autolina') => $this->parseAutolina($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'autogrid') => $this->parseAutogrid($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'swiss_html') => $this->parseSwissAutomotive($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'mobile') => $this->parseMobileDe($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'heycar') => $this->parseHeycar($html, $storeKey, $platform, $parsedQuery),
             default => $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery),
         };
 
@@ -506,6 +520,226 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
                 'location' => $locationLabel,
                 'brand' => 'audi',
                 'model' => 'q5',
+                'year' => $this->yearFromTitle($title),
+                'condition' => 'used',
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseMobileDe(string $html, string $storeKey, array $platform, array $parsedQuery = []): array
+    {
+        if ($html === '' || $this->isBlockedHtml($html)) {
+            return [];
+        }
+
+        if (preg_match('/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s', $html, $match)) {
+            $data = json_decode($match[1], true);
+            $listings = $data['props']['pageProps']['searchResults']['items']
+                ?? $data['props']['pageProps']['listings']
+                ?? [];
+            if (is_array($listings) && $listings !== []) {
+                return $this->mapMobileDeJsonListings($listings, $storeKey, $platform);
+            }
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.mobile.de'), '/');
+        $items = [];
+        $seen = [];
+
+        if (! preg_match_all('/href="(\/fahrzeuge\/details\.html\?id=\d+[^"]*)"[^>]*>[\s\S]{0,4000}?<\/a>/is', $html, $blocks, PREG_SET_ORDER)) {
+            return $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery);
+        }
+
+        foreach ($blocks as $block) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $path = html_entity_decode($block[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (isset($seen[$path])) {
+                continue;
+            }
+            $seen[$path] = true;
+
+            $chunk = $block[0];
+            $title = '';
+            if (preg_match('/title="([^"]+)"/i', $chunk, $titleMatch)) {
+                $title = trim(html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            } elseif (preg_match('/>([^<]{8,120})</', $chunk, $titleMatch)) {
+                $title = trim(html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            }
+
+            if ($title === '' || $this->isKleinanzeigenPartsListing($title)) {
+                continue;
+            }
+
+            $price = 0.0;
+            if (preg_match('/(\d{1,3}(?:\.\d{3})+)\s*€/', $chunk, $priceMatch)) {
+                $price = $this->parseGermanPrice($priceMatch[1].' €');
+            }
+
+            if ($price < 800) {
+                continue;
+            }
+
+            $image = null;
+            if (preg_match('/src="(https:\/\/[^"]+mobile\.de[^"]+)"/i', $chunk, $imgMatch)) {
+                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            $url = str_starts_with($path, 'http') ? $path : $baseUrl.$path;
+
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => md5($path),
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $url,
+                'location' => (string) ($platform['location'] ?? 'Germany'),
+                'brand' => $this->brandFromTitle($title),
+                'model' => $this->modelFromTitle($title),
+                'year' => $this->yearFromTitle($title),
+                'condition' => 'used',
+                'color' => AutomotiveColorResolver::extractFromText($title),
+                'engine_liters' => AutomotiveEngineResolver::extractFromTitle(
+                    $title,
+                    isset($parsedQuery['fuel']) ? (string) $parsedQuery['fuel'] : null,
+                ),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $listings
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapMobileDeJsonListings(array $listings, string $storeKey, array $platform): array
+    {
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.mobile.de'), '/');
+        $items = [];
+
+        foreach (array_slice($listings, 0, self::MAX_LISTINGS) as $listing) {
+            if (! is_array($listing)) {
+                continue;
+            }
+
+            $make = (string) ($listing['make'] ?? $listing['brand'] ?? '');
+            $model = (string) ($listing['model'] ?? '');
+            $variant = trim((string) ($listing['title'] ?? $listing['modelDescription'] ?? ''));
+            $title = $variant !== '' ? $variant : trim($make.' '.$model);
+            if ($title === '') {
+                continue;
+            }
+
+            $price = (float) ($listing['price'] ?? $listing['priceGross'] ?? 0);
+            if ($price <= 0 && isset($listing['priceFormatted'])) {
+                $price = $this->parseGermanPrice((string) $listing['priceFormatted']);
+            }
+            if ($price < 800) {
+                continue;
+            }
+
+            $path = (string) ($listing['url'] ?? $listing['relativeUrl'] ?? '');
+            $url = str_starts_with($path, 'http') ? $path : $baseUrl.$path;
+            $image = is_string($listing['image'] ?? null)
+                ? $listing['image']
+                : (is_string(($listing['images'][0] ?? null)) ? $listing['images'][0] : null);
+
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => (string) ($listing['id'] ?? md5($title.$url)),
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $url,
+                'location' => (string) ($listing['location'] ?? $platform['location'] ?? 'Germany'),
+                'brand' => $this->brandFromTitle($title) ?? mb_strtolower($make),
+                'model' => $this->modelFromTitle($title) ?? mb_strtolower($model),
+                'year' => isset($listing['year']) ? (int) $listing['year'] : $this->yearFromTitle($title),
+                'mileage' => isset($listing['mileage']) ? (int) $listing['mileage'] : null,
+                'condition' => 'used',
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseHeycar(string $html, string $storeKey, array $platform, array $parsedQuery = []): array
+    {
+        if ($html === '' || $this->isBlockedHtml($html)) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.heycar.de'), '/');
+        $items = [];
+        $seen = [];
+
+        if (! preg_match_all('/<a[^>]+href="(\/de\/autos\/[^"]+)"[^>]*>[\s\S]{0,6000}?<\/a>/is', $html, $blocks, PREG_SET_ORDER)) {
+            return $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery);
+        }
+
+        foreach ($blocks as $block) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $path = html_entity_decode($block[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (isset($seen[$path]) || ! preg_match('/\/de\/autos\/[^\/]+\/[^\/]+/i', $path)) {
+                continue;
+            }
+            $seen[$path] = true;
+
+            $chunk = $block[0];
+            $title = '';
+            if (preg_match('/aria-label="([^"]+)"/i', $chunk, $titleMatch)) {
+                $title = trim(html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            } elseif (preg_match('/<h[23][^>]*>([^<]+)</i', $chunk, $titleMatch)) {
+                $title = trim(html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            }
+
+            if ($title === '') {
+                continue;
+            }
+
+            $price = 0.0;
+            if (preg_match('/(\d{1,3}(?:\.\d{3})+)\s*€/', $chunk, $priceMatch)) {
+                $price = $this->parseGermanPrice($priceMatch[1].' €');
+            }
+
+            if ($price < 800) {
+                continue;
+            }
+
+            $image = null;
+            if (preg_match('/src="(https:\/\/[^"]+)"/i', $chunk, $imgMatch)) {
+                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            $url = str_starts_with($path, 'http') ? $path : $baseUrl.$path;
+
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => md5($path),
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $url,
+                'location' => (string) ($platform['location'] ?? 'Germany'),
+                'brand' => $this->brandFromTitle($title),
+                'model' => $this->modelFromTitle($title),
                 'year' => $this->yearFromTitle($title),
                 'condition' => 'used',
             ]);

@@ -103,6 +103,11 @@ class LocalMarketplaceResolver
             return true;
         }
 
+        if (UniversalMarketplaceBridge::isBridgeProvider($sourceKey)
+            && UniversalMarketplaceBridge::allowsBridge($sourceKey, $countryCode, $category)) {
+            return $provider->isAvailable();
+        }
+
         $localKeys = $targets !== [] ? $targets : self::keys($countryCode, $category);
         if ($localKeys === []) {
             return true;
@@ -179,6 +184,12 @@ class LocalMarketplaceResolver
             $country = (string) ($parsed['search_country'] ?? $searchGeo['country'] ?? 'local');
 
             return "Searched {$count} local marketplaces in {$country}";
+        }
+
+        if (self::isTargeted($parsed) && UniversalMarketplaceBridge::enabled()) {
+            $country = (string) ($parsed['search_country'] ?? $searchGeo['country'] ?? 'local');
+
+            return "Searched online stores in {$country} via Google Shopping & marketplaces";
         }
 
         if (strtoupper((string) ($parsed['search_country_code'] ?? $searchGeo['country_code'] ?? '')) === 'XK') {

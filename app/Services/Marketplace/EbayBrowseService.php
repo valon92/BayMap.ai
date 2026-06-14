@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Log;
  * Real product search via eBay Browse API.
  * @see https://developer.ebay.com/api-docs/buy/browse/resources/item_summary/methods/search
  */
+use App\Support\UniversalMarketplaceBridge;
+
 class EbayBrowseService implements MarketplaceSearchInterface
 {
     public function __construct(
@@ -38,11 +40,13 @@ class EbayBrowseService implements MarketplaceSearchInterface
             $base = config('ebay.sandbox')
                 ? 'https://api.sandbox.ebay.com'
                 : 'https://api.ebay.com';
+            $countryCode = UniversalMarketplaceBridge::resolveCountryCode($parsedQuery, $expandedFilters);
+            $marketplaceId = UniversalMarketplaceBridge::ebayMarketplaceId($countryCode);
 
             $response = Http::withToken($token)
                 ->timeout(config('ebay.timeout', 15))
                 ->withHeaders([
-                    'X-EBAY-C-MARKETPLACE-ID' => config('ebay.marketplace_id', 'EBAY_DE'),
+                    'X-EBAY-C-MARKETPLACE-ID' => $marketplaceId,
                     'Accept' => 'application/json',
                 ])
                 ->get("{$base}/buy/browse/v1/item_summary/search", [

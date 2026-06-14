@@ -7,6 +7,15 @@ namespace App\Services\Valon;
  */
 class ValonResultNormalizer
 {
+    /** @var array<int, string> */
+    private const TRAVEL_PASSTHROUGH = [
+        'category', 'product_type', 'travel_mode', 'subtitle', 'departure_time', 'arrival_time',
+        'departure_airport', 'arrival_airport', 'departure_date', 'return_date', 'origin_city',
+        'destination_city', 'origin_country_code', 'destination_country_code', 'duration_minutes',
+        'duration_label', 'stops', 'stops_label', 'travel_class', 'airline', 'flight_number',
+        'carbon_kg', 'price_on_request', 'legs', 'travel_type', 'travelers',
+    ];
+
     /**
      * @param  array<string, mixed>  $item
      * @return array<string, mixed>
@@ -22,7 +31,12 @@ class ValonResultNormalizer
         }
         $images = array_values(array_unique(array_filter($images)));
 
-        return [
+        $source = (string) ($item['source'] ?? '');
+        if ($source === '') {
+            $source = $sourceLabel ?: $platform;
+        }
+
+        $normalized = [
             'id' => $item['id'] ?? null,
             'title' => (string) ($item['title'] ?? ''),
             'price' => (float) ($item['price'] ?? $item['price_eur'] ?? 0),
@@ -30,7 +44,7 @@ class ValonResultNormalizer
             'location' => (string) ($item['location'] ?? ''),
             'images' => $images,
             'image' => $images[0] ?? null,
-            'source' => $sourceLabel ?: (string) ($item['source'] ?? $platform),
+            'source' => $source,
             'source_key' => (string) ($item['source_key'] ?? $platform),
             'url' => (string) ($item['url'] ?? '#'),
             'match_score' => (int) ($item['match_score'] ?? 0),
@@ -46,8 +60,21 @@ class ValonResultNormalizer
             'store' => $item['store'] ?? null,
             'fingerprint' => $item['fingerprint'] ?? null,
             'sponsored' => (bool) ($item['sponsored'] ?? false),
+            'country_code' => $item['country_code'] ?? null,
             '_provider_latency_ms' => $item['_provider_latency_ms'] ?? null,
         ];
+
+        foreach (self::TRAVEL_PASSTHROUGH as $field) {
+            if (! array_key_exists($field, $item)) {
+                continue;
+            }
+            $value = $item[$field];
+            if ($value !== null && $value !== '' && $value !== []) {
+                $normalized[$field] = $value;
+            }
+        }
+
+        return $normalized;
     }
 
     /**

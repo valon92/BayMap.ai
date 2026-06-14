@@ -85,7 +85,8 @@ Return ONLY valid JSON with this shape:
 
 Rules:
 - category: pick ONE best match from the list. Use automotive for cars, electronics_tech for phones/laptops, fashion for clothing/shoes, real_estate for apartments/houses, etc.
-- Set category-specific fields only (e.g. automotive: brand, model, year, max_km, fuel; fashion: size, brand, gender; travel: destination, travel_type)
+- Set category-specific fields only (e.g. automotive: brand, model, year, max_km, fuel; fashion: size, brand, gender; travel: destination, travel_type, origin_city, destination_city, departure_date)
+- travel/flights: "bilet avioni nga Geneva ne London 21.06.2026" => category travel, product_type flight, origin_city Geneva, destination_city London, departure_date YYYY-MM-DD, travel_type one_way, travelers 1. Do NOT set year, year_min, year_max, or gender for travel. Route cities are not search countries — leave search_country null unless buyer names where to book.
 - max_km: integer kilometers for cars (180k km => 180000)
 - year: integer if mentioned
 - keywords: 3-8 relevant terms, lowercase

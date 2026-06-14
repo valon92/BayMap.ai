@@ -327,8 +327,10 @@ class CategoryCatalog
                 self::priceFilter($parsed, $sq, 0, 80),
             ),
             'travel' => array_merge(
-                self::select('travel_type', $sq ? 'Lloji' : 'Type', ['flight', 'hotel', 'package', 'car_rental', 'activity'], $parsed['travel_type'] ?? null),
-                self::textFilter('destination', $sq ? 'Destinacioni' : 'Destination', $parsed['destination'] ?? null),
+                self::select('travel_type', $sq ? 'Lloji' : 'Type', ['one_way', 'round_trip', 'flight', 'hotel', 'package', 'car_rental'], $parsed['travel_type'] ?? null),
+                self::textFilter('origin_city', $sq ? 'Nisja' : 'Origin', $parsed['origin_city'] ?? null),
+                self::textFilter('destination', $sq ? 'Destinacioni' : 'Destination', $parsed['destination_city'] ?? $parsed['destination'] ?? null),
+                self::textFilter('departure_date', $sq ? 'Data' : 'Date', $parsed['departure_date'] ?? null),
                 self::rangeFilter('travelers', $sq ? 'Udhëtarët' : 'Travelers', 1, 10, $parsed['travelers'] ?? null),
                 self::priceFilter($parsed, $sq, 50, 10000),
             ),

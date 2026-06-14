@@ -40,13 +40,32 @@ final class SearchListing
         public readonly ?string $transmission = null,
         public readonly ?float $engineLiters = null,
         public readonly ?string $countryCode = null,
+        /** @var array<string, mixed> */
+        public readonly array $extensions = [],
     ) {}
+
+    /** @var array<int, string> */
+    private const KNOWN_KEYS = [
+        'id', 'title', 'image', 'price', 'currency', 'location', 'condition', 'url', 'source',
+        'source_key', 'live', 'affiliate_ready', 'sponsored', 'tags', 'brand', 'model', 'storage',
+        'year', 'mileage', 'seller_type', 'store', 'price_eur', 'fingerprint', 'fuel', 'color',
+        'transmission', 'engine_liters', 'country_code', 'images', 'match_score', 'availability',
+        'valon_worker_id', 'valon_platform', '_provider_latency_ms', 'ai_explanation', 'extensions',
+    ];
 
     /**
      * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self
     {
+        $extensions = [];
+        foreach ($data as $key => $value) {
+            if (in_array($key, self::KNOWN_KEYS, true) || $value === null || $value === '' || $value === []) {
+                continue;
+            }
+            $extensions[$key] = $value;
+        }
+
         return new self(
             id: (string) ($data['id'] ?? uniqid('listing-', true)),
             title: (string) ($data['title'] ?? 'Listing'),
@@ -76,6 +95,7 @@ final class SearchListing
             transmission: isset($data['transmission']) ? (string) $data['transmission'] : null,
             engineLiters: isset($data['engine_liters']) ? (float) $data['engine_liters'] : null,
             countryCode: isset($data['country_code']) ? (string) $data['country_code'] : null,
+            extensions: $extensions,
         );
     }
 
@@ -84,7 +104,7 @@ final class SearchListing
      */
     public function toArray(): array
     {
-        return array_filter([
+        $base = array_filter([
             'id' => $this->id,
             'title' => $this->title,
             'image' => $this->image,
@@ -114,6 +134,11 @@ final class SearchListing
             'engine_liters' => $this->engineLiters,
             'country_code' => $this->countryCode,
         ], fn ($v) => $v !== null && $v !== '');
+
+        return array_merge($base, array_filter(
+            $this->extensions,
+            fn ($v) => $v !== null && $v !== '' && $v !== [],
+        ));
     }
 
     public function withFingerprint(string $fingerprint): self
@@ -147,6 +172,7 @@ final class SearchListing
             transmission: $this->transmission,
             engineLiters: $this->engineLiters,
             countryCode: $this->countryCode,
+            extensions: $this->extensions,
         );
     }
 }

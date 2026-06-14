@@ -35,6 +35,7 @@ class SearchCountryResolver
         'gjermani' => ['code' => 'DE', 'name' => 'Germany'],
         'gjermanni' => ['code' => 'DE', 'name' => 'Germany'],
         'gjermania' => ['code' => 'DE', 'name' => 'Germany'],
+        'gjermanis' => ['code' => 'DE', 'name' => 'Germany'],
         'gjermanise' => ['code' => 'DE', 'name' => 'Germany'],
         'gjermanisë' => ['code' => 'DE', 'name' => 'Germany'],
         'deutschland' => ['code' => 'DE', 'name' => 'Germany'],
@@ -77,6 +78,16 @@ class SearchCountryResolver
         'britanine' => ['code' => 'GB', 'name' => 'United Kingdom'],
         'angleze' => ['code' => 'GB', 'name' => 'United Kingdom'],
         'angli' => ['code' => 'GB', 'name' => 'United Kingdom'],
+        'india' => ['code' => 'IN', 'name' => 'India'],
+        'indian' => ['code' => 'IN', 'name' => 'India'],
+        'bharat' => ['code' => 'IN', 'name' => 'India'],
+        'mumbai' => ['code' => 'IN', 'name' => 'India'],
+        'delhi' => ['code' => 'IN', 'name' => 'India'],
+        'bangalore' => ['code' => 'IN', 'name' => 'India'],
+        'bengaluru' => ['code' => 'IN', 'name' => 'India'],
+        'hyderabad' => ['code' => 'IN', 'name' => 'India'],
+        'chennai' => ['code' => 'IN', 'name' => 'India'],
+        'kolkata' => ['code' => 'IN', 'name' => 'India'],
     ];
 
     /**

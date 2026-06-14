@@ -99,6 +99,12 @@ return [
             ],
         ],
 
+        'travel' => [
+            'agents' => [
+                ['id' => 'GoogleFlightsAgent', 'sources' => ['google_flights'], 'countries' => ['*'], 'trust' => 92, 'speed' => 78],
+            ],
+        ],
+
         'default' => [
             'agents' => [
                 ['id' => 'EUAggregatorAgent', 'sources' => ['ebay', 'google_shopping'], 'countries' => ['*'], 'trust' => 90, 'speed' => 75],

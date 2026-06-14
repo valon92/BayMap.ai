@@ -5,6 +5,7 @@ namespace App\Services\Marketplace;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\Providers\EbaySearchProvider;
 use App\Services\Marketplace\Providers\MockSearchProvider;
+use App\Services\Marketplace\Providers\SerpApiFlightsSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
 use App\Support\LivePlatformRegistry;
 use App\Support\CategoryCatalog;
@@ -18,6 +19,7 @@ use App\Support\LocalMarketplaceResolver;
 use App\Support\SwissCarMarketplaces;
 use App\Support\SwissRealEstateMarketplaces;
 use App\Support\UKRealEstateMarketplaces;
+use App\Support\UniversalMarketplaceBridge;
 
 /**
  * Registry of all federated search connectors.
@@ -31,6 +33,7 @@ class ProviderRegistry
     public function __construct(
         private EbaySearchProvider $ebay,
         private SerpApiSearchProvider $serpApi,
+        private SerpApiFlightsSearchProvider $serpFlights,
         private LiveSearchProviderFactory $liveFactory,
     ) {}
 
@@ -44,7 +47,7 @@ class ProviderRegistry
         }
 
         $this->providers = array_merge(
-            [$this->ebay, $this->serpApi],
+            [$this->ebay, $this->serpApi, $this->serpFlights],
             $this->liveFactory->all(),
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),
@@ -98,25 +101,17 @@ class ProviderRegistry
             $geo
         ) {
             if (LocalMarketplaceResolver::isTargeted($parsedQuery)) {
+                if (UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())
+                    && UniversalMarketplaceBridge::allowsBridge($provider->sourceKey(), $countryCode, $category)) {
+                    return $provider->supportsCategory($category);
+                }
+
                 $allowed = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
                 if ($allowed !== []) {
                     if (! in_array($provider->sourceKey(), $allowed, true)) {
                         return false;
                     }
                 } else {
-                    if (in_array($provider->sourceKey(), LocalMarketplaceResolver::excludedGlobalProviders($countryCode, $category), true)) {
-                        return false;
-                    }
-
-                    $meta = LivePlatformRegistry::platform($provider->sourceKey());
-                    if ($meta !== null) {
-                        $platformCountry = strtoupper((string) ($meta['country'] ?? ''));
-                        if ($platformCountry !== '' && $platformCountry !== $countryCode
-                            && ! in_array($platformCountry, ['WW', 'GLOBAL', '*'], true)) {
-                            return false;
-                        }
-                    }
-
                     return false;
                 }
             }

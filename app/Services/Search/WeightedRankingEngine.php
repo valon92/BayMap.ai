@@ -23,6 +23,10 @@ class WeightedRankingEngine
      */
     public function score(array $product, array $parsed): int
     {
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
+            return min(99, max(40, (int) round($this->travelScore($product, $parsed))));
+        }
+
         $weights = $this->agentPools->rankingWeights();
 
         $specification = $this->exactMatchScore($product, $parsed);
@@ -215,6 +219,38 @@ class WeightedRankingEngine
         }
 
         return min(100.0, $score);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     */
+    private function travelScore(array $product, array $parsed): float
+    {
+        $score = ! empty($product['price_on_request']) ? 52.0 : 78.0;
+
+        if (($product['travel_mode'] ?? '') === 'flight' && (float) ($product['price'] ?? 0) > 0) {
+            $score = 82.0;
+            $dep = (string) ($product['departure_time'] ?? '');
+            $from = (string) ($parsed['departure_time_from'] ?? '');
+            $to = (string) ($parsed['departure_time_to'] ?? '');
+            if ($dep !== '' && $from !== '' && $dep >= $from && ($to === '' || $dep <= $to)) {
+                $score += 12.0;
+            }
+            if ((int) ($product['stops'] ?? 99) === 0) {
+                $score += 6.0;
+            }
+        }
+
+        if (($product['travel_mode'] ?? '') === 'train') {
+            $score += 4.0;
+        }
+
+        if (! empty($product['live'])) {
+            $score += 5.0;
+        }
+
+        return min(98.0, $score);
     }
 
     /**

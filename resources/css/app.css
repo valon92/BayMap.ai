@@ -467,6 +467,164 @@
       transition-[border-color,box-shadow,transform] duration-200
       hover:border-blue-200 hover:shadow-card-hover;
   }
+
+  /* Travel bridge cards */
+  .travel-route-summary {
+    @apply rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 to-white px-4 py-3 sm:px-5 sm:py-4 shadow-card;
+  }
+
+  .travel-route-summary__route {
+    @apply flex flex-wrap items-center gap-2 text-lg sm:text-xl font-semibold text-slate-900;
+  }
+
+  .travel-route-summary__arrow {
+    @apply text-sky-500 font-normal;
+  }
+
+  .travel-route-summary__meta {
+    @apply mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-600;
+  }
+
+  .travel-route-summary__hint {
+    @apply mt-2 text-xs text-slate-500 leading-relaxed;
+  }
+
+  .travel-results-list {
+    @apply w-full max-w-full min-w-0;
+  }
+
+  .travel-card {
+    @apply rounded-2xl border border-slate-200/90 bg-white shadow-card overflow-hidden
+      transition-[border-color,box-shadow] duration-200
+      hover:border-sky-200 hover:shadow-card-hover;
+  }
+
+  .travel-card__main {
+    @apply flex flex-col lg:flex-row lg:items-stretch gap-4 p-4 sm:p-5;
+  }
+
+  .travel-card__timeline {
+    @apply flex items-center justify-between gap-3 shrink-0 lg:w-52 xl:w-60;
+  }
+
+  .travel-card__time-block {
+    @apply flex flex-col items-start min-w-[3.5rem];
+  }
+
+  .travel-card__time-block--end {
+    @apply items-end text-right;
+  }
+
+  .travel-card__time {
+    @apply text-xl sm:text-2xl font-bold tabular-nums text-slate-900 leading-none;
+  }
+
+  .travel-card__code {
+    @apply mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+
+  .travel-card__route-line {
+    @apply flex-1 flex flex-col items-center justify-center gap-1 min-w-[4rem] px-1;
+  }
+
+  .travel-card__route-line::before,
+  .travel-card__route-line::after {
+    content: '';
+    @apply block h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent;
+  }
+
+  .travel-card__mode-icon {
+    @apply text-lg leading-none;
+  }
+
+  .travel-card__duration {
+    @apply text-[10px] sm:text-xs font-medium text-slate-500 whitespace-nowrap;
+  }
+
+  .travel-card__stops {
+    @apply text-[9px] sm:text-[10px] font-medium text-slate-400 whitespace-nowrap;
+  }
+
+  .travel-card__details {
+    @apply flex-1 min-w-0;
+  }
+
+  .travel-card__header {
+    @apply flex items-start gap-3;
+  }
+
+  .travel-card__logo {
+    @apply h-8 w-8 sm:h-9 sm:w-9 rounded-lg object-contain bg-white border border-slate-100 shrink-0;
+  }
+
+  .travel-card__titles {
+    @apply min-w-0 flex-1;
+  }
+
+  .travel-card__title {
+    @apply text-sm sm:text-base font-semibold text-slate-900 leading-snug truncate;
+  }
+
+  .travel-card__subtitle {
+    @apply mt-0.5 text-xs text-slate-500 truncate;
+  }
+
+  .travel-card__meta {
+    @apply mt-2 flex flex-wrap gap-1.5;
+  }
+
+  .travel-chip {
+    @apply inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-slate-700;
+  }
+
+  .travel-chip--muted {
+    @apply bg-emerald-50 text-emerald-700;
+  }
+
+  .travel-card__route {
+    @apply mt-2 text-xs text-slate-500 truncate;
+  }
+
+  .travel-card__buy {
+    @apply flex flex-col items-stretch lg:items-end justify-center gap-1.5 shrink-0 lg:w-36 xl:w-40 border-t lg:border-t-0 lg:border-l border-slate-100 pt-3 lg:pt-0 lg:pl-4 mt-1 lg:mt-0;
+  }
+
+  .travel-card__score {
+    @apply self-start lg:self-end inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide;
+  }
+
+  .travel-card__score--high {
+    @apply bg-emerald-100 text-emerald-800;
+  }
+
+  .travel-card__score--mid {
+    @apply bg-sky-100 text-sky-800;
+  }
+
+  .travel-card__score--base {
+    @apply bg-slate-100 text-slate-600;
+  }
+
+  .travel-card__price {
+    @apply text-lg sm:text-xl font-bold text-slate-900 tabular-nums;
+  }
+
+  .travel-card__price--quote {
+    @apply text-sm font-semibold text-slate-500;
+  }
+
+  .travel-card__cta {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white
+      transition-colors hover:bg-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600;
+  }
+
+  .travel-card__source {
+    @apply text-[10px] text-slate-400 text-center lg:text-right;
+  }
+
+  .travel-card__live {
+    @apply inline-flex items-center rounded px-1 py-px mr-1 text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700;
+  }
 }
 
 .ai-mesh {

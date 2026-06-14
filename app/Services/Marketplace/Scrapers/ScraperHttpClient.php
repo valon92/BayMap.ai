@@ -2,12 +2,38 @@
 
 namespace App\Services\Marketplace\Scrapers;
 
+use App\Services\Marketplace\BrowseAiScrapeService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class ScraperHttpClient
 {
-    public function get(string $url, ?string $locale = null, ?string $referer = null): string
+    public function __construct(private BrowseAiScrapeService $browseAi) {}
+
+    public function get(string $url, ?string $locale = null, ?string $referer = null, ?string $platformKey = null): string
+    {
+        $html = $this->fetchDirect($url, $locale, $referer);
+        if ($html !== '') {
+            return $html;
+        }
+
+        if ($platformKey !== null && $this->browseAi->shouldUse($platformKey)) {
+            $viaBrowse = $this->browseAi->fetchHtml($platformKey, $url);
+            if ($viaBrowse !== '') {
+                Log::info('Live platform fetched via Browse AI', [
+                    'platform' => $platformKey,
+                    'url' => $url,
+                    'bytes' => strlen($viaBrowse),
+                ]);
+
+                return $viaBrowse;
+            }
+        }
+
+        return '';
+    }
+
+    private function fetchDirect(string $url, ?string $locale, ?string $referer): string
     {
         $acceptLanguage = match ($locale) {
             'de-DE' => 'de-DE,de;q=0.9,en;q=0.8',
@@ -66,6 +92,11 @@ class ScraperHttpClient
         }
 
         if (strlen($html) < 12000 && str_contains($html, 'Just a moment...')) {
+            return true;
+        }
+
+        $lower = mb_strtolower($html);
+        if (str_contains($lower, 'zugriff verweigert') || str_contains($lower, 'access denied')) {
             return true;
         }
 
