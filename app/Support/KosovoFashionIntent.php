@@ -71,4 +71,19 @@ class KosovoFashionIntent
             mb_strtolower($query)
         );
     }
+
+    public static function isAccessoryType(string $type): bool
+    {
+        return in_array(mb_strtolower(trim($type)), [
+            'cap', 'hat', 'beanie', 'kapa', 'kapela', 'kapelë', 'kapele', 'bag', 'backpack', 'accessory', 'accessories',
+        ], true);
+    }
+
+    public static function queryMentionsAccessory(string $query): bool
+    {
+        return (bool) preg_match(
+            '/\b(cap|hat|kapa|kapela|kapel|kapele|beanie|snapback|backpack|bag|çant|cant|aksesor)\b/ui',
+            mb_strtolower($query)
+        );
+    }
 }

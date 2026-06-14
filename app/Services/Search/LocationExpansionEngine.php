@@ -55,8 +55,15 @@ class LocationExpansionEngine
         return is_array($last) ? (string) ($last['level'] ?? 'international') : 'international';
     }
 
-    public function shouldExpand(int $resultCount): bool
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    public function shouldExpand(int $resultCount, array $parsed = []): bool
     {
+        if (! empty($parsed['search_target'])) {
+            return false;
+        }
+
         $threshold = (int) config('agent_pools.min_results_before_expand', 3);
 
         return $resultCount < $threshold && $this->canExpand();

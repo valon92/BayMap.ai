@@ -5,8 +5,10 @@ namespace App\Services\Marketplace\Scrapers;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveModelResolver;
+use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
+use App\Support\FashionIntentParser;
 
 class ProductListingNormalizer
 {
@@ -139,11 +141,33 @@ class ProductListingNormalizer
         $wantedEngine = isset($parsed['engine_liters']) ? (float) $parsed['engine_liters'] : null;
 
         $isAutomotive = CategoryCatalog::isAutomotive($parsed['category'] ?? '');
-        $productType = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+        $isElectronics = CategoryCatalog::isElectronics($parsed['category'] ?? '');
+        $isFashion = in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true);
+        $productType = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
+        $maxPrice = isset($parsed['max_price']) ? (float) $parsed['max_price'] : null;
 
-        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $productType) {
-            if (! $isAutomotive && $productType !== '' && ! ElectronicsIntentParser::productMatchesType($item, $productType)) {
-                return false;
+        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isElectronics, $isFashion, $productType, $maxPrice) {
+            if ($maxPrice !== null && $maxPrice > 0) {
+                $price = (float) ($item['price'] ?? $item['price_eur'] ?? 0);
+                if ($price <= 0) {
+                    return false;
+                }
+                if ($price > $maxPrice) {
+                    return false;
+                }
+            }
+
+            if ($productType !== '') {
+                $typeMatch = match (true) {
+                    $isAutomotive => true,
+                    $isElectronics => ElectronicsIntentParser::productMatchesType($item, $productType),
+                    $isFashion => FashionIntentParser::productMatchesType($item, $productType),
+                    CategoryCatalog::isBookSearch($parsed) => BookIntentParser::productMatchesType($item, $productType),
+                    default => true,
+                };
+                if (! $typeMatch) {
+                    return false;
+                }
             }
             if ($brand !== '') {
                 $title = mb_strtolower($item['title'] ?? '');
@@ -189,6 +213,12 @@ class ProductListingNormalizer
                     if (! $modelMatch) {
                         return false;
                     }
+                }
+            }
+
+            if (! empty($parsed['gender']) && $isFashion) {
+                if (! FashionIntentParser::matchesGender($item, (string) $parsed['gender'])) {
+                    return false;
                 }
             }
 

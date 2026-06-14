@@ -97,6 +97,30 @@ class ProviderRegistry
             $liveFanOut,
             $geo
         ) {
+            if (LocalMarketplaceResolver::isTargeted($parsedQuery)) {
+                $allowed = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
+                if ($allowed !== []) {
+                    if (! in_array($provider->sourceKey(), $allowed, true)) {
+                        return false;
+                    }
+                } else {
+                    if (in_array($provider->sourceKey(), LocalMarketplaceResolver::excludedGlobalProviders($countryCode, $category), true)) {
+                        return false;
+                    }
+
+                    $meta = LivePlatformRegistry::platform($provider->sourceKey());
+                    if ($meta !== null) {
+                        $platformCountry = strtoupper((string) ($meta['country'] ?? ''));
+                        if ($platformCountry !== '' && $platformCountry !== $countryCode
+                            && ! in_array($platformCountry, ['WW', 'GLOBAL', '*'], true)) {
+                            return false;
+                        }
+                    }
+
+                    return false;
+                }
+            }
+
             if ($liveFanOut) {
                 $allowed = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
                 if (! in_array($provider->sourceKey(), $allowed, true)) {

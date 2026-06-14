@@ -150,6 +150,16 @@ class ValonWorkerRunner
             'heycar_de',
             'facebook_marketplace_de',
             'wirkaufendeinauto',
+            'zalando_ch',
+            'zalando_de',
+            'galaxus_ch',
+            'digitec_ch',
+            'aboutyou_ch',
+            'aboutyou_de',
+            'decathlon_ch',
+            'bonprix_de',
+            'peek_cloppenburg_de',
+            'asos_de',
         ], true);
     }
 

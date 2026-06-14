@@ -55,6 +55,13 @@ class FashionIntentParser
         'jacket' => 'jacket',
         'dress' => 'dress',
         'fustan' => 'dress',
+        'cap' => 'cap',
+        'kapa' => 'cap',
+        'kapela' => 'cap',
+        'kapelë' => 'cap',
+        'kapele' => 'cap',
+        'hat' => 'cap',
+        'beanie' => 'cap',
     ];
 
     /**
@@ -111,6 +118,13 @@ class FashionIntentParser
         return $result;
     }
 
+    public static function normalizeType(string $type): string
+    {
+        $type = mb_strtolower(trim($type));
+
+        return self::PRODUCT_TYPES[$type] ?? $type;
+    }
+
     public static function isFashionQuery(string $query): bool
     {
         $parsed = self::fromQuery($query);
@@ -118,5 +132,123 @@ class FashionIntentParser
         return ! empty($parsed['brand'])
             || ! empty($parsed['product_type'])
             || ! empty($parsed['size']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    public static function productMatchesType(array $product, string $type): bool
+    {
+        $type = self::normalizeType($type);
+        if ($type === '') {
+            return true;
+        }
+
+        $title = mb_strtolower((string) ($product['title'] ?? ''));
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+        $itemType = mb_strtolower((string) ($product['product_type'] ?? ''));
+
+        if ($itemType === $type || str_contains($itemType, $type)) {
+            return true;
+        }
+
+        $needles = match ($type) {
+            'sneakers', 'trainers' => ['sneaker', 'trainer', 'atlete', 'patika', 'këpuc', 'kepuc', 'shoe', 'running', 'court', 'slipstream', 'smash', 'r78', 'caven', 'anzarun', 'rebound', 'flyer', 'st runner', 'disperse', 'softride', 'x-cell', 'flexfocus', 'easy rider', 'extend lite', 'trinity', 'runtamed'],
+            'shoes' => ['shoe', 'sneaker', 'atlete', 'patika', 'këpuc', 'kepuc', 'trainer', 'boot', 'çizme', 'cizme'],
+            'boots' => ['boot', 'çizme', 'cizme', 'timberland'],
+            'jacket' => ['jacket', 'xhaket', 'xhaketa', 'blouson', 'windbreaker'],
+            'dress' => ['dress', 'fustan', 'robe'],
+            'pants' => ['pant', 'trener', 'track', 'jogger'],
+            'shirt' => ['shirt', 'tee', 'bluz', 't-shirt', 'polo'],
+            'cap', 'hat', 'beanie', 'kapa', 'kapela', 'kapelë', 'kapele' => ['cap', 'kapel', 'kapele', 'kapela', 'hat', 'beanie', 'snapback', 'club cap', 'df club', 'fitted', 'trucker', 'mütze', 'mutze', 'kappe', 'badekappe', 'baseballmütze', 'baseballmutze'],
+            default => [$type],
+        };
+
+        $exclude = match ($type) {
+            'sneakers', 'trainers', 'shoes' => ['jacket', 'xhaket', 'pantallona', 'pants', 'track pant', 'shorts', 'shorce', 't-shirt', ' tee', 'bluz', 'dress', 'fustan', 'backpack', 'çant', 'cant', ' suit', 'sweatshirt', 'hoodie'],
+            'cap', 'hat', 'beanie', 'kapa', 'kapela', 'kapelë', 'kapele' => ['captain', 'captainbinde', 'armband', 'binde', 'schlapphut', 'bucket'],
+            default => [],
+        };
+
+        foreach ($exclude as $bad) {
+            if (str_contains($title, $bad)) {
+                return false;
+            }
+        }
+
+        foreach ($needles as $needle) {
+            if (self::titleContainsNeedle($title, $needle) || in_array($needle, $tags, true)) {
+                return true;
+            }
+        }
+
+        if (KosovoFashionIntent::isFootwearType($type)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    public static function matchesColor(array $product, string $color, bool $allowUnknown = false): bool
+    {
+        $color = mb_strtolower(trim($color));
+        if ($color === '' || $color === 'multicolor') {
+            return true;
+        }
+
+        $title = mb_strtolower((string) ($product['title'] ?? ''));
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
+
+        $aliases = match ($color) {
+            'black' => ['black', 'zez', 'zeze', 'schwarz', 'noir', 'negro'],
+            'white' => ['white', 'bardh', 'bardhe', 'weiss', 'blanc'],
+            'grey', 'gray' => ['grey', 'gray', 'gri', 'hiri', 'silver', 'grau'],
+            'blue' => ['blue', 'blu', 'navy', 'kalter', 'kaltër'],
+            'red' => ['red', 'kuq', 'rot'],
+            'green' => ['green', 'jeshil', 'grün'],
+            default => [$color],
+        };
+
+        foreach ($aliases as $alias) {
+            if (str_contains($title, $alias) || in_array($alias, $tags, true)) {
+                return true;
+            }
+        }
+
+        return $allowUnknown;
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    public static function matchesGender(array $product, string $gender): bool
+    {
+        $gender = CategoryCatalog::normalizeGender($gender);
+        if ($gender === null || $gender === '') {
+            return true;
+        }
+
+        $title = mb_strtolower((string) ($product['title'] ?? ''));
+        $isKids = (bool) preg_match('/\b(jr\.?|junior|kids|kid|children|child|fëmij|femij|vogël|vogel|infant|toddler)\b/u', $title);
+        $isWomen = (bool) preg_match('/\b(women|woman|female|femra|dama|for her|wmns|w\s|ladies)\b/u', $title);
+        $isMen = (bool) preg_match('/\b(men|man|male|meshkuj|for him|homme)\b/u', $title);
+
+        return match ($gender) {
+            'male', 'men' => ! $isKids && ! $isWomen,
+            'female', 'women' => ! $isKids && ! $isMen,
+            default => true,
+        };
+    }
+
+    private static function titleContainsNeedle(string $title, string $needle): bool
+    {
+        if (mb_strlen($needle) <= 3) {
+            return preg_match('/\b'.preg_quote($needle, '/').'\b/u', $title) === 1;
+        }
+
+        return str_contains($title, $needle);
     }
 }

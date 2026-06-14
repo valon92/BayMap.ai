@@ -83,22 +83,39 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
      */
     private function parseProducts(string $html, string $storeKey, array $platform): array
     {
-        $chunks = preg_split('/(?=class="product type-product post-)/', $html) ?: [];
+        $chunks = preg_split('/(?=class="[^"]*type-product[^"]*post-|class="product type-product post-)/', $html) ?: [];
+        if (count($chunks) <= 1) {
+            $chunks = preg_split('/(?=post-\d+[^"]*type-product|type-product post-\d+)/', $html) ?: [];
+        }
         $products = [];
 
         foreach ($chunks as $chunk) {
-            if (! preg_match('/class="product type-product post-(\d+)/', $chunk, $idMatch)) {
+            if (! preg_match('/(?:product type-product post-|type-product post-|post-(\d+)[^"]*type-product)/', $chunk, $idMatch)) {
                 continue;
             }
 
-            $productId = $idMatch[1];
-
-            if (! preg_match('/woocommerce-loop-product__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>\s*([^<]+?)\s*<\/a>/', $chunk, $titleMatch)) {
+            $productId = $idMatch[1] ?? null;
+            if ($productId === null && preg_match('/post-(\d+)/', $chunk, $idFallback)) {
+                $productId = $idFallback[1];
+            }
+            if ($productId === null) {
                 continue;
             }
 
-            $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $title = null;
+            $url = null;
+
+            if (preg_match('/woocommerce-loop-product__title[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>\s*([^<]+?)\s*<\/a>/s', $chunk, $titleMatch)) {
+                $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } elseif (preg_match('/class="[^"]*woocommerce-loop-product__link[^"]*"[^>]*href="([^"]+)"[^>]*>\s*<h2[^>]*>\s*([^<]+?)\s*<\/h2>/s', $chunk, $titleMatch)) {
+                $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            if ($title === null || $title === '') {
+                continue;
+            }
             $image = null;
 
             if (preg_match('/<img[^>]+src="([^"]+)"/', $chunk, $imgMatch)) {
@@ -119,14 +136,38 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
 
     private function parsePrice(string $chunk): float
     {
+        if (preg_match('/woocommerce-Price-amount amount[^>]*>\s*<bdi>([\s\S]{0,160}?)<\/bdi>/', $chunk, $m)) {
+            if (preg_match('/(\d[\d.\']*(?:,\d{2})?)/', html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'), $num)) {
+                return $this->normalizeEuropeanPrice($num[1]);
+            }
+        }
+
         if (preg_match('/woocommerce-Price-amount amount">\s*<bdi>\s*(\d+[.,]\d+)/', $chunk, $m)) {
-            return (float) str_replace(',', '.', $m[1]);
+            return $this->normalizeEuropeanPrice($m[1]);
         }
 
         if (preg_match('/<ins[^>]*>[\s\S]{0,400}?woocommerce-Price-currencySymbol[^>]*>.*?<\/span>\s*(\d+[.,]\d+)/', $chunk, $m)) {
-            return (float) str_replace(',', '.', $m[1]);
+            return $this->normalizeEuropeanPrice($m[1]);
+        }
+
+        if (preg_match('/class="price"[^>]*>[\s\S]{0,300}?(\d+[.,]\d{2})/', $chunk, $m)) {
+            return $this->normalizeEuropeanPrice($m[1]);
         }
 
         return 0.0;
+    }
+
+    private function normalizeEuropeanPrice(string $raw): float
+    {
+        $raw = trim(str_replace(["'", ' '], '', $raw));
+        if ($raw === '') {
+            return 0.0;
+        }
+
+        if (str_contains($raw, ',') && str_contains($raw, '.')) {
+            $raw = str_replace('.', '', $raw);
+        }
+
+        return (float) str_replace(',', '.', $raw);
     }
 }

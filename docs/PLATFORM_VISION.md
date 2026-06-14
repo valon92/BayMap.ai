@@ -99,7 +99,7 @@ AI descriptions adapt to the active UI locale where supported.
 
 Laravel 10 · Vue 3 · Tailwind · Vite · Stateless services · `storage/data` mock products
 
-Deploy: cPanel addon domain, Render, Railway, Vercel/Netlify (static + API host). See [DEPLOY_CPANEL.md](DEPLOY_CPANEL.md).
+Deploy: **Render** (API + app) + **Vercel** (domain/proxy). See [DEPLOY.md](DEPLOY.md).
 
 ---
 

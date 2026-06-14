@@ -18,9 +18,11 @@ class MetaSearchEngine
     {
         $clusters = $this->cluster($products);
 
-        return array_values(array_map(function (array $cluster) {
-            return $this->buildMetaListing($cluster);
-        }, $clusters));
+        return array_values(array_filter(array_map(function (array $cluster) {
+            $listing = $this->buildMetaListing($cluster);
+
+            return $listing !== [] ? $listing : null;
+        }, $clusters)));
     }
 
     /**
@@ -45,6 +47,12 @@ class MetaSearchEngine
      */
     private function buildMetaListing(array $cluster): array
     {
+        $cluster = array_values(array_filter($cluster, fn ($p) => (float) ($p['price'] ?? $p['price_eur'] ?? 0) > 0));
+
+        if ($cluster === []) {
+            return [];
+        }
+
         usort($cluster, function ($a, $b) {
             $priceA = (float) ($a['price_eur'] ?? $a['price'] ?? PHP_INT_MAX);
             $priceB = (float) ($b['price_eur'] ?? $b['price'] ?? PHP_INT_MAX);
@@ -62,28 +70,45 @@ class MetaSearchEngine
         $max = $prices !== [] ? max($prices) : $min;
 
         $sources = array_values(array_unique(array_map(fn ($p) => (string) ($p['source'] ?? ''), $cluster)));
-        $offers = array_map(fn ($p) => [
-            'source' => $p['source'] ?? '',
-            'source_key' => $p['source_key'] ?? '',
-            'price' => $p['price'] ?? 0,
-            'price_eur' => $p['price_eur'] ?? $p['price'] ?? 0,
-            'currency' => $p['currency'] ?? 'EUR',
-            'location' => $p['location'] ?? '',
-            'url' => $p['url'] ?? '#',
-            'live' => (bool) ($p['live'] ?? false),
-            'condition' => $p['condition'] ?? 'used',
-        ], $cluster);
+        $offers = [];
+        $seenOfferKeys = [];
+
+        foreach ($cluster as $p) {
+            $price = (float) ($p['price'] ?? $p['price_eur'] ?? 0);
+            if ($price <= 0) {
+                continue;
+            }
+
+            $offerKey = strtolower((string) ($p['source_key'] ?? '')).'|'.(string) ($p['url'] ?? '');
+            if (isset($seenOfferKeys[$offerKey])) {
+                continue;
+            }
+            $seenOfferKeys[$offerKey] = true;
+
+            $offers[] = [
+                'source' => $p['source'] ?? '',
+                'source_key' => $p['source_key'] ?? '',
+                'price' => $price,
+                'price_eur' => (float) ($p['price_eur'] ?? $price),
+                'currency' => $p['currency'] ?? 'EUR',
+                'location' => $p['location'] ?? '',
+                'url' => $p['url'] ?? '#',
+                'live' => (bool) ($p['live'] ?? false),
+                'condition' => $p['condition'] ?? 'used',
+            ];
+        }
 
         $primary = $best;
-        $primary['offer_count'] = count($cluster);
+        $primary['offer_count'] = max(1, count($offers));
         $primary['best_price_eur'] = $min;
         $primary['price_spread_eur'] = round(max(0, $max - $min), 2);
         $primary['alternate_sources'] = array_values(array_filter($sources, fn ($s) => $s !== ($best['source'] ?? '')));
         $primary['offers'] = $offers;
         $primary['is_best_offer'] = true;
 
-        if (count($cluster) > 1) {
-            $primary['meta_label'] = count($cluster).' offers · from €'.number_format($min, 0).' on '.implode(', ', array_slice($sources, 0, 3));
+        if (count($offers) > 1) {
+            $uniqueSources = array_values(array_unique(array_map(fn ($o) => $o['source'], $offers)));
+            $primary['meta_label'] = count($offers).' offers · from €'.number_format($min, 0).' on '.implode(', ', array_slice($uniqueSources, 0, 3));
         }
 
         return $primary;

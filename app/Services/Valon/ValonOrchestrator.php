@@ -82,7 +82,7 @@ class ValonOrchestrator
                 'workers' => count($workers),
             ];
 
-            if ($locationEngine->shouldExpand(count($results))) {
+            if ($locationEngine->shouldExpand(count($results), $parsedQuery)) {
                 $locationEngine->expand();
             } else {
                 break;

@@ -7,6 +7,7 @@ use App\Services\Marketplace\ProviderRegistry;
 use App\Support\CategoryCatalog;
 use App\Support\KosovoFashionIntent;
 use App\Support\LivePlatformRegistry;
+use App\Support\LocalMarketplaceResolver;
 
 /**
  * Activates Valon Workers per query.
@@ -37,6 +38,19 @@ class AgentActivationService
         $parsedForFanOut = $parsed;
         if (empty($parsedForFanOut['search_country_code']) && ! empty($geo['country_code'])) {
             $parsedForFanOut['search_country_code'] = strtoupper((string) $geo['country_code']);
+        }
+
+        if (LocalMarketplaceResolver::isTargeted($parsed)) {
+            $keys = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
+            if ($keys !== []) {
+                return $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+            }
+
+            return [
+                'agents' => [],
+                'source_keys' => [],
+                'providers' => [],
+            ];
         }
 
         if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {

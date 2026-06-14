@@ -18,10 +18,23 @@ class KosovoFashionLiveStores
      */
     public static function driloniSearchUrl(array $parsed): string
     {
+        $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+        $raw = mb_strtolower(trim((string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? '')));
+        $isAccessory = KosovoFashionIntent::isAccessoryType($type) || KosovoFashionIntent::queryMentionsAccessory($raw);
+
+        if ($isAccessory) {
+            $search = ! empty($parsed['brand'])
+                ? trim((string) $parsed['brand'])
+                : 'kapela';
+
+            return KosovoMarketplaces::url('driloni')
+                .'/product-category/lloji-i-produktit/kapela/?s='.rawurlencode($search)
+                .'&post_type=product&dgwt_wcas=1&filter=1';
+        }
+
         if (! empty($parsed['brand'])) {
             $search = (string) $parsed['brand'];
         } else {
-            $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
             $search = KosovoFashionIntent::isFootwearType($type)
                 ? 'atlete'
                 : self::compactSearchTerm($parsed);

@@ -30,6 +30,7 @@ class PlatformCatalogBridge
                 CategoryCatalog::isAutomotive($category) => SwissCarMarketplaces::keys(),
                 CategoryCatalog::isElectronics($category) => SwissElectronicsMarketplaces::keys(),
                 $category === 'real_estate' => SwissRealEstateMarketplaces::keys(),
+                in_array($category, ['fashion', 'sports_outdoor'], true) => SwissFashionMarketplaces::keys(),
                 default => [],
             },
             'NL' => CategoryCatalog::isAutomotive($category) ? DutchCarMarketplaces::keys() : [],
@@ -57,6 +58,7 @@ class PlatformCatalogBridge
             ?: GermanCarMarketplaces::label($key)
             ?: GermanElectronicsMarketplaces::label($key)
             ?: SwissElectronicsMarketplaces::label($key)
+            ?: SwissFashionMarketplaces::label($key)
             ?: '';
     }
 

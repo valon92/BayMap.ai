@@ -46,7 +46,7 @@ export function useI18n() {
   const t = (key, params = {}) => {
     const value = translate(locale.value, key);
     return Object.entries(params).reduce(
-      (str, [k, v]) => str.replace(`:${k}`, String(v)),
+      (str, [k, v]) => str.replace(`:${k}`, String(v)).replace(`{${k}}`, String(v)),
       value
     );
   };

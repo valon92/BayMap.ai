@@ -28,7 +28,8 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
     {
         $storeKey = (string) ($platform['_key'] ?? 'generic');
         $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
-        $html = $this->http->get($searchUrl, $platform['locale'] ?? null);
+        $referer = rtrim((string) ($platform['base_url'] ?? ''), '/').'/';
+        $html = $this->http->get($searchUrl, $platform['locale'] ?? null, $referer);
 
         if ($html === '') {
             return [];
@@ -38,7 +39,8 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
             return $this->csCart->scrape($platform, $parsedQuery);
         }
 
-        if (str_contains($html, 'woocommerce-loop-product__title')) {
+        if (str_contains($html, 'woocommerce-loop-product__title')
+            || preg_match('/type-product post-\d+/i', $html)) {
             return $this->wooCommerce->scrape($platform, $parsedQuery);
         }
 
@@ -59,6 +61,8 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         $scraper = (string) ($platform['scraper'] ?? '');
 
         foreach ([
+            fn () => $this->parseShopifySearchAnalytics($html, $storeKey, $platform),
+            fn () => $this->parseShopifyDataProductCards($html, $storeKey, $platform),
             fn () => $this->parseManorNextData($html, $storeKey, $platform),
             fn () => $this->parseAlternateProducts($html, $storeKey, $platform),
             fn () => $this->parseJsonLdProducts($html, $storeKey, $platform),
@@ -100,6 +104,11 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
             }
 
             $title = trim((string) ($node['name'] ?? ''));
+            $brand = trim((string) ($node['brandName'] ?? ''));
+            if ($brand !== '' && $title !== ''
+                && ! preg_match('/\b'.preg_quote($brand, '/').'\b/ui', $title)) {
+                $title = trim($brand.' '.$title);
+            }
             if ($title === '' || isset($seen[$title])) {
                 continue;
             }
@@ -406,6 +415,168 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         }
 
         return $items;
+    }
+
+    /**
+     * Shopify stores embed search analytics JSON (Intersport, etc.).
+     *
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseShopifySearchAnalytics(string $html, string $storeKey, array $platform): array
+    {
+        $variants = $this->extractJsonArrayAfter($html, '"productVariants":');
+        if (! is_array($variants) || $variants === []) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $items = [];
+        $seen = [];
+
+        foreach ($variants as $variant) {
+            if (! is_array($variant) || count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $product = is_array($variant['product'] ?? null) ? $variant['product'] : [];
+            $title = trim((string) ($product['title'] ?? ''));
+            $vendor = trim((string) ($product['vendor'] ?? ''));
+            if ($title === '') {
+                continue;
+            }
+
+            if ($vendor !== '' && ! preg_match('/\b'.preg_quote($vendor, '/').'\b/ui', $title)) {
+                $title = trim($vendor.' '.$title);
+            }
+
+            $dedupeKey = mb_strtolower($title);
+            if (isset($seen[$dedupeKey])) {
+                continue;
+            }
+
+            $price = (float) ($variant['price']['amount'] ?? 0);
+            if ($price <= 0) {
+                continue;
+            }
+
+            $url = (string) ($product['url'] ?? '');
+            if ($url === '') {
+                continue;
+            }
+            if (str_starts_with($url, '/')) {
+                $url = $baseUrl.$url;
+            }
+
+            $image = (string) ($variant['image']['src'] ?? '');
+            if (str_starts_with($image, '//')) {
+                $image = 'https:'.$image;
+            }
+
+            $seen[$dedupeKey] = true;
+            $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                'product_id' => (string) ($product['id'] ?? md5($title.$url)),
+                'title' => $title,
+                'url' => $url,
+                'price' => $price,
+                'currency' => (string) ($variant['price']['currencyCode'] ?? $platform['currency'] ?? 'CHF'),
+                'image' => $image !== '' ? $image : null,
+                'brand' => $vendor !== '' ? mb_strtolower($vendor) : null,
+                'location' => (string) ($platform['location'] ?? 'Switzerland'),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseShopifyDataProductCards(string $html, string $storeKey, array $platform): array
+    {
+        if (! str_contains($html, 'data-product_name=')) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $items = [];
+        $seen = [];
+
+        if (! preg_match_all(
+            '/class="[^"]*product-card-wrapper[^"]*"[\s\S]{0,120}?data-product_name="([^"]+)"[\s\S]{0,500}?data-product_brand="([^"]+)"[\s\S]{0,250}?data-product_price="([^"]+)"[\s\S]{0,6000}?href="(\/products\/[^"]+)"/i',
+            $html,
+            $matches,
+            PREG_SET_ORDER,
+        )) {
+            return [];
+        }
+
+        foreach ($matches as $match) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $title = html_entity_decode(trim($match[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $brand = html_entity_decode(trim($match[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $price = (float) $match[3];
+            $path = html_entity_decode(trim($match[4]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+            if ($title === '' || $price <= 0 || isset($seen[$title])) {
+                continue;
+            }
+
+            if ($brand !== '' && ! preg_match('/\b'.preg_quote($brand, '/').'\b/ui', $title)) {
+                $title = trim($brand.' '.$title);
+            }
+
+            $seen[$title] = true;
+            $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                'product_id' => md5($title.$path),
+                'title' => $title,
+                'url' => $baseUrl.$path,
+                'price' => $price,
+                'currency' => (string) ($platform['currency'] ?? 'CHF'),
+                'brand' => $brand !== '' ? mb_strtolower($brand) : null,
+                'location' => (string) ($platform['location'] ?? 'Switzerland'),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array<int, mixed>|null
+     */
+    private function extractJsonArrayAfter(string $html, string $needle): ?array
+    {
+        $pos = strpos($html, $needle);
+        if ($pos === false) {
+            return null;
+        }
+
+        $start = strpos($html, '[', $pos);
+        if ($start === false) {
+            return null;
+        }
+
+        $depth = 0;
+        $length = strlen($html);
+        for ($i = $start; $i < $length; $i++) {
+            $char = $html[$i];
+            if ($char === '[') {
+                $depth++;
+            } elseif ($char === ']') {
+                $depth--;
+                if ($depth === 0) {
+                    $decoded = json_decode(substr($html, $start, $i - $start + 1), true);
+
+                    return is_array($decoded) ? $decoded : null;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

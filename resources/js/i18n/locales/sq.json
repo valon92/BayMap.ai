@@ -151,7 +151,7 @@
   "loading_more": "Duke ngarkuar…",
   "swiss_car_marketplaces": "Marketplace zvicerane të kërkuara",
   "swiss_electronics_marketplaces": "Dyqane elektronike zvicerane të kërkuara",
-  "local_marketplaces_searched": "Marketplace lokale të kërkuara në {country}",
+  "local_marketplaces_searched": "Marketplace lokale të kërkuara në :country",
   "dutch_car_marketplaces": "Marketplace holandeze të kërkuara",
   "german_car_marketplaces": "Dyqane online gjermane të kërkuara",
   "german_electronics_marketplaces": "Dyqane elektronike gjermane të kërkuara",

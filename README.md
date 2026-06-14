@@ -194,57 +194,52 @@ curl -s -X POST http://127.0.0.1:8765/api/search \
 - Auto-detect from IP country (XK, AL → `sq`) or browser language
 - Manual toggle in header
 
-## Deployment (free tiers)
+## Deployment
 
-### Recommended: Render or Railway (full Laravel)
+Full guide: **[docs/DEPLOY.md](docs/DEPLOY.md)**
+
+### Recommended: Render + Vercel
+
+| Platform | Role |
+|----------|------|
+| **Render** | Laravel API, AI search, live scraping, Vue SPA |
+| **Vercel** | Custom domain `buymap.ai` — proxies all traffic to Render |
 
 **Render** — use included `render.yaml`:
 
-1. Connect GitHub repo on [render.com](https://render.com)
-2. Set environment: `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_DRIVER=array`
-3. Build runs `composer install`, `npm run build` automatically
+1. [render.com](https://render.com) → **New Blueprint** → connect `valon92/BayMap.ai`
+2. Set secrets in Environment: `OPENAI_API_KEY`, `GEMINI_API_KEY`, optional `EBAY_*`, `SERPAPI_KEY`
+3. Set `APP_URL=https://buymap.ai` after domain is live
+4. Health: `GET /api/health`
 
-**Railway**:
+**Vercel** — domain front (optional):
 
-1. Connect repo at [railway.app](https://railway.app)
-2. Uses `Procfile` — set `APP_KEY` in variables
-3. Point Namecheap DNS CNAME to Railway URL
+1. Import repo on [vercel.com](https://vercel.com)
+2. Edit `vercel.json` → replace `YOUR_RENDER_APP_URL` with your Render URL (e.g. `buymap-api.onrender.com`)
+3. Add domain `buymap.ai` in Vercel → update Namecheap DNS
 
-### Cloudflare / VPS
+**Railway** (alternative): uses `Procfile` — set `APP_KEY` and API keys in variables.
 
-Deploy as standard PHP app with `public/` as web root. Run `npm run build` on deploy.
-
-### Vercel / Netlify
-
-Laravel requires PHP runtime — use Render/Railway for the API. For split deployment:
-
-- Host Laravel API on Render
-- Set `VITE_API_URL=https://your-api.onrender.com/api` before `npm run build`
-- Optional static CDN for assets only
-
-## Domain (Namecheap → BuyMap.ai)
-
-### Same cPanel as arontrade.net (shared hosting)
-
-Use a **separate addon domain folder** — do **not** upload into `public_html` (that is arontrade.net).
-
-Full step-by-step: **[docs/DEPLOY_CPANEL.md](docs/DEPLOY_CPANEL.md)**
-
-Summary:
-1. Namecheap DNS: **A** `@` and `www` → server IP (`162.0.232.61`)
-2. cPanel → Addon domain `buymap.ai` → document root `/home/aronqbxm/buymap.ai/public`
-3. Clone repo, `composer install --no-dev`, `npm run build`, configure `.env`
+### Local production build test
 
 ```bash
-git clone https://github.com/valon92/BayMap.ai.git
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+php artisan serve --host=0.0.0.0 --port=8765
 ```
-4. SSL via AutoSSL in cPanel
 
-### Cloud (Render / Railway)
+## Domain (Namecheap → buymap.ai)
 
-1. Add CNAME record: `@` or `www` → your Render/Railway host
-2. Enable HTTPS on host
-3. Set `APP_URL=https://buymap.ai` in production `.env`
+### With Vercel (recommended)
+
+1. Point DNS to Vercel (A/CNAME records shown in Vercel dashboard)
+2. Vercel proxies to Render — set `APP_URL=https://buymap.ai` on Render
+
+### Render only (no Vercel)
+
+1. Add custom domain in Render dashboard
+2. Namecheap **CNAME** `www` → your Render hostname
+3. Set `APP_URL=https://buymap.ai`
 
 ## Environment variables
 

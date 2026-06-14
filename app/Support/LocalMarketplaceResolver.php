@@ -198,6 +198,7 @@ class LocalMarketplaceResolver
         return [
             SwissCarMarketplaces::class,
             SwissElectronicsMarketplaces::class,
+            SwissFashionMarketplaces::class,
             SwissRealEstateMarketplaces::class,
             GermanCarMarketplaces::class,
             GermanElectronicsMarketplaces::class,

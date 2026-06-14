@@ -26,7 +26,7 @@ return [
         'allow_ebay_categories' => ['DE:automotive'],
         'by_country' => [
             'CH' => [
-                'exclude_global' => ['ebay', 'google_shopping'],
+                'exclude_global' => ['ebay', 'google_shopping', 'amazon', 'etsy'],
             ],
             'DE' => [
                 'exclude_global' => ['google_shopping'],
@@ -77,6 +77,10 @@ return [
             'currency' => 'EUR',
             'priority' => 4,
             'search_template' => '/?s={query}&post_type=product',
+            'category_search_template' => '?s={query}&post_type=product&dgwt_wcas=1&filter=1',
+            'paths' => [
+                'accessories' => '/product-category/lloji-i-produktit/kapela',
+            ],
             'default_query' => 'atlete',
         ],
 
@@ -279,6 +283,99 @@ return [
             'priority' => 11,
             'search_template' => '/de-de/search?q={query}',
             'locale' => 'de-DE',
+        ],
+
+        // ── Switzerland · Fashion ────────────────────────────────────────
+        'zalando_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Zalando Switzerland',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.zalando.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 3,
+            'search_template' => '/catalog/?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'aboutyou_ch' => [
+            'adapter' => 'generic',
+            'label' => 'ABOUT YOU Switzerland',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.aboutyou.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 4,
+            'search_template' => '/search?term={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'ochsnersport_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Ochsner Sport',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.ochsnersport.com',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 5,
+            'search_template' => '/ch-de/search?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'intersport_ch' => [
+            'adapter' => 'generic',
+            'scraper' => 'shopify',
+            'label' => 'Intersport Switzerland',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.intersport.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 6,
+            'search_template' => '/search?q={query}&type=product',
+            'locale' => 'de-CH',
+        ],
+
+        'sportxx_ch' => [
+            'adapter' => 'generic',
+            'label' => 'SportXX',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.sportxx.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 7,
+            'search_template' => '/de/search?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'decathlon_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Decathlon Switzerland',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.decathlon.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 8,
+            'search_template' => '/de/search?Ntt={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'hm_ch' => [
+            'adapter' => 'generic',
+            'label' => 'H&M Switzerland',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www2.hm.com',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 9,
+            'search_template' => '/de_ch/search-results.html?q={query}',
+            'locale' => 'de-CH',
         ],
 
         // ── Germany · Automotive (live HTML scraping) ────────────────────
@@ -815,7 +912,7 @@ return [
             'scraper' => 'galaxus',
             'label' => 'Galaxus',
             'country' => 'CH',
-            'categories' => ['electronics_tech', 'gaming_entertainment', 'home_appliances', 'marketplace'],
+            'categories' => ['electronics_tech', 'gaming_entertainment', 'home_appliances', 'marketplace', 'fashion', 'sports_outdoor'],
             'base_url' => 'https://www.galaxus.ch',
             'location' => 'Switzerland',
             'currency' => 'CHF',
@@ -830,7 +927,7 @@ return [
             'scraper' => 'manor',
             'label' => 'Manor',
             'country' => 'CH',
-            'categories' => ['electronics_tech', 'home_appliances', 'marketplace'],
+            'categories' => ['electronics_tech', 'home_appliances', 'marketplace', 'fashion', 'sports_outdoor'],
             'base_url' => 'https://www.manor.ch',
             'location' => 'Switzerland',
             'currency' => 'CHF',

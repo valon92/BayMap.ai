@@ -10,7 +10,9 @@ use App\Support\CategoryCatalog;
 use App\Support\LocalMarketplaceResolver;
 use App\Support\CountryMatcher;
 use App\Support\ElectronicsIntentParser;
+use App\Support\FashionIntentParser;
 use App\Support\KosovoMarketplaces;
+use App\Support\LivePlatformRegistry;
 use App\Support\ShoeSize;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
@@ -317,7 +319,7 @@ class SearchOrchestratorService
             }
             if (isset($filters['color']) && $filters['color'] !== '') {
                 $wantedColors = (array) ($filters['colors'] ?? $parsed['colors'] ?? []);
-                if (! $this->productMatchesColor($product, (string) $filters['color'], $wantedColors)) {
+                if (! $this->productMatchesColor($product, (string) $filters['color'], $wantedColors, $parsed)) {
                     return false;
                 }
             }
@@ -433,6 +435,10 @@ class SearchOrchestratorService
                     if (! ElectronicsIntentParser::productMatchesType($product, $wantedType)) {
                         return false;
                     }
+                } elseif (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {
+                    if (! FashionIntentParser::productMatchesType($product, $wantedType)) {
+                        return false;
+                    }
                 }
             }
             if (isset($filters['genre']) && $filters['genre'] !== '' && CategoryCatalog::isBookSearch($parsed)) {
@@ -441,8 +447,38 @@ class SearchOrchestratorService
                 }
             }
             if (! empty($parsed['features']) && is_array($parsed['features'])) {
-                if (! ElectronicsIntentParser::productMatchesFeatures($product, $parsed['features'])) {
-                    return false;
+                $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+                if (CategoryCatalog::isElectronics($category) || $category === 'gaming_entertainment') {
+                    if (! ElectronicsIntentParser::productMatchesFeatures($product, $parsed['features'])) {
+                        return false;
+                    }
+                }
+            }
+            if (! empty($parsed['search_target'])) {
+                $targetCountries = $parsed['search_countries'] ?? [];
+                if (is_array($targetCountries) && count($targetCountries) > 1) {
+                    $countryMatch = false;
+                    foreach ($targetCountries as $country) {
+                        if (CountryMatcher::locationMatchesFilter(
+                            (string) ($product['location'] ?? ''),
+                            (string) ($country['search_country'] ?? ''),
+                            isset($product['country_code']) ? (string) $product['country_code'] : null,
+                        )) {
+                            $countryMatch = true;
+                            break;
+                        }
+                    }
+                    if (! $countryMatch) {
+                        return false;
+                    }
+                } elseif (! empty($parsed['search_country']) && empty($filters['country'])) {
+                    if (! CountryMatcher::locationMatchesFilter(
+                        (string) ($product['location'] ?? ''),
+                        (string) $parsed['search_country'],
+                        isset($product['country_code']) ? (string) $product['country_code'] : null,
+                    )) {
+                        return false;
+                    }
                 }
             }
             if (isset($filters['storage']) && $filters['storage'] !== '') {
@@ -552,14 +588,22 @@ class SearchOrchestratorService
     /**
      * @param  array<int, string>  $wantedColors
      */
-    private function productMatchesColor(array $product, string $color, array $wantedColors = []): bool
+    private function productMatchesColor(array $product, string $color, array $wantedColors = [], array $parsed = []): bool
     {
         $color = mb_strtolower(trim($color));
         $title = (string) ($product['title'] ?? '');
         $productColor = isset($product['color']) ? (string) $product['color'] : null;
+        $tags = array_map('mb_strtolower', $product['tags'] ?? []);
 
         $store = strtolower((string) ($product['store'] ?? $product['source_key'] ?? ''));
-        $allowUnknown = str_contains($store, 'kleinanzeigen') || $color === 'multicolor';
+        $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+        $isFashion = in_array($category, ['fashion', 'sports_outdoor'], true);
+        $allowUnknown = str_contains($store, 'kleinanzeigen') || $color === 'multicolor'
+            || ($isFashion && (KosovoMarketplaces::isKosovoPlatform($store) || LivePlatformRegistry::isLivePlatform($store)));
+
+        if ($isFashion && $color !== 'multicolor') {
+            return FashionIntentParser::matchesColor($product, $color, $allowUnknown);
+        }
 
         if ($color === 'multicolor') {
             $tones = $wantedColors !== []
@@ -567,6 +611,9 @@ class SearchOrchestratorService
                 : ['black', 'white'];
 
             foreach ($tones as $tone) {
+                if ($isFashion && FashionIntentParser::matchesColor($product, $tone, $allowUnknown)) {
+                    return true;
+                }
                 if (AutomotiveColorResolver::matchesWanted($productColor, $tone, $title, $allowUnknown)) {
                     return true;
                 }

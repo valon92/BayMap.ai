@@ -151,7 +151,7 @@
   "loading_more": "Loading more…",
   "swiss_car_marketplaces": "Swiss car marketplaces searched",
   "swiss_electronics_marketplaces": "Swiss electronics retailers searched",
-  "local_marketplaces_searched": "Local marketplaces searched in {country}",
+  "local_marketplaces_searched": "Local marketplaces searched in :country",
   "dutch_car_marketplaces": "Dutch car marketplaces searched",
   "german_car_marketplaces": "German car marketplaces searched",
   "german_electronics_marketplaces": "German electronics retailers searched",

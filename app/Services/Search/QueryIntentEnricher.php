@@ -32,6 +32,9 @@ class QueryIntentEnricher
         } elseif (count($countriesFromQuery) === 1) {
             $parsed = array_merge($parsed, $countriesFromQuery[0]);
             $parsed['country'] = $countriesFromQuery[0]['search_country'];
+            unset($parsed['search_countries']);
+        } elseif ($countriesFromQuery === [] && ! empty($parsed['search_country_code'])) {
+            unset($parsed['search_countries']);
         }
 
         $parsed = self::mergeCityHint($parsed, $rawQuery);
@@ -89,6 +92,16 @@ class QueryIntentEnricher
 
         if (! empty($parsed['gender'])) {
             $parsed['gender'] = CategoryCatalog::normalizeGender((string) $parsed['gender']);
+        }
+
+        if (! CategoryCatalog::isElectronics($parsed['category'] ?? '')
+            && CategoryCatalog::normalize($parsed['category'] ?? '') !== 'gaming_entertainment') {
+            unset($parsed['features']);
+        }
+
+        if (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)
+            && ! empty($parsed['product_type'])) {
+            $parsed['product_type'] = FashionIntentParser::normalizeType((string) $parsed['product_type']);
         }
 
         if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
@@ -424,7 +437,11 @@ class QueryIntentEnricher
 
         foreach (['brand', 'size', 'product_type', 'color', 'colors', 'fuel', 'engine_liters', 'year_min', 'year_max', 'model'] as $key) {
             if (! empty($parsed[$key]) && ! isset($clientFilters[$key])) {
-                $defaults[$key] = $parsed[$key];
+                $value = $parsed[$key];
+                if ($key === 'product_type' && in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {
+                    $value = FashionIntentParser::normalizeType((string) $value);
+                }
+                $defaults[$key] = $value;
             }
         }
 

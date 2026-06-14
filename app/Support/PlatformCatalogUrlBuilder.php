@@ -79,12 +79,34 @@ class PlatformCatalogUrlBuilder
         }
 
         if (! empty($parsed['brand'])) {
-            return (string) $parsed['brand'];
+            $brand = trim((string) $parsed['brand']);
+            $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+            $raw = mb_strtolower(trim((string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? '')));
+
+            if (KosovoFashionIntent::isAccessoryType($type) || KosovoFashionIntent::queryMentionsAccessory($raw)) {
+                $accessory = match (true) {
+                    str_contains($type, 'cap') || str_contains($type, 'hat') || str_contains($raw, 'cap') || str_contains($raw, 'hat') || str_contains($raw, 'kapel') => self::localizedCapTerm($platform, $parsed),
+                    default => trim($type !== '' ? $type : 'accessory'),
+                };
+
+                return $brand !== '' ? trim($brand.' '.$accessory) : $accessory;
+            }
+
+            if (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)
+                && KosovoFashionIntent::isFootwearType($type)) {
+                return $brand;
+            }
+
+            return $brand;
         }
 
         $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
         if (KosovoFashionIntent::isFootwearType($type)) {
             return (string) ($platform['default_query'] ?? 'sneakers');
+        }
+
+        if (KosovoFashionIntent::isAccessoryType($type)) {
+            return self::localizedCapTerm($platform, $parsed);
         }
 
         $raw = trim((string) ($parsed['search_query'] ?? $parsed['raw_query'] ?? ''));
@@ -139,10 +161,49 @@ class PlatformCatalogUrlBuilder
     private static function wooCommerceUrl(array $platform, array $parsed): string
     {
         $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $accessoryPath = self::wooCommerceAccessoryPath($platform, $parsed);
+
+        if ($accessoryPath !== null) {
+            $query = rawurlencode(self::wooCommerceAccessoryQuery($platform, $parsed));
+            $suffix = (string) ($platform['category_search_template'] ?? '?s={query}&post_type=product');
+
+            return $base.rtrim($accessoryPath, '/').'/'.ltrim(str_replace('{query}', $query, $suffix), '/');
+        }
+
         $template = (string) ($platform['search_template'] ?? '/?s={query}&post_type=product');
         $query = rawurlencode(self::searchTerm($platform, $parsed));
 
         return $base.str_replace('{query}', $query, $template);
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function wooCommerceAccessoryPath(array $platform, array $parsed): ?string
+    {
+        $paths = (array) ($platform['paths'] ?? []);
+        $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+        $raw = mb_strtolower(trim((string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? '')));
+
+        if (! KosovoFashionIntent::isAccessoryType($type) && ! KosovoFashionIntent::queryMentionsAccessory($raw)) {
+            return null;
+        }
+
+        return isset($paths['accessories']) ? (string) $paths['accessories'] : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function wooCommerceAccessoryQuery(array $platform, array $parsed): string
+    {
+        if (! empty($parsed['brand'])) {
+            return trim((string) $parsed['brand']);
+        }
+
+        return self::localizedCapTerm($platform, $parsed);
     }
 
     /**
@@ -451,5 +512,14 @@ class PlatformCatalogUrlBuilder
             'seat' => '21900',
             default => '11000',
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function localizedCapTerm(array $platform, array $parsed): string
+    {
+        return 'cap';
     }
 }
