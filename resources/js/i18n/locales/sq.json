@@ -186,6 +186,8 @@
   "travel_mode_bus": "Autobus",
   "travel_type_one_way": "Një drejtim",
   "travel_type_round_trip": "Vajtje-ardhje",
+  "travel_type_return": "Vajtje-ardhje",
+  "travel_return_date": "Kthimi",
   "sources": "Burimet e kërkuara",
   "parsed_intent": "AI kuptoi",
   "location": "Rajoni juaj",

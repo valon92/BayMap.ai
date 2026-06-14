@@ -186,6 +186,8 @@
   "travel_mode_bus": "Bus",
   "travel_type_one_way": "One way",
   "travel_type_round_trip": "Round trip",
+  "travel_type_return": "Round trip",
+  "travel_return_date": "Return",
   "sources": "Sources searched",
   "parsed_intent": "AI understood",
   "location": "Your region",

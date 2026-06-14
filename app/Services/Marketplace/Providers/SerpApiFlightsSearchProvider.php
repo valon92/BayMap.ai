@@ -27,7 +27,7 @@ class SerpApiFlightsSearchProvider implements FederatedSearchProviderInterface
 
     public function isAvailable(): bool
     {
-        return $this->travel->isConfigured();
+        return true;
     }
 
     public function priority(): int

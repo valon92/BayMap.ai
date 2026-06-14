@@ -33,11 +33,23 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
      */
     public function search(array $parsedQuery, array $expandedFilters): array
     {
-        if (! $this->isConfigured()) {
+        $parsedQuery = TravelIntentParser::ensureTravelEndpoints($parsedQuery);
+        $parsedQuery = TravelIntentParser::applyRelativeSchedule(
+            $parsedQuery,
+            mb_strtolower((string) ($parsedQuery['raw_query'] ?? '')),
+        );
+        $parsedQuery = TravelIntentParser::normalizeTravelType($parsedQuery);
+        $parsedQuery = TravelIntentParser::resolveReturnDate($parsedQuery);
+
+        $groundOnly = in_array(
+            mb_strtolower((string) ($parsedQuery['product_type'] ?? $parsedQuery['travel_mode'] ?? '')),
+            ['train', 'tren', 'bus', 'autobus'],
+            true,
+        );
+
+        if (! $this->isConfigured() && ! $groundOnly) {
             return [];
         }
-
-        $parsedQuery = TravelIntentParser::ensureTravelEndpoints($parsedQuery);
 
         $items = [];
 
@@ -128,8 +140,14 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
                 'api_key' => config('serpapi.api_key'),
             ]);
 
-            if ($travelType === 'round_trip' && ! empty($parsedQuery['return_date'])) {
-                $params['return_date'] = (string) $parsedQuery['return_date'];
+            if ($travelType === 'round_trip') {
+                $returnDate = (string) ($parsedQuery['return_date'] ?? '');
+                if ($returnDate === '' && $date !== '') {
+                    $returnDate = \Illuminate\Support\Carbon::parse($date)->addWeeks(2)->format('Y-m-d');
+                }
+                if ($returnDate !== '') {
+                    $params['return_date'] = $returnDate;
+                }
             }
 
             $response = Http::timeout(config('serpapi.timeout', 20))->get('https://serpapi.com/search', $params);
@@ -181,16 +199,7 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
         $countryCode = strtoupper((string) ($parsedQuery['origin_country_code'] ?? $parsedQuery['search_country_code'] ?? 'CH'));
 
         $items = [];
-        foreach (TravelBridgeUrls::groundOptions(array_merge($parsedQuery, ['product_type' => 'train'])) as $option) {
-            if (($option['travel_mode'] ?? '') !== 'train') {
-                continue;
-            }
-            $items[] = $this->bridgeCard($option, $parsedQuery, $countryCode, $origin, $destination);
-        }
-        foreach (TravelBridgeUrls::groundOptions(array_merge($parsedQuery, ['product_type' => 'bus'])) as $option) {
-            if (($option['travel_mode'] ?? '') !== 'bus') {
-                continue;
-            }
+        foreach (TravelBridgeUrls::groundOptions($parsedQuery) as $option) {
             $items[] = $this->bridgeCard($option, $parsedQuery, $countryCode, $origin, $destination);
         }
 
@@ -208,10 +217,20 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
         $label = (string) ($option['label'] ?? 'Travel');
         $title = "{$label}: {$origin} → {$destination}";
 
+        $timeHint = trim((string) ($parsedQuery['departure_time_from'] ?? ''));
+        if ($timeHint !== '' && ! empty($parsedQuery['departure_time_to'])) {
+            $timeHint .= '–'.($parsedQuery['departure_time_to'] ?? '');
+        }
+        $subtitle = trim(implode(' · ', array_filter([
+            self::modeLabel($mode),
+            $parsedQuery['departure_date'] ?? null,
+            $timeHint !== '' ? $timeHint : null,
+        ])));
+
         return [
             'id' => 'travel-bridge-'.md5($title.($option['url'] ?? '')),
             'title' => $title,
-            'subtitle' => self::modeLabel($mode).' · '.($parsedQuery['departure_date'] ?? ''),
+            'subtitle' => $subtitle,
             'image' => self::modeImage($mode),
             'price' => 0.0,
             'price_on_request' => true,
@@ -234,8 +253,12 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
             'departure_date' => $parsedQuery['departure_date'] ?? null,
             'departure_time' => (string) ($parsedQuery['departure_time_from'] ?? ''),
             'arrival_time' => (string) ($parsedQuery['departure_time_to'] ?? ''),
-            'departure_airport' => $origin,
-            'arrival_airport' => $destination,
+            'departure_airport' => in_array($mode, ['train', 'bus'], true)
+                ? $origin
+                : (string) ($parsedQuery['departure_airport'] ?? $origin),
+            'arrival_airport' => in_array($mode, ['train', 'bus'], true)
+                ? $destination
+                : (string) ($parsedQuery['arrival_airport'] ?? $destination),
         ];
     }
 

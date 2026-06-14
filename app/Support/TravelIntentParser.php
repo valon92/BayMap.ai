@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Carbon;
+
 /**
  * Rule-based travel / flight intent (Albanian + English route phrases).
  */
@@ -13,6 +15,12 @@ class TravelIntentParser
         'genève' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
         'gjenev' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
         'gjeneva' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
+        'zhenev' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
+        'zhenèv' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
+        'zenev' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
+        'gjenever' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
+        'gjeneev' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
+        'geneve' => ['city' => 'Geneva', 'country_code' => 'CH', 'airport' => 'GVA'],
         'zurich' => ['city' => 'Zurich', 'country_code' => 'CH', 'airport' => 'ZRH'],
         'zürich' => ['city' => 'Zurich', 'country_code' => 'CH', 'airport' => 'ZRH'],
         'bern' => ['city' => 'Bern', 'country_code' => 'CH', 'airport' => 'BRN'],
@@ -33,6 +41,10 @@ class TravelIntentParser
         'cologne' => ['city' => 'Cologne', 'country_code' => 'DE', 'airport' => 'CGN'],
         'köln' => ['city' => 'Cologne', 'country_code' => 'DE', 'airport' => 'CGN'],
         'paris' => ['city' => 'Paris', 'country_code' => 'FR', 'airport' => 'CDG'],
+        'parisi' => ['city' => 'Paris', 'country_code' => 'FR', 'airport' => 'CDG'],
+        'parisit' => ['city' => 'Paris', 'country_code' => 'FR', 'airport' => 'CDG'],
+        'zuriku' => ['city' => 'Zurich', 'country_code' => 'CH', 'airport' => 'ZRH'],
+        'zurichu' => ['city' => 'Zurich', 'country_code' => 'CH', 'airport' => 'ZRH'],
         'amsterdam' => ['city' => 'Amsterdam', 'country_code' => 'NL', 'airport' => 'AMS'],
         'vienna' => ['city' => 'Vienna', 'country_code' => 'AT', 'airport' => 'VIE'],
         'wien' => ['city' => 'Vienna', 'country_code' => 'AT', 'airport' => 'VIE'],
@@ -119,6 +131,8 @@ class TravelIntentParser
             $result['departure_date'] = sprintf('%s-%02d-%02d', $dateMatch[1], (int) $dateMatch[2], (int) $dateMatch[3]);
         }
 
+        $result = self::applyRelativeSchedule($result, $lower);
+
         if (preg_match('/\b(?:ora|at)\s*(\d{1,2})(?:[:\.]?(\d{2}))?\s*(?:e\s+)?(?:mengjesit|morning|am)\b/ui', $lower, $time)) {
             $result['departure_time_from'] = sprintf('%02d:%02d', (int) $time[1], (int) ($time[2] ?? 0));
         }
@@ -126,10 +140,22 @@ class TravelIntentParser
             $result['departure_time_to'] = sprintf('%02d:%02d', (int) $time[1], (int) ($time[2] ?? 0));
         }
 
-        if (preg_match('/\b(round\s*trip|roundtrip|vajtje\s*ardhje|rt)\b/ui', $lower)) {
+        if (preg_match('/\b(round\s*trip|roundtrip|vajtje\s*[- ]?ardhje|rt|kthy[së]?e|kthyes|kthese|bilet[aë]?\s+(?:avioni\s+)?kthy)\b/ui', $lower)) {
             $result['travel_type'] = 'round_trip';
-        } elseif (empty($parsed['travel_type'])) {
+        } elseif (empty($parsed['travel_type']) && empty($result['travel_type'])) {
             $result['travel_type'] = 'one_way';
+        }
+
+        if (preg_match('/\b(?:kthy[së]?e|return|ardhje)\b.*?(?:afersisht|rreth|about|approx(?:imately)?)?\s*(\d+)\s*(jav[eë]?|javë|jav|week|weeks|dit[eë]?|dit|day|days)\b/ui', $lower, $relativeReturn)) {
+            $result['travel_type'] = 'round_trip';
+            $result['return_offset_value'] = max(1, (int) $relativeReturn[1]);
+            $unit = mb_strtolower($relativeReturn[2]);
+            $result['return_offset_unit'] = preg_match('/^(dit|day)/u', $unit) ? 'days' : 'weeks';
+        } elseif (preg_match('/\b(?:pas|rreth|after|in)\s*(\d+)\s*(jav[eë]?|javë|jav|week|weeks|dit[eë]?|dit|day|days)\b/ui', $lower, $relativeReturn)) {
+            $result['travel_type'] = 'round_trip';
+            $result['return_offset_value'] = max(1, (int) $relativeReturn[1]);
+            $unit = mb_strtolower($relativeReturn[2]);
+            $result['return_offset_unit'] = preg_match('/^(dit|day)/u', $unit) ? 'days' : 'weeks';
         }
 
         if (preg_match('/\b(?:kthim|return|ardhje)\s*(?:me|on)?\s*(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](20\d{2})\b/ui', $query, $ret)) {
@@ -181,6 +207,9 @@ class TravelIntentParser
         }
 
         $parsed = self::ensureTravelEndpoints($parsed);
+        $parsed = self::applyRelativeSchedule($parsed, mb_strtolower((string) ($parsed['raw_query'] ?? '')));
+        $parsed = self::normalizeTravelType($parsed);
+        $parsed = self::resolveReturnDate($parsed);
 
         unset(
             $parsed['year'],
@@ -243,6 +272,104 @@ class TravelIntentParser
                 }
             }
         }
+
+        return $parsed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    public static function applyRelativeSchedule(array $parsed, string $query): array
+    {
+        $query = mb_strtolower(trim($query));
+
+        if ($query !== '' && empty($parsed['departure_date'])) {
+            if (preg_match('/\b(jav[eë]n?\s+e\s+ardhshme|java\s+e\s+ardhme|next\s+week)\b/u', $query)) {
+                $parsed['departure_date'] = Carbon::now()->startOfWeek(Carbon::MONDAY)->addWeek()->format('Y-m-d');
+            } elseif (preg_match('/\b(k[eë]t[eë]\s+jav[eë]|this\s+week)\b/u', $query)) {
+                $parsed['departure_date'] = Carbon::now()->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
+                if (Carbon::parse($parsed['departure_date'])->isPast()) {
+                    $parsed['departure_date'] = Carbon::tomorrow()->format('Y-m-d');
+                }
+            } elseif (preg_match('/\b(fund\s*jav[eë]s|fundjav[eë]s|weekend)\b/u', $query)) {
+                $parsed['departure_date'] = Carbon::now()->next(Carbon::SATURDAY)->format('Y-m-d');
+            } elseif (preg_match('/\b(?:pas|in|brenda|after)\s+(\d+)\s+(dit[eë]?|days?)\b/u', $query, $offset)) {
+                $parsed['departure_date'] = Carbon::today()->addDays(max(1, (int) $offset[1]))->format('Y-m-d');
+            } elseif (preg_match('/\b(?:pas|in|brenda|after)\s+(\d+)\s+(jav[eë]?|weeks?)\b/u', $query, $offset)) {
+                $parsed['departure_date'] = Carbon::today()->addWeeks(max(1, (int) $offset[1]))->format('Y-m-d');
+            } elseif (preg_match('/\b(pasnes[eë]r|pas\s+nes[eë]r|day\s+after\s+tomorrow)\b/u', $query)) {
+                $parsed['departure_date'] = Carbon::tomorrow()->addDay()->format('Y-m-d');
+            } elseif (preg_match('/\b(nes[eë]r|nesra|tomorrow|next\s+day)\b/u', $query)) {
+                $parsed['departure_date'] = Carbon::tomorrow()->format('Y-m-d');
+            } elseif (preg_match('/\b(sot|today)\b/u', $query)) {
+                $parsed['departure_date'] = Carbon::today()->format('Y-m-d');
+            }
+        }
+
+        if ($query !== '' && empty($parsed['departure_time_from']) && empty($parsed['departure_time_to'])) {
+            if (preg_match('/\b(paradite|afternoon)\b/u', $query)) {
+                $parsed['departure_time_from'] = '12:00';
+                $parsed['departure_time_to'] = '17:00';
+            } elseif (preg_match('/\b(mbasdite|mbasdite|midday|noon)\b/u', $query)) {
+                $parsed['departure_time_from'] = '11:00';
+                $parsed['departure_time_to'] = '15:00';
+            } elseif (preg_match('/\b(m[eë]ngjes|morning|mengjesit|am)\b/u', $query)) {
+                $parsed['departure_time_from'] = '06:00';
+                $parsed['departure_time_to'] = '12:00';
+            } elseif (preg_match('/\b(mbr[eë]mje|dark[eë]|evening|night)\b/u', $query)) {
+                $parsed['departure_time_from'] = '17:00';
+                $parsed['departure_time_to'] = '22:00';
+            }
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    public static function normalizeTravelType(array $parsed): array
+    {
+        $type = mb_strtolower(trim((string) ($parsed['travel_type'] ?? '')));
+
+        if (in_array($type, ['return', 'roundtrip', 'round trip', 'kthyse', 'kthyes', 'kthese', 'vajtje ardhje', 'vajtje-ardhje'], true)) {
+            $parsed['travel_type'] = 'round_trip';
+        } elseif ($type === '') {
+            $parsed['travel_type'] = 'one_way';
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    public static function resolveReturnDate(array $parsed): array
+    {
+        if (($parsed['travel_type'] ?? '') !== 'round_trip' || empty($parsed['departure_date'])) {
+            unset($parsed['return_offset_value'], $parsed['return_offset_unit']);
+
+            return $parsed;
+        }
+
+        if (empty($parsed['return_date'])) {
+            $offsetValue = (int) ($parsed['return_offset_value'] ?? 0);
+            $offsetUnit = (string) ($parsed['return_offset_unit'] ?? 'weeks');
+            $departure = Carbon::parse((string) $parsed['departure_date']);
+
+            if ($offsetValue > 0) {
+                $parsed['return_date'] = $offsetUnit === 'days'
+                    ? $departure->copy()->addDays($offsetValue)->format('Y-m-d')
+                    : $departure->copy()->addWeeks($offsetValue)->format('Y-m-d');
+            } else {
+                $parsed['return_date'] = $departure->copy()->addWeeks(2)->format('Y-m-d');
+            }
+        }
+
+        unset($parsed['return_offset_value'], $parsed['return_offset_unit']);
 
         return $parsed;
     }

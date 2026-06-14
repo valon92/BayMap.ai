@@ -16,13 +16,44 @@ class MetaSearchEngine
      */
     public function enrich(array $products): array
     {
-        $clusters = $this->cluster($products);
+        $passthrough = [];
+        $toCluster = [];
 
-        return array_values(array_filter(array_map(function (array $cluster) {
+        foreach ($products as $product) {
+            if ($this->isQuoteListing($product)) {
+                $passthrough[] = $product;
+
+                continue;
+            }
+            $toCluster[] = $product;
+        }
+
+        $clusters = $this->cluster($toCluster);
+
+        $meta = array_values(array_filter(array_map(function (array $cluster) {
             $listing = $this->buildMetaListing($cluster);
 
             return $listing !== [] ? $listing : null;
         }, $clusters)));
+
+        return array_merge($passthrough, $meta);
+    }
+
+    /**
+     * Bridge listings (train/bus compare links) have no upfront price — keep them out of price clustering.
+     *
+     * @param  array<string, mixed>  $product
+     */
+    private function isQuoteListing(array $product): bool
+    {
+        if (! empty($product['price_on_request'])) {
+            return true;
+        }
+
+        $mode = mb_strtolower((string) ($product['travel_mode'] ?? $product['product_type'] ?? ''));
+
+        return ($product['category'] ?? '') === 'travel'
+            && in_array($mode, ['train', 'bus', 'tren', 'autobus'], true);
     }
 
     /**
