@@ -3,7 +3,12 @@
 namespace App\Services\Platform;
 
 use App\Support\CategoryCatalog;
+use App\Support\KosovoAutomotiveIntent;
+use App\Support\KosovoFashionPlatforms;
+use App\Support\KosovoToyIntent;
+use App\Support\KosovoToyPlatforms;
 use App\Support\LivePlatformRegistry;
+use App\Support\ProductCategoryResolver;
 use App\Support\PlatformCatalogBridge;
 use App\Support\SearchScopeResolver;
 
@@ -43,6 +48,8 @@ class PlatformDiscoveryService
     if (count($keys) > $cap) {
       $keys = array_slice($keys, 0, $cap);
     }
+
+    $keys = $this->filterKeysByIntent($keys, $parsed);
 
     return [
       'scope' => $scope,
@@ -119,6 +126,51 @@ class PlatformDiscoveryService
     }
 
     return $keys;
+  }
+
+  /**
+   * @param  array<int, string>  $keys
+   * @param  array<string, mixed>  $parsed
+   * @return array<int, string>
+   */
+  private function filterKeysByIntent(array $keys, array $parsed): array
+  {
+    $country = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+
+    if (KosovoToyIntent::isToySearch($parsed) && $country === 'XK') {
+      $toyKeys = array_flip(KosovoToyPlatforms::keys());
+
+      return array_values(array_filter(
+        $keys,
+        fn (string $key) => isset($toyKeys[$key]),
+      ));
+    }
+
+    if (CategoryCatalog::isAutomotive($parsed['category'] ?? '') && $country === 'XK') {
+      $autoKeys = array_flip(KosovoAutomotiveIntent::livePlatformKeys());
+
+      return array_values(array_filter(
+        $keys,
+        fn (string $key) => isset($autoKeys[$key]),
+      ));
+    }
+
+    if (ProductCategoryResolver::isFashionPlatformRelevant($parsed)) {
+      $toyKeys = array_flip(KosovoToyPlatforms::keys());
+
+      return array_values(array_filter(
+        $keys,
+        fn (string $key) => ! isset($toyKeys[$key]),
+      ));
+    }
+
+    $fashionKeys = array_flip(KosovoFashionPlatforms::keys());
+    $toyKeys = array_flip(KosovoToyPlatforms::keys());
+
+    return array_values(array_filter(
+      $keys,
+      fn (string $key) => ! isset($fashionKeys[$key]) && ! isset($toyKeys[$key]),
+    ));
   }
 
   /**

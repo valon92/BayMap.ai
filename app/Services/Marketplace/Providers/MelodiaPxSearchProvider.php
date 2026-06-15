@@ -5,7 +5,9 @@ namespace App\Services\Marketplace\Providers;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\MelodiaPxScraperService;
 use App\Support\CategoryCatalog;
+use App\Support\KosovoFashionIntent;
 use App\Support\MelodiaPxCatalog;
+use App\Support\ProductCategoryResolver;
 
 class MelodiaPxSearchProvider implements FederatedSearchProviderInterface
 {
@@ -55,6 +57,10 @@ class MelodiaPxSearchProvider implements FederatedSearchProviderInterface
      */
     public function search(array $parsedQuery, array $expandedFilters): array
     {
+        if (! ProductCategoryResolver::isFashionPlatformRelevant($parsedQuery)) {
+            return [];
+        }
+
         $items = $this->scraper->search($parsedQuery);
 
         return array_map(function (array $item) {

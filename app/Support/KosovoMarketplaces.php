@@ -74,6 +74,11 @@ class KosovoMarketplaces
         // Digital / General retail
         'sparkle_shop' => ['label' => 'Sparkle Online Shop', 'url' => 'https://sparkle-ks.com', 'categories' => ['marketplace', 'fashion', 'electronics_tech']],
         'albi_online' => ['label' => 'Albi Online', 'url' => 'https://albionline.com', 'categories' => ['marketplace', 'fashion']],
+
+        // Toys
+        'jumbo_ks' => ['label' => 'Lodra Jumbo', 'url' => 'https://www.jumbo-ks.com', 'categories' => ['gaming_entertainment']],
+        'mytoys_ks' => ['label' => 'My Toys', 'url' => 'https://mytoys-ks.com', 'categories' => ['gaming_entertainment']],
+        'thetoyshop_ks' => ['label' => 'The Entertainer Kosovo', 'url' => 'https://thetoyshop-ks.com', 'categories' => ['gaming_entertainment']],
     ];
 
     /** @var array<string, string> */
@@ -135,6 +140,13 @@ class KosovoMarketplaces
 
         if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
             $priority = array_values(array_filter(KosovoFashionPlatforms::keys(), fn ($k) => in_array($k, $keys, true)));
+            if ($priority !== []) {
+                $keys = array_values(array_unique(array_merge($priority, $keys)));
+            }
+        }
+
+        if ($category === 'gaming_entertainment') {
+            $priority = KosovoToyPlatforms::keys();
             if ($priority !== []) {
                 $keys = array_values(array_unique(array_merge($priority, $keys)));
             }

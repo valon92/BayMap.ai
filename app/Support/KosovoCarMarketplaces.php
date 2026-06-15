@@ -11,7 +11,11 @@ class KosovoCarMarketplaces
     private const CATALOG = [
         'merrjep_auto' => [
             'label' => 'MerrJep Auto',
-            'url' => 'https://www.merrjep.com/auto',
+            'url' => 'https://www.merrjep.com/shpallje/makina/vetura',
+        ],
+        'veturaneshitje' => [
+            'label' => 'Veturaneshitje.com',
+            'url' => 'https://www.veturaneshitje.com/vetura',
         ],
         'auto24' => [
             'label' => 'Auto24 Kosovo',

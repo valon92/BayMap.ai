@@ -46,7 +46,7 @@ class AutomotiveModelResolver
     /**
      * @param  array<string, mixed>  $parsed
      */
-    public static function matchesListing(string $title, ?string $itemModel, string $queryModel, array $parsed = []): bool
+    public static function matchesListing(string $title, ?string $itemModel, string $queryModel, array $parsed = [], bool $allowUnknownYear = false): bool
     {
         $queryModel = mb_strtolower(trim($queryModel));
         if ($queryModel === '') {
@@ -73,7 +73,7 @@ class AutomotiveModelResolver
             $year = (int) $yearMatch[0];
         }
 
-        if (! self::matchesYearRange($year, $title, $parsed)) {
+        if (! self::matchesYearRange($year, $title, $parsed, $allowUnknownYear)) {
             return false;
         }
 
@@ -105,7 +105,7 @@ class AutomotiveModelResolver
     /**
      * @param  array<string, mixed>  $parsed
      */
-    public static function matchesYearRange(?int $year, string $title, array $parsed): bool
+    public static function matchesYearRange(?int $year, string $title, array $parsed, bool $allowUnknownYear = false): bool
     {
         $minYear = ! empty($parsed['year_min']) ? (int) $parsed['year_min'] : null;
         $maxYear = ! empty($parsed['year_max']) ? (int) $parsed['year_max'] : null;
@@ -119,6 +119,21 @@ class AutomotiveModelResolver
 
         if ($year !== null) {
             return $year >= $min && $year <= $max;
+        }
+
+        if ($allowUnknownYear) {
+            if (preg_match_all('/\b(19|20)\d{2}\b/', $title, $years)) {
+                foreach ($years[1] as $foundYear) {
+                    $found = (int) $foundYear;
+                    if ($found >= $min && $found <= $max) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return true;
         }
 
         if ($min === $max && preg_match('/\b'.$min.'\b/', $title) === 1) {

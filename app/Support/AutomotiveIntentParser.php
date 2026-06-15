@@ -29,6 +29,10 @@ class AutomotiveIntentParser
 
     public static function isCarQuery(string $query): bool
     {
+        if (ProductCategoryResolver::isChildrenToyVehicleQuery($query)) {
+            return false;
+        }
+
         $lower = mb_strtolower(trim($query));
 
         return (bool) preg_match(

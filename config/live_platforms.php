@@ -4,7 +4,7 @@
  * Live scraping registry — one Valon Worker per platform, per country + category.
  * Add a row here to enable real HTML scraping (no mock) for that store.
  *
- * adapter: cscart | woocommerce | generic | automotive
+ * adapter: cscart | woocommerce | generic | automotive | gy_digital
  */
 return [
 
@@ -188,6 +188,101 @@ return [
             'currency' => 'EUR',
             'priority' => 12,
             'search_template' => '/?s={query}',
+        ],
+
+        // ── Kosovo · Toys & children's products ──────────────────────────
+        'jumbo_ks' => [
+            'adapter' => 'gy_digital',
+            'label' => 'Lodra Jumbo',
+            'country' => 'XK',
+            'categories' => ['gaming_entertainment'],
+            'toy_retailer' => true,
+            'base_url' => 'https://www.jumbo-ks.com',
+            'locale' => 'sq',
+            'location' => 'Prishtinë, Kosovo',
+            'currency' => 'EUR',
+            'priority' => 1,
+            'search_api_template' => '/{locale}/products/autocomplete.json?query={query}&thumbor_options[fit_in]=false&thumbor_options[height]=480&thumbor_options[width]=480',
+            'default_query' => 'lodra',
+        ],
+
+        'mytoys_ks' => [
+            'adapter' => 'woocommerce',
+            'label' => 'My Toys',
+            'country' => 'XK',
+            'categories' => ['gaming_entertainment'],
+            'toy_retailer' => true,
+            'base_url' => 'https://mytoys-ks.com',
+            'location' => 'Prishtinë, Kosovo',
+            'currency' => 'EUR',
+            'priority' => 2,
+            'search_template' => '/?s={query}&post_type=product',
+            'fallback_paths' => [
+                '/product-category/lodra-per-djem/',
+                '/product-category/lodra-per-vajza/',
+                '/product-category/lodra-te-butha/',
+            ],
+            'default_query' => 'lodra',
+        ],
+
+        'thetoyshop_ks' => [
+            'adapter' => 'woocommerce',
+            'label' => 'The Entertainer Kosovo',
+            'country' => 'XK',
+            'categories' => ['gaming_entertainment'],
+            'toy_retailer' => true,
+            'base_url' => 'https://thetoyshop-ks.com',
+            'location' => 'Prishtinë, Kosovo',
+            'currency' => 'EUR',
+            'priority' => 3,
+            'search_template' => '/?s={query}&post_type=product',
+            'default_query' => 'lodra',
+        ],
+
+        // ── Kosovo · Automotive (autosallone & listings) ─────────────────
+        'merrjep_auto' => [
+            'adapter' => 'automotive',
+            'scraper' => 'merrjep_auto',
+            'label' => 'MerrJep Auto',
+            'country' => 'XK',
+            'categories' => ['automotive'],
+            'automotive_live' => true,
+            'base_url' => 'https://www.merrjep.com',
+            'location' => 'Kosovo',
+            'currency' => 'EUR',
+            'locale' => 'sq-AL',
+            'priority' => 1,
+            'search_template' => '/shpallje/makina/vetura/{make}/{model}?Private=False',
+        ],
+
+        'veturaneshitje' => [
+            'adapter' => 'automotive',
+            'scraper' => 'veturaneshitje',
+            'label' => 'Veturaneshitje.com',
+            'country' => 'XK',
+            'categories' => ['automotive'],
+            'automotive_live' => true,
+            'base_url' => 'https://www.veturaneshitje.com',
+            'location' => 'Kosovo',
+            'currency' => 'EUR',
+            'locale' => 'sq-AL',
+            'priority' => 2,
+            'search_template' => '/vetura?make={make_id}',
+            'make_ids' => [
+                'audi' => 10,
+                'bmw' => 11,
+                'mercedes' => 12,
+                'mercedes-benz' => 12,
+                'volkswagen' => 13,
+                'vw' => 13,
+                'ford' => 14,
+                'opel' => 15,
+                'toyota' => 16,
+                'honda' => 17,
+                'porsche' => 18,
+                'skoda' => 19,
+                'seat' => 20,
+            ],
         ],
 
         // ── Germany · Fashion ────────────────────────────────────────────

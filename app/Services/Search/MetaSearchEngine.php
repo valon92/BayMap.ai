@@ -2,6 +2,7 @@
 
 namespace App\Services\Search;
 
+use App\Support\CategoryCatalog;
 use App\Support\LivePlatformRegistry;
 
 /**
@@ -20,7 +21,7 @@ class MetaSearchEngine
         $toCluster = [];
 
         foreach ($products as $product) {
-            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product)) {
+            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product) || $this->isAutomotivePriceOnRequest($product)) {
                 $passthrough[] = $product;
 
                 continue;
@@ -87,6 +88,26 @@ class MetaSearchEngine
         }
 
         return array_values($groups);
+    }
+
+    /**
+     * Live automotive listings often omit price on list pages (contact dealer).
+     *
+     * @param  array<string, mixed>  $product
+     */
+    private function isAutomotivePriceOnRequest(array $product): bool
+    {
+        if (! CategoryCatalog::isAutomotive($product['category'] ?? '')) {
+            return false;
+        }
+
+        if (empty($product['live'])) {
+            return false;
+        }
+
+        $price = (float) ($product['price'] ?? $product['price_eur'] ?? 0);
+
+        return $price <= 0;
     }
 
     /**

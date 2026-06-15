@@ -627,8 +627,11 @@ class SearchOrchestratorService
         $store = strtolower((string) ($product['store'] ?? $product['source_key'] ?? ''));
         $category = CategoryCatalog::normalize($parsed['category'] ?? '');
         $isFashion = in_array($category, ['fashion', 'sports_outdoor'], true);
+        $isAutomotive = CategoryCatalog::isAutomotive($category);
+        $kosovoAutoLive = $isAutomotive && $this->isKosovoAutomotiveLiveStore($store);
         $allowUnknown = str_contains($store, 'kleinanzeigen') || $color === 'multicolor'
-            || ($isFashion && (KosovoMarketplaces::isKosovoPlatform($store) || LivePlatformRegistry::isLivePlatform($store)));
+            || ($isFashion && (KosovoMarketplaces::isKosovoPlatform($store) || LivePlatformRegistry::isLivePlatform($store)))
+            || $kosovoAutoLive;
 
         if ($isFashion && $color !== 'multicolor') {
             return FashionIntentParser::matchesColor($product, $color, $allowUnknown);
@@ -651,7 +654,22 @@ class SearchOrchestratorService
             return false;
         }
 
+        if ($kosovoAutoLive) {
+            if (AutomotiveColorResolver::matchesWanted($productColor, $color, $title, false)) {
+                return true;
+            }
+
+            // List pages rarely include paint color — keep matches for ranking, not hard drop.
+            return true;
+        }
+
         return AutomotiveColorResolver::matchesWanted($productColor, $color, $title, $allowUnknown);
+    }
+
+    private function isKosovoAutomotiveLiveStore(string $store): bool
+    {
+        return str_contains($store, 'merrjep')
+            || str_contains($store, 'veturaneshitje');
     }
 
     /**

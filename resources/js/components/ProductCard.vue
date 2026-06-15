@@ -4,7 +4,8 @@
       <img
         :src="displayImage"
         :alt="displayTitle"
-        class="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-[1.04]"
+        class="h-full w-full transition-transform duration-300 group-hover/card:scale-[1.03]"
+        :class="product.live ? 'object-contain p-2 bg-white' : 'object-cover'"
         loading="lazy"
         @error="onImageError"
       />

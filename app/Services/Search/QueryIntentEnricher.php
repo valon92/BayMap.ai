@@ -182,6 +182,24 @@ class QueryIntentEnricher
             return $parsed;
         }
 
+        if (ProductCategoryResolver::isChildrenToyVehicleQuery($rawQuery)) {
+            $parsed['category'] = 'gaming_entertainment';
+            $parsed['product_type'] = 'toy_car';
+            unset(
+                $parsed['year'],
+                $parsed['year_min'],
+                $parsed['year_max'],
+                $parsed['fuel'],
+                $parsed['mileage'],
+                $parsed['transmission'],
+                $parsed['brand'],
+                $parsed['model'],
+                $parsed['condition'],
+            );
+
+            return $parsed;
+        }
+
         if (AutomotiveIntentParser::isCarQuery($rawQuery)) {
             $parsed['category'] = 'automotive';
         }

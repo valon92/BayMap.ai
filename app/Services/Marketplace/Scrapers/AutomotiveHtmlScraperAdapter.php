@@ -57,6 +57,8 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             str_contains($scraper, 'swiss_html') => $this->parseSwissAutomotive($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'mobile') => $this->parseMobileDe($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'heycar') => $this->parseHeycar($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'merrjep') => $this->parseMerrjepAuto($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'veturaneshitje') => $this->parseVeturaneshitje($html, $storeKey, $platform, $parsedQuery),
             default => $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery),
         };
 
@@ -836,6 +838,14 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             return false;
         }
 
+        if (preg_match('/row-listing/i', $html) && str_contains($html, 'merrjep.com')) {
+            return false;
+        }
+
+        if (preg_match('/li class="row"/i', $html) && str_contains($html, 'veturaneshitje.com')) {
+            return false;
+        }
+
         $lower = mb_strtolower($html);
 
         if (preg_match('/<title>[^<]*(captcha|attention required|access denied|just a moment)[^<]*<\/title>/i', $html)) {
@@ -1029,6 +1039,211 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             '/^(vw|volkswagen|audi|bmw|mercedes|opel|ford|skoda|seat|golf)\b/i',
             trim($title),
         );
+    }
+
+    /**
+     * MerrJep Auto — Kosovo dealer & private car listings.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseMerrjepAuto(string $html, string $storeKey, array $platform, array $parsedQuery): array
+    {
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.merrjep.com'), '/');
+        $chunks = preg_split('/(?=<div class="new row row-listing)/', $html) ?: [];
+        $items = [];
+        $seen = [];
+
+        foreach ($chunks as $chunk) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            if (! preg_match('/data-product-id="(\d+)"/', $chunk, $idMatch)) {
+                continue;
+            }
+
+            $productId = $idMatch[1];
+            if (isset($seen[$productId])) {
+                continue;
+            }
+
+            $title = null;
+            $url = null;
+            if (preg_match('/<h2>\s*<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/s', $chunk, $titleMatch)) {
+                $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } elseif (preg_match('/title="([^"]+)"[^>]*href="(\/shpallja\/[^"]+)"/', $chunk, $titleMatch)) {
+                $title = html_entity_decode(trim($titleMatch[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $url = html_entity_decode($titleMatch[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            if ($title === null || $title === '') {
+                continue;
+            }
+
+            if ($this->isMerrjepNoiseListing($title)) {
+                continue;
+            }
+
+            if (! str_starts_with($url ?? '', 'http')) {
+                $url = $baseUrl.($url ?? '');
+            }
+
+            $image = null;
+            if (preg_match('/data-src="(https:\/\/media\.merrjep\.com[^"]+)"/', $chunk, $imgMatch)) {
+                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            $price = 0.0;
+            if (preg_match('/format-money-int" value="(\d+)"/', $chunk, $priceMatch)) {
+                $price = (float) $priceMatch[1];
+            }
+
+            $location = (string) ($platform['location'] ?? 'Kosovo');
+            if (preg_match('/href="[^"]*\/(prishtine|ferizaj|peje|gjakove|prizren|mitrovice|gjilan|lipjan)[^"]*"/i', $chunk, $locMatch)) {
+                $location = ucfirst($locMatch[1]).', Kosovo';
+            }
+
+            $seen[$productId] = true;
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => $productId,
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $url,
+                'location' => $location,
+                'brand' => $this->brandFromTitle($title),
+                'model' => $this->modelFromTitle($title),
+                'year' => $this->yearFromTitle($title),
+                'mileage' => $this->mileageFromTitle($title),
+                'color' => AutomotiveColorResolver::extractFromText($title),
+                'condition' => 'used',
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * Veturaneshitje.com — Kosovo autosallon listings.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseVeturaneshitje(string $html, string $storeKey, array $platform, array $parsedQuery): array
+    {
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.veturaneshitje.com'), '/');
+        $chunks = preg_split('/(?=<li class="row")/', $html) ?: [];
+        $items = [];
+        $seen = [];
+
+        foreach ($chunks as $chunk) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            if (! preg_match('/href="(\/vetura\/\d+\/([^"]+))"/', $chunk, $urlMatch)) {
+                continue;
+            }
+
+            $path = html_entity_decode($urlMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $slug = html_entity_decode($urlMatch[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (isset($seen[$path]) || str_contains($slug, 'sipas-markes')) {
+                continue;
+            }
+
+            $title = $this->titleFromVeturaneshitjeSlug($slug);
+
+            $price = 0.0;
+            if (preg_match('/<div class="lead text-orange price">.*?<strong>\s*([\d.,]+)\s*EUR\s*<\/strong>/is', $chunk, $priceMatch)) {
+                $price = (float) str_replace(',', '', trim($priceMatch[1]));
+            }
+
+            $year = null;
+            if (preg_match('/time\.png"[^>]*>\s*(\d{4})/', $chunk, $yearMatch)) {
+                $year = (int) $yearMatch[1];
+            }
+            $year ??= $this->yearFromTitle($title);
+
+            $location = (string) ($platform['location'] ?? 'Kosovo');
+            if (preg_match('/glyphicon-map-marker[^>]*><\/i>\s*([^<]+)/', $chunk, $locMatch)) {
+                $location = trim(html_entity_decode($locMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8')).', Kosovo';
+            }
+
+            $image = null;
+            if (preg_match('/<img src="(\/CarImages\/[^"]+)"/', $chunk, $imgMatch)) {
+                $image = $baseUrl.html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
+
+            $seen[$path] = true;
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => md5($path),
+                'title' => $title,
+                'price' => $price,
+                'image' => $image,
+                'url' => $baseUrl.$path,
+                'location' => $location,
+                'brand' => $this->brandFromTitle($title),
+                'model' => $this->modelFromTitle($title),
+                'year' => $year,
+                'mileage' => $this->mileageFromTitle($title),
+                'color' => AutomotiveColorResolver::extractFromText($title),
+                'condition' => 'used',
+            ]);
+        }
+
+        return $items;
+    }
+
+    private function titleFromVeturaneshitjeSlug(string $slug): string
+    {
+        $slug = preg_replace('/^id-\d+-[^-]+-/', '', $slug) ?? $slug;
+
+        return ucwords(str_replace('-', ' ', $slug));
+    }
+
+    private function isMerrjepNoiseListing(string $title): bool
+    {
+        $lower = mb_strtolower($title);
+        $noise = [
+            'pjes per', 'per pjes', 'shitet per pjes', 'kemi pjes', 'rent a car', 'renta car',
+            'blejm te gjitha', 'blejme te gjitha', 'auto:tregu', 'tregu/blejm', 'blejm vetura',
+            '24/7 kesh', 'invalid shitet', 'shes pjes', 'pjes per audi', 'motorri defekt',
+            'aksidentua', 'pa dogane aksident',
+        ];
+
+        foreach ($noise as $hint) {
+            if (str_contains($lower, $hint)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function mileageFromTitle(string $title): ?int
+    {
+        if (preg_match('/\bkm[:\s]*([\d.x]+)/ui', $title, $m)) {
+            $raw = str_replace(['.', 'x', 'X', ' '], '', $m[1]);
+            if (preg_match('/^(\d+)/', $raw, $num)) {
+                $km = (int) $num[1];
+
+                return $km < 1000 ? $km * 1000 : $km;
+            }
+        }
+
+        if (preg_match('/\b(\d{2,3})[,.\s]*(?:000|xxx)\s*km/ui', $title, $m)) {
+            return (int) $m[1] * 1000;
+        }
+
+        if (preg_match('/\b(\d{5,6})\s*km/ui', $title, $m)) {
+            return (int) $m[1];
+        }
+
+        return null;
     }
 
     /**

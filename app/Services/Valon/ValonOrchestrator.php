@@ -92,8 +92,10 @@ class ValonOrchestrator
         } while ($locationEngine->canExpand());
 
         if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)
-            && ! \App\Support\WebServicesIntentParser::isActive($parsedQuery)) {
-            $fallback = $this->runDemoFallback($parsedQuery, $expandedFilters, $geo);
+            && ! \App\Support\WebServicesIntentParser::isActive($parsedQuery)
+            && ! \App\Support\KosovoToyIntent::shouldSkipDemoFallback($parsedQuery)
+            && ! \App\Support\KosovoAutomotiveIntent::shouldSkipDemoFallback($parsedQuery)) {
+            $fallback = $this->runDemoFallback($parsedQuery, $expandedFilters, $geo, count($workerMeta));
             if ($fallback['results'] !== []) {
                 $results = $fallback['results'];
                 $workerReports = array_merge($workerReports, $fallback['report']);
@@ -203,7 +205,7 @@ class ValonOrchestrator
      *   workers: array<int, array<string, mixed>>
      * }
      */
-    private function runDemoFallback(array $parsedQuery, array $expandedFilters, array $geo): array
+    private function runDemoFallback(array $parsedQuery, array $expandedFilters, array $geo, int $workerOffset = 0): array
     {
         $category = CategoryCatalog::normalize($parsedQuery['category'] ?? 'marketplace');
         $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? $geo['country_code'] ?? ''));
@@ -227,8 +229,11 @@ class ValonOrchestrator
             return ['results' => [], 'report' => [], 'workers' => []];
         }
 
-        usort($providers, fn ($a, $b) => $a->priority() <=> $b->priority());
-        $providers = array_slice($providers, 0, (int) config('valon.max_workers', 6));
+        $providers = $this->prioritizeDemoProviders($providers, $countryCode);
+
+        $maxProviders = (int) config('marketplaces.demo_fallback_max_providers', 8);
+        $targetResults = (int) config('marketplaces.demo_fallback_target_results', 8);
+        $providers = array_slice($providers, 0, max(1, $maxProviders));
 
         $demoFilters = $expandedFilters;
         unset($demoFilters['marketplaces']);
@@ -237,7 +242,7 @@ class ValonOrchestrator
         $report = [];
         $workers = [];
         $prefix = config('valon.worker_prefix', 'ValonWorker');
-        $index = 1;
+        $index = $workerOffset + 1;
 
         foreach ($providers as $provider) {
             $started = microtime(true);
@@ -249,39 +254,45 @@ class ValonOrchestrator
             }
 
             $count = is_array($items) ? count($items) : 0;
+            if ($count === 0) {
+                continue;
+            }
+
             $latencyMs = (int) round((microtime(true) - $started) * 1000);
             $platform = $provider->sourceKey();
 
-            if ($count > 0) {
-                foreach ($items as $item) {
-                    $results[] = $item;
-                }
+            foreach ($items as $item) {
+                $results[] = $item;
             }
 
             $report[] = [
-                'worker_id' => "{$prefix}-demo-{$index}",
+                'worker_id' => "{$prefix}-{$index}",
                 'platform' => $platform,
                 'platform_label' => $provider->label(),
-                'role' => 'Demo catalog fallback',
+                'role' => 'Local catalog',
                 'mode' => 'demo',
                 'count' => $count,
-                'status' => $count > 0 ? 'ok' : 'empty',
+                'status' => 'ok',
                 'location_tier' => $geo['city'] ?? '',
                 'latency_ms' => $latencyMs,
                 'error' => null,
             ];
 
             $workers[] = [
-                'id' => "{$prefix}-demo-{$index}",
-                'role' => 'Demo catalog fallback',
+                'id' => "{$prefix}-{$index}",
+                'role' => 'Local catalog',
                 'platform' => $platform,
                 'platform_label' => $provider->label(),
-                'status' => $count > 0 ? 'ok' : 'empty',
+                'status' => 'ok',
                 'results' => $count,
                 'latency_ms' => $latencyMs,
             ];
 
             $index++;
+
+            if (count($results) >= $targetResults) {
+                break;
+            }
         }
 
         return [
@@ -289,6 +300,33 @@ class ValonOrchestrator
             'report' => $report,
             'workers' => $workers,
         ];
+    }
+
+    /**
+     * @param  array<int, FederatedSearchProviderInterface>  $providers
+     * @return array<int, FederatedSearchProviderInterface>
+     */
+    private function prioritizeDemoProviders(array $providers, string $countryCode): array
+    {
+        $local = [];
+        $global = [];
+
+        foreach ($providers as $provider) {
+            if ($countryCode !== ''
+                && $provider instanceof MockSearchProvider
+                && $provider->supportsCountry($countryCode)) {
+                $local[] = $provider;
+
+                continue;
+            }
+
+            $global[] = $provider;
+        }
+
+        usort($local, fn ($a, $b) => $a->priority() <=> $b->priority());
+        usort($global, fn ($a, $b) => $a->priority() <=> $b->priority());
+
+        return array_merge($local, $global);
     }
 
     /**

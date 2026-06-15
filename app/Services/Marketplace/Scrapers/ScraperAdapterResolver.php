@@ -14,12 +14,14 @@ class ScraperAdapterResolver
         WooCommerceScraperAdapter $wooCommerce,
         GenericHtmlScraperAdapter $generic,
         AutomotiveHtmlScraperAdapter $automotive,
+        GyDigitalScraperAdapter $gyDigital,
     ) {
         $this->adapters = [
             $csCart->adapterKey() => $csCart,
             $wooCommerce->adapterKey() => $wooCommerce,
             $generic->adapterKey() => $generic,
             $automotive->adapterKey() => $automotive,
+            $gyDigital->adapterKey() => $gyDigital,
         ];
     }
 

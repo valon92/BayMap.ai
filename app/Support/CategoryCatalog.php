@@ -199,7 +199,7 @@ class CategoryCatalog
             'automotive' => ['audi', 'bmw', 'mercedes', 'volkswagen', 'toyota', 'honda', 'ford', 'km', 'mileage', 'sedan', 'suv', 'diesel', 'vetur', 'veture', 'makina', 'car'],
             'home_furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room', 'mobilje', 'dollap', 'karrige'],
             'health_wellness' => ['supplement', 'vitamin', 'fitness', 'yoga', 'wellness', 'protein', 'shëndet', 'shendet', 'gym', 'massage'],
-            'gaming_entertainment' => ['ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming', 'game', 'console', 'lojë', 'loje'],
+            'gaming_entertainment' => ['ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming', 'game', 'console', 'lojë', 'loje', 'piano', 'pianino', 'lodër', 'loder', 'lodra', 'instrument', 'gitar', 'toy', 'lego', 'makina femije', 'veture femije', 'automjet femije'],
             'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm', 'domain', 'domen', 'domenë', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar', 'website', 'faqe internet'],
             'construction' => ['cement', 'concrete', 'drill', 'hammer', 'construction', 'ndërtim', 'ndertim', 'material ndertimi', 'tools', 'scaffold'],
             'online_education' => ['course', 'udemy', 'certification', 'training', 'book', 'libër', 'liber', 'librin', 'roman', 'thriller', 'psikologjik', 'papritur', 'novel', 'learn', 'edukim', 'kurs', 'tutorial', 'bestseller'],
@@ -309,7 +309,7 @@ class CategoryCatalog
             ),
             'gaming_entertainment' => array_merge(
                 self::select('platform', $sq ? 'Platforma' : 'Platform', ['ps5', 'xbox', 'pc', 'switch', 'mobile'], $parsed['platform'] ?? null),
-                self::select('product_type', $sq ? 'Lloji' : 'Type', ['game', 'console', 'controller', 'headset', 'vr'], $parsed['product_type'] ?? null),
+                self::select('product_type', $sq ? 'Lloji' : 'Type', ['game', 'console', 'controller', 'headset', 'vr', 'toy_car', 'piano'], $parsed['product_type'] ?? null),
                 self::select('genre', $sq ? 'Zhanri' : 'Genre', ['action', 'rpg', 'sports', 'racing', 'strategy'], $parsed['genre'] ?? null),
                 self::conditionFilter($parsed, $sq),
                 self::priceFilter($parsed, $sq, 15, 800),

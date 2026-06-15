@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Providers;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\WooCommerceFashionScraperService;
 use App\Support\CategoryCatalog;
+use App\Support\ProductCategoryResolver;
 
 class DriloniSearchProvider implements FederatedSearchProviderInterface
 {
@@ -54,6 +55,10 @@ class DriloniSearchProvider implements FederatedSearchProviderInterface
      */
     public function search(array $parsedQuery, array $expandedFilters): array
     {
+        if (! ProductCategoryResolver::isFashionPlatformRelevant($parsedQuery)) {
+            return [];
+        }
+
         $items = $this->scraper->searchDriloni($parsedQuery);
 
         return array_map(function (array $item) {

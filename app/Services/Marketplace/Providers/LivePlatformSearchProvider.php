@@ -5,7 +5,11 @@ namespace App\Services\Marketplace\Providers;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\LivePlatformScraperService;
 use App\Support\CategoryCatalog;
+use App\Support\KosovoFashionPlatforms;
+use App\Support\KosovoToyIntent;
+use App\Support\KosovoToyPlatforms;
 use App\Support\LivePlatformRegistry;
+use App\Support\ProductCategoryResolver;
 
 class LivePlatformSearchProvider implements FederatedSearchProviderInterface
 {
@@ -61,6 +65,16 @@ class LivePlatformSearchProvider implements FederatedSearchProviderInterface
      */
     public function search(array $parsedQuery, array $expandedFilters): array
     {
+        if (KosovoFashionPlatforms::isPlatform($this->platformKey)
+            && ! ProductCategoryResolver::isFashionPlatformRelevant($parsedQuery)) {
+            return [];
+        }
+
+        if (KosovoToyPlatforms::isPlatform($this->platformKey)
+            && ! KosovoToyIntent::isToySearch($parsedQuery)) {
+            return [];
+        }
+
         $items = $this->scraper->search($this->platformKey, $parsedQuery);
 
         return array_map(function (array $item) {

@@ -26,6 +26,11 @@ class PlatformCatalogUrlBuilder
      */
     public static function searchTerm(array $platform, array $parsed): string
     {
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'gaming_entertainment'
+            && (($platform['toy_retailer'] ?? false) || KosovoToyIntent::isToySearch($parsed))) {
+            return self::toySearchTerm($platform, $parsed);
+        }
+
         if (CategoryCatalog::isElectronics($parsed['category'] ?? '')) {
             $brand = trim((string) ($parsed['brand'] ?? ''));
             $model = trim((string) ($parsed['model'] ?? ''));
@@ -286,6 +291,14 @@ class PlatformCatalogUrlBuilder
             return self::autolinaUrl($platform, $parsed);
         }
 
+        if (str_contains($scraper, 'merrjep')) {
+            return self::merrjepAutoUrl($platform, $parsed);
+        }
+
+        if (str_contains($scraper, 'veturaneshitje')) {
+            return self::veturaneshitjeUrl($platform, $parsed);
+        }
+
         if (str_contains($scraper, 'autogrid')) {
             return self::autogridUrl($platform, $parsed);
         }
@@ -405,6 +418,50 @@ class PlatformCatalogUrlBuilder
     }
 
     /**
+     * MerrJep Auto — dealer listings by make/model path.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function merrjepAutoUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $make = mb_strtolower(trim((string) ($parsed['brand'] ?? '')));
+        $model = mb_strtolower(trim((string) ($parsed['model'] ?? '')));
+        $model = str_replace(' ', '-', $model);
+
+        if ($make !== '' && $model !== '') {
+            return $base.'/shpallje/makina/vetura/'.$make.'/'.$model.'?Private=False';
+        }
+
+        if ($make !== '') {
+            return $base.'/shpallje/makina/vetura/'.$make.'?Private=False';
+        }
+
+        return $base.'/shpallje/makina/vetura?Private=False';
+    }
+
+    /**
+     * Veturaneshitje.com — Kosovo autosallon aggregator.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function veturaneshitjeUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $makeIds = (array) ($platform['make_ids'] ?? []);
+        $brand = mb_strtolower(str_replace([' ', '-'], '', (string) ($parsed['brand'] ?? '')));
+        $makeId = $makeIds[$brand] ?? null;
+
+        if ($makeId !== null) {
+            return $base.'/vetura?make='.$makeId;
+        }
+
+        return $base.'/vetura';
+    }
+
+    /**
      * @param  array<string, mixed>  $parsed
      * @return array<string, string|int>
      */
@@ -512,6 +569,34 @@ class PlatformCatalogUrlBuilder
             'seat' => '21900',
             default => '11000',
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function toySearchTerm(array $platform, array $parsed): string
+    {
+        $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
+        $raw = trim((string) ($parsed['search_query'] ?? $parsed['raw_query'] ?? ''));
+
+        if ($type === 'toy_car' || ProductCategoryResolver::isChildrenToyVehicleQuery($raw)) {
+            return 'makina femije';
+        }
+
+        if ($type === 'piano' || preg_match('/\bpiano\b/ui', $raw)) {
+            return 'piano';
+        }
+        $raw = preg_replace('/\b(?:e\s+)?vogel\b/ui', '', $raw) ?? $raw;
+        $raw = preg_replace('/\b(?:per|për)\s+femij(?:e|ë)?\b/ui', '', $raw) ?? $raw;
+        $raw = preg_replace('/\b(?:kerkoj|kërkoj|dua|nje|një|loder|lodër)\b/ui', '', $raw) ?? $raw;
+        $raw = trim(preg_replace('/\s+/', ' ', $raw) ?? $raw);
+
+        if ($raw !== '' && mb_strlen($raw) >= 3) {
+            return $raw;
+        }
+
+        return (string) ($platform['default_query'] ?? 'lodra');
     }
 
     /**

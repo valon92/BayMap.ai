@@ -19,6 +19,11 @@ return [
     /** When live connectors return nothing, query demo datasets so discovery examples still work. */
     'demo_fallback_when_empty' => (bool) env('MARKETPLACE_DEMO_FALLBACK', true),
 
+    /** Max demo providers to query per fallback (stops early once target_results reached). */
+    'demo_fallback_max_providers' => (int) env('MARKETPLACE_DEMO_FALLBACK_MAX_PROVIDERS', 8),
+
+    'demo_fallback_target_results' => (int) env('MARKETPLACE_DEMO_FALLBACK_TARGET_RESULTS', 8),
+
     /*
     |--------------------------------------------------------------------------
     | Intelligent agent expansion (see config/agent_pools.php)

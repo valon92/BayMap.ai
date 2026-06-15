@@ -29,6 +29,11 @@ return [
         'etsy' => 78,
         'driloni' => 82,
         'melodiapx' => 88,
+        'jumbo_ks' => 92,
+        'mytoys_ks' => 88,
+        'thetoyshop_ks' => 86,
+        'merrjep_auto' => 90,
+        'veturaneshitje' => 88,
         'default' => 70,
     ],
 
@@ -58,6 +63,7 @@ return [
 
         'automotive' => [
             'agents' => [
+                ['id' => 'KosovoAutomotivePlatformAgent', 'sources' => ['merrjep_auto', 'veturaneshitje'], 'countries' => ['XK'], 'trust' => 90, 'speed' => 92],
                 ['id' => 'MobileDeAgent', 'sources' => ['mobile.de', 'mobile_de'], 'countries' => ['DE'], 'trust' => 92, 'speed' => 85],
                 ['id' => 'AutoScout24Agent', 'sources' => ['autoscout24', 'autoscout24_de', 'autoscout24_nl', 'autoscout24_ch'], 'countries' => ['DE', 'CH', 'NL', 'AT'], 'trust' => 91, 'speed' => 83],
                 ['id' => 'CarGurusAgent', 'sources' => ['google_shopping', 'ebay'], 'countries' => ['US', 'DE', 'GB'], 'trust' => 80, 'speed' => 72],
@@ -109,6 +115,14 @@ return [
         'ai_software' => [
             'agents' => [
                 ['id' => 'WebServicesBridgeAgent', 'sources' => ['web_services_bridge'], 'countries' => ['*'], 'trust' => 94, 'speed' => 98],
+            ],
+        ],
+
+        'gaming_entertainment' => [
+            'agents' => [
+                ['id' => 'KosovoToyPlatformAgent', 'sources' => ['jumbo_ks', 'mytoys_ks', 'thetoyshop_ks'], 'countries' => ['XK'], 'trust' => 92, 'speed' => 95],
+                ['id' => 'AmazonAgent', 'sources' => ['amazon'], 'countries' => ['*'], 'trust' => 85, 'speed' => 78],
+                ['id' => 'EbayTechAgent', 'sources' => ['ebay'], 'countries' => ['*'], 'trust' => 88, 'speed' => 80],
             ],
         ],
 

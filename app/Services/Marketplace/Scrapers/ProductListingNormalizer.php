@@ -9,6 +9,7 @@ use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
+use App\Support\KosovoToyIntent;
 
 class ProductListingNormalizer
 {
@@ -141,24 +142,31 @@ class ProductListingNormalizer
         $wantedEngine = isset($parsed['engine_liters']) ? (float) $parsed['engine_liters'] : null;
 
         $isAutomotive = CategoryCatalog::isAutomotive($parsed['category'] ?? '');
-        $isElectronics = CategoryCatalog::isElectronics($parsed['category'] ?? '');
+        $isToy = KosovoToyIntent::isToySearch($parsed);
+        $isElectronics = CategoryCatalog::isElectronics($parsed['category'] ?? '') && ! $isToy;
         $isFashion = in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true);
         $productType = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
         $maxPrice = isset($parsed['max_price']) ? (float) $parsed['max_price'] : null;
 
-        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isElectronics, $isFashion, $productType, $maxPrice) {
+        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isElectronics, $isFashion, $isToy, $productType, $maxPrice) {
+            if ($isToy
+                && ! KosovoToyIntent::titleMatchesIntent((string) ($item['title'] ?? ''), $parsed)) {
+                return false;
+            }
+
             if ($maxPrice !== null && $maxPrice > 0) {
                 $price = (float) ($item['price'] ?? $item['price_eur'] ?? 0);
-                if ($price <= 0) {
+                if ($price <= 0 && ! $isAutomotive) {
                     return false;
                 }
-                if ($price > $maxPrice) {
+                if ($price > 0 && $price > $maxPrice) {
                     return false;
                 }
             }
 
             if ($productType !== '') {
                 $typeMatch = match (true) {
+                    $isToy => true,
                     $isAutomotive => true,
                     $isElectronics => ElectronicsIntentParser::productMatchesType($item, $productType),
                     $isFashion => FashionIntentParser::productMatchesType($item, $productType),
@@ -195,11 +203,18 @@ class ProductListingNormalizer
 
             if ($model !== '') {
                 if ($isAutomotive) {
+                    $store = strtolower((string) ($item['store'] ?? ''));
+                    $allowUnknownYear = str_contains($store, 'merrjep') || str_contains($store, 'veturaneshitje');
+                    $matchParsed = array_merge($parsed, ['year' => $item['year'] ?? null]);
+                    if ($allowUnknownYear) {
+                        unset($matchParsed['year_min'], $matchParsed['year_max']);
+                    }
                     if (! AutomotiveModelResolver::matchesListing(
                         (string) ($item['title'] ?? ''),
                         isset($item['model']) ? (string) $item['model'] : null,
                         $model,
-                        array_merge($parsed, ['year' => $item['year'] ?? null]),
+                        $matchParsed,
+                        $allowUnknownYear,
                     )) {
                         return false;
                     }
@@ -230,7 +245,10 @@ class ProductListingNormalizer
 
             if ($wantedColor !== '' && $isAutomotive) {
                 $store = strtolower((string) ($item['store'] ?? ''));
-                $allowUnknown = str_contains($store, 'kleinanzeigen') || $wantedColor === 'multicolor';
+                $allowUnknown = str_contains($store, 'kleinanzeigen')
+                    || str_contains($store, 'merrjep')
+                    || str_contains($store, 'veturaneshitje')
+                    || $wantedColor === 'multicolor';
                 $colorMatch = false;
                 if ($wantedColor === 'multicolor' && ! empty($parsed['colors']) && is_array($parsed['colors'])) {
                     foreach ($parsed['colors'] as $tone) {

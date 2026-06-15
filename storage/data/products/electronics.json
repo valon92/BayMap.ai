@@ -433,5 +433,61 @@
     "product_type": "phone",
     "url": "https://dyqani.app",
     "tags": ["phone", "apple", "iphone", "128GB", "black"]
+  },
+  {
+    "id": "piano-kids-gjirafa50",
+    "store": "gjirafa50",
+    "title": "Piano i vogël për fëmijë — 25 tastiera me mikrofon (Gjirafa50)",
+    "image": "https://images.unsplash.com/photo-1520523839897-bd160688ec81?w=800&q=80",
+    "price": 34.99,
+    "currency": "EUR",
+    "location": "Prishtinë, Kosovo",
+    "country_code": "XK",
+    "condition": "new",
+    "product_type": "piano",
+    "url": "https://gjirafa50.com",
+    "tags": ["piano", "toy", "kids", "lodra", "femije", "lodër", "keyboard"]
+  },
+  {
+    "id": "piano-kids-neptun",
+    "store": "neptun",
+    "title": "Piano elektrik për fëmijë me stenda — lodër muzikore",
+    "image": "https://images.unsplash.com/photo-1552422534-17f2451fef4f?w=800&q=80",
+    "price": 29.95,
+    "currency": "EUR",
+    "location": "Prishtinë, Kosovo",
+    "country_code": "XK",
+    "condition": "new",
+    "product_type": "piano",
+    "url": "https://www.neptun-ks.com",
+    "tags": ["piano", "toy", "kids", "lodra", "instrument", "femije"]
+  },
+  {
+    "id": "piano-kids-merrjep",
+    "store": "merrjep",
+    "title": "Piano i vogël lodër për fëmijë — gjendje e re",
+    "image": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800&q=80",
+    "price": 18.00,
+    "currency": "EUR",
+    "location": "Ferizaj, Kosovo",
+    "country_code": "XK",
+    "condition": "new",
+    "product_type": "piano",
+    "url": "https://www.merrjep.com",
+    "tags": ["piano", "toy", "lodra", "loder", "femije", "vogel"]
+  },
+  {
+    "id": "piano-kids-amazon",
+    "store": "amazon",
+    "title": "Kids Electronic Keyboard Piano — 37 Keys with Microphone",
+    "image": "https://images.unsplash.com/photo-1514119412353-e1b3b5bb5d7e?w=800&q=80",
+    "price": 32.50,
+    "currency": "EUR",
+    "location": "International",
+    "country_code": "DE",
+    "condition": "new",
+    "product_type": "piano",
+    "url": "https://www.amazon.de",
+    "tags": ["piano", "toy", "kids", "keyboard", "instrument", "children"]
   }
 ]

@@ -348,22 +348,64 @@ let lastQueryKey = '';
 
 const platformCapabilities = computed(() => data.value?.platform?.positioning ?? []);
 
+function normalizePlatformToken(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function workerMatchesResults(worker, items) {
+  const needles = [
+    normalizePlatformToken(worker.platform),
+    normalizePlatformToken(worker.platform_label),
+  ].filter((token) => token.length >= 3);
+
+  if (!needles.length || !items.length) {
+    return (worker.results ?? 0) > 0;
+  }
+
+  return items.some((product) => {
+    const haystacks = [
+      normalizePlatformToken(product.source_key),
+      normalizePlatformToken(product.source),
+      normalizePlatformToken(product.store),
+    ];
+
+    return needles.some((needle) => haystacks.some((hay) => hay.includes(needle) || needle.includes(hay)));
+  });
+}
+
 const valonWorkerChips = computed(() => {
   const workers = data.value?.meta?.valon?.workers ?? [];
-  return workers.map((w) => {
-    const count =
-      w.status === 'blocked'
+  const pool = results.value;
+  const poolSize = data.value?.meta?.pool_size ?? pool.length;
+
+  return workers
+    .filter((w) => {
+      if (w.status === 'blocked') {
+        return true;
+      }
+      if (poolSize > 0) {
+        return workerMatchesResults(w, pool);
+      }
+      if ((w.results ?? 0) > 0) {
+        return true;
+      }
+
+      return !String(w.id || '').includes('demo');
+    })
+    .map((w) => {
+      const count = w.status === 'blocked'
         ? t('worker_blocked')
         : w.results != null
-          ? ` (${w.results})`
+          ? ` · ${w.results}`
           : '';
-    return {
-      id: w.id,
-      role: w.role,
-      label: `${w.id} → ${w.platform_label || w.platform}${count}`,
-      blocked: w.status === 'blocked',
-    };
-  });
+
+      return {
+        id: w.id,
+        role: w.role,
+        label: `${w.platform_label || w.platform}${count}`,
+        blocked: w.status === 'blocked',
+      };
+    });
 });
 
 const displayQuery = computed(() => {

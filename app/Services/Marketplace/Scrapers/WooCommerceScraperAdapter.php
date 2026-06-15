@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Scrapers;
 
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
 use App\Support\KosovoFashionIntent;
+use App\Support\KosovoToyIntent;
 use App\Support\PlatformCatalogUrlBuilder;
 
 class WooCommerceScraperAdapter implements ScraperAdapterInterface
@@ -22,41 +23,71 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
     public function scrape(array $platform, array $parsedQuery): array
     {
         $storeKey = (string) ($platform['_key'] ?? 'woocommerce');
-        $baseUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
-        $maxPages = $this->maxPages($parsedQuery);
         $all = [];
         $seen = [];
 
-        for ($page = 1; $page <= $maxPages; $page++) {
-            $url = $page <= 1
-                ? $baseUrl
-                : rtrim(explode('?', $baseUrl, 2)[0], '/').'/page/'.$page.'/'.(str_contains($baseUrl, '?') ? '?'.explode('?', $baseUrl, 2)[1] : '');
+        foreach ($this->urlsToScrape($platform, $parsedQuery) as $baseUrl) {
+            $maxPages = $this->maxPages($parsedQuery);
 
-            $html = $this->http->get($url, $platform['locale'] ?? null);
-            if ($html === '') {
-                break;
-            }
+            for ($page = 1; $page <= $maxPages; $page++) {
+                $url = $page <= 1
+                    ? $baseUrl
+                    : rtrim(explode('?', $baseUrl, 2)[0], '/').'/page/'.$page.'/'.(str_contains($baseUrl, '?') ? '?'.explode('?', $baseUrl, 2)[1] : '');
 
-            $batch = $this->parseProducts($html, $storeKey, $platform);
-            if ($batch === []) {
-                break;
-            }
-
-            foreach ($batch as $item) {
-                $key = (string) ($item['id'] ?? '');
-                if ($key === '' || isset($seen[$key])) {
-                    continue;
+                $html = $this->http->get($url, $platform['locale'] ?? null);
+                if ($html === '') {
+                    break;
                 }
-                $seen[$key] = true;
-                $all[] = $item;
-            }
 
-            if (count($batch) < 8) {
-                break;
+                $batch = $this->parseProducts($html, $storeKey, $platform);
+                if ($batch === []) {
+                    break;
+                }
+
+                foreach ($batch as $item) {
+                    $key = (string) ($item['id'] ?? '');
+                    if ($key === '' || isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+                    $all[] = $item;
+                }
+
+                if (count($batch) < 8) {
+                    break;
+                }
             }
         }
 
         return ProductListingNormalizer::filterForIntent($all, $parsedQuery);
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, string>
+     */
+    private function urlsToScrape(array $platform, array $parsedQuery): array
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
+        $template = (string) ($platform['search_template'] ?? '/?s={query}&post_type=product');
+        $urls = [];
+
+        if (! empty($platform['toy_retailer']) && KosovoToyIntent::isToySearch($parsedQuery)) {
+            foreach (KosovoToyIntent::searchTerms($parsedQuery) as $term) {
+                $urls[] = $base.str_replace('{query}', rawurlencode($term), $template);
+            }
+        } else {
+            $urls[] = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
+        }
+
+        if (! empty($platform['toy_retailer']) && KosovoToyIntent::isToySearch($parsedQuery)) {
+            foreach ((array) ($platform['fallback_paths'] ?? []) as $path) {
+                $urls[] = $base.rtrim((string) $path, '/').'/';
+            }
+        }
+
+        return array_values(array_unique($urls));
     }
 
     /**
@@ -83,24 +114,18 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
      */
     private function parseProducts(string $html, string $storeKey, array $platform): array
     {
-        $chunks = preg_split('/(?=class="[^"]*type-product[^"]*post-|class="product type-product post-)/', $html) ?: [];
+        $chunks = preg_split('/(?=class="[^"]*\btype-product\b[^"]*\bpost-\d+|\bproduct type-product post-\d+)/', $html) ?: [];
         if (count($chunks) <= 1) {
-            $chunks = preg_split('/(?=post-\d+[^"]*type-product|type-product post-\d+)/', $html) ?: [];
+            $chunks = preg_split('/(?=\bpost-\d+[^"]*type-product|\btype-product post-\d+)/', $html) ?: [];
         }
         $products = [];
 
         foreach ($chunks as $chunk) {
-            if (! preg_match('/(?:product type-product post-|type-product post-|post-(\d+)[^"]*type-product)/', $chunk, $idMatch)) {
+            if (! preg_match('/(?:product type-product post-(\d+)|type-product post-(\d+)|post-(\d+)[^"]*type-product)/', $chunk, $idMatch)) {
                 continue;
             }
 
-            $productId = $idMatch[1] ?? null;
-            if ($productId === null && preg_match('/post-(\d+)/', $chunk, $idFallback)) {
-                $productId = $idFallback[1];
-            }
-            if ($productId === null) {
-                continue;
-            }
+            $productId = $idMatch[1] ?: ($idMatch[2] ?: ($idMatch[3] ?? null));
 
             $title = null;
             $url = null;
@@ -111,16 +136,28 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
             } elseif (preg_match('/class="[^"]*woocommerce-loop-product__link[^"]*"[^>]*href="([^"]+)"[^>]*>\s*<h2[^>]*>\s*([^<]+?)\s*<\/h2>/s', $chunk, $titleMatch)) {
                 $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
                 $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } elseif (preg_match('/woocommerce-loop-product__link[^>]*href="([^"]+)"[^>]*>[\s\S]{0,400}?c-product-grid__title-inner[^>]*>\s*([^<]+?)\s*</s', $chunk, $titleMatch)) {
+                $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } elseif (preg_match('/class="[^"]*c-product-grid__title-inner[^"]*"[^>]*>\s*([^<]+?)\s*</', $chunk, $titleMatch)) {
+                $title = html_entity_decode(trim($titleMatch[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (preg_match('/woocommerce-loop-product__link[^>]*href="([^"]+)"/', $chunk, $urlMatch)) {
+                    $url = html_entity_decode($urlMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
+            } elseif (preg_match('/class="[^"]*product-title[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>\s*([^<]+?)\s*<\/a>/s', $chunk, $titleMatch)) {
+                $url = html_entity_decode($titleMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $title = html_entity_decode(trim($titleMatch[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            } elseif (preg_match('/aria-label="Image link for Product:\s*([^"]+)"/', $chunk, $titleMatch)) {
+                $title = html_entity_decode(trim($titleMatch[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (preg_match('/woocommerce-LoopProduct-link[^>]*href="([^"]+)"/', $chunk, $urlMatch)) {
+                    $url = html_entity_decode($urlMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }
             }
 
-            if ($title === null || $title === '') {
+            if ($productId === null || $productId === '' || $title === null || $title === '') {
                 continue;
             }
-            $image = null;
-
-            if (preg_match('/<img[^>]+src="([^"]+)"/', $chunk, $imgMatch)) {
-                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            }
+            $image = $this->parseImage($chunk);
 
             $products[] = ProductListingNormalizer::finalize($platform, $storeKey, [
                 'product_id' => $productId,
@@ -132,6 +169,32 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
         }
 
         return $products;
+    }
+
+    private function parseImage(string $chunk): ?string
+    {
+        if (preg_match('/srcset="([^"]+)"/', $chunk, $srcsetMatch)) {
+            $best = null;
+            $bestWidth = 0;
+            foreach (preg_split('/\s*,\s*/', html_entity_decode($srcsetMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: [] as $part) {
+                if (preg_match('/^(\S+)\s+(\d+)w$/', trim($part), $m)) {
+                    $width = (int) $m[2];
+                    if ($width >= $bestWidth) {
+                        $bestWidth = $width;
+                        $best = $m[1];
+                    }
+                }
+            }
+            if ($best !== null) {
+                return $best;
+            }
+        }
+
+        if (preg_match('/<img[^>]+(?:data-src|data-lazy-src|src)="([^"]+)"/', $chunk, $imgMatch)) {
+            return html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        return null;
     }
 
     private function parsePrice(string $chunk): float
