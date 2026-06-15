@@ -52,9 +52,18 @@ class ProductCategoryResolver
     'book' => 'online_education',
   ];
 
+  /** @var array<int, string> */
+  private const WEB_SERVICE_SIGNALS = [
+    'domain', 'domen', 'domenë', 'domena', 'domenen', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar',
+  ];
+
   public static function categoryFromQuery(string $query): ?string
   {
     $lower = mb_strtolower($query);
+
+    if (WebServicesIntentParser::isWebServicesQuery($query)) {
+      return 'ai_software';
+    }
 
     foreach (self::KEYWORDS as $keyword => $category) {
       if (preg_match('/\b'.preg_quote($keyword, '/').'\b/u', $lower)) {
@@ -81,7 +90,8 @@ class ProductCategoryResolver
       || ($detected === 'automotive' && $current === 'real_estate')
       || ($detected === 'electronics_tech' && in_array($current, ['marketplace', 'real_estate'], true))
       || ($detected === 'sports_outdoor' && $current === 'marketplace')
-      || ($detected === 'real_estate' && $current === 'marketplace');
+      || ($detected === 'real_estate' && $current === 'marketplace')
+      || ($detected === 'ai_software' && $current !== 'travel');
 
     if ($shouldOverride) {
       $parsed['category'] = $detected;

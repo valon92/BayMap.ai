@@ -7,6 +7,7 @@ use App\Services\Marketplace\Providers\EbaySearchProvider;
 use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiFlightsSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
+use App\Services\Marketplace\Providers\WebServicesSearchProvider;
 use App\Support\LivePlatformRegistry;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
@@ -20,6 +21,7 @@ use App\Support\SwissCarMarketplaces;
 use App\Support\SwissRealEstateMarketplaces;
 use App\Support\UKRealEstateMarketplaces;
 use App\Support\UniversalMarketplaceBridge;
+use App\Support\WebServicesIntentParser;
 
 /**
  * Registry of all federated search connectors.
@@ -34,6 +36,7 @@ class ProviderRegistry
         private EbaySearchProvider $ebay,
         private SerpApiSearchProvider $serpApi,
         private SerpApiFlightsSearchProvider $serpFlights,
+        private WebServicesSearchProvider $webServices,
         private LiveSearchProviderFactory $liveFactory,
     ) {}
 
@@ -47,7 +50,7 @@ class ProviderRegistry
         }
 
         $this->providers = array_merge(
-            [$this->ebay, $this->serpApi, $this->serpFlights],
+            [$this->ebay, $this->serpApi, $this->serpFlights, $this->webServices],
             $this->liveFactory->all(),
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),
@@ -87,6 +90,8 @@ class ProviderRegistry
             $parsedForFanOut['search_country_code'] = strtoupper((string) $geo['country_code']);
         }
         $liveFanOut = LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode);
+        $webServices = WebServicesIntentParser::isActive($parsedQuery)
+            || WebServicesIntentParser::isWebServicesQuery((string) ($parsedQuery['raw_query'] ?? ''));
 
         return array_values(array_filter($this->all(), function (FederatedSearchProviderInterface $provider) use (
             $parsedForFanOut,
@@ -98,8 +103,18 @@ class ProviderRegistry
             $kosovoLocal,
             $localTargeted,
             $liveFanOut,
+            $webServices,
             $geo
         ) {
+            if ($webServices) {
+                return $provider->sourceKey() === 'web_services_bridge';
+            }
+
+            if ($category === 'travel' && $provider->sourceKey() !== 'google_flights') {
+                if (UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())) {
+                    return false;
+                }
+            }
             if (LocalMarketplaceResolver::isTargeted($parsedQuery)) {
                 if (UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())
                     && UniversalMarketplaceBridge::allowsBridge($provider->sourceKey(), $countryCode, $category)) {

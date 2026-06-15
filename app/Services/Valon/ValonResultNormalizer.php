@@ -16,6 +16,12 @@ class ValonResultNormalizer
         'carbon_kg', 'price_on_request', 'legs', 'travel_type', 'travelers',
     ];
 
+    /** @var array<int, string> */
+    private const WEB_SERVICES_PASSTHROUGH = [
+        'category', 'product_type', 'web_service_type', 'subtitle', 'domain_name', 'provider_rank',
+        'price_label', 'billing_period', 'brand_color', 'brand_bg', 'logo_url', 'price_on_request',
+    ];
+
     /**
      * @param  array<string, mixed>  $item
      * @return array<string, mixed>
@@ -65,6 +71,16 @@ class ValonResultNormalizer
         ];
 
         foreach (self::TRAVEL_PASSTHROUGH as $field) {
+            if (! array_key_exists($field, $item)) {
+                continue;
+            }
+            $value = $item[$field];
+            if ($value !== null && $value !== '' && $value !== []) {
+                $normalized[$field] = $value;
+            }
+        }
+
+        foreach (self::WEB_SERVICES_PASSTHROUGH as $field) {
             if (! array_key_exists($field, $item)) {
                 continue;
             }

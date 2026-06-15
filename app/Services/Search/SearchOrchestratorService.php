@@ -14,6 +14,7 @@ use App\Support\FashionIntentParser;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
 use App\Support\ShoeSize;
+use App\Support\WebServicesIntentParser;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
 use App\Services\Geo\GeoLocationService;
@@ -192,7 +193,8 @@ class SearchOrchestratorService
         $estimatedTotal = $this->resultPool->estimateTotal($parsed, count($pool));
 
         $page = max(1, $page);
-        $perPage = max(6, min(36, $perPage));
+        $maxPerPage = WebServicesIntentParser::isActive($parsed) ? 48 : 36;
+        $perPage = max(6, min($maxPerPage, $perPage));
         $offset = ($page - 1) * $perPage;
         $pageResults = array_slice($pool, $offset, $perPage);
         $returnedSoFar = min($offset + count($pageResults), count($pool));
@@ -280,6 +282,7 @@ class SearchOrchestratorService
 
         return array_values(array_filter($products, function (array $product) use ($filters, $parsed) {
             $isTravel = CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel';
+            $isWebServices = \App\Support\WebServicesIntentParser::isActive($parsed);
 
             if (isset($filters['price_min']) && ($product['price'] ?? 0) < (float) $filters['price_min']) {
                 return false;
@@ -422,7 +425,7 @@ class SearchOrchestratorService
                     return false;
                 }
             }
-            if (isset($filters['gender']) && $filters['gender'] !== '') {
+            if (isset($filters['gender']) && $filters['gender'] !== '' && ! $isWebServices) {
                 if (! $this->productMatchesGender($product, (string) $filters['gender'])) {
                     return false;
                 }
@@ -441,6 +444,30 @@ class SearchOrchestratorService
                     if (! FashionIntentParser::productMatchesType($product, $wantedType)) {
                         return false;
                     }
+                }
+            }
+            if ($isWebServices && isset($filters['web_service_type']) && $filters['web_service_type'] !== '') {
+                $wanted = mb_strtolower((string) $filters['web_service_type']);
+                $actual = mb_strtolower((string) ($product['web_service_type'] ?? $product['product_type'] ?? ''));
+                if ($actual !== $wanted) {
+                    return false;
+                }
+            }
+            if ($isWebServices && isset($filters['provider']) && $filters['provider'] !== '') {
+                $needle = mb_strtolower((string) $filters['provider']);
+                $haystack = mb_strtolower((string) ($product['source_key'] ?? ''));
+                if (! str_contains($haystack, $needle)) {
+                    return false;
+                }
+            }
+            if ($isWebServices && isset($filters['billing']) && $filters['billing'] !== '') {
+                $wantedBilling = mb_strtolower((string) $filters['billing']);
+                $actualBilling = mb_strtolower((string) ($product['billing_period'] ?? ''));
+                if ($wantedBilling === 'yearly' && $actualBilling === 'monthly') {
+                    return false;
+                }
+                if ($wantedBilling === 'monthly' && $actualBilling === 'yearly') {
+                    return false;
                 }
             }
             if (isset($filters['genre']) && $filters['genre'] !== '' && CategoryCatalog::isBookSearch($parsed)) {
@@ -725,7 +752,17 @@ class SearchOrchestratorService
     {
         $sort = (string) ($filters['sort'] ?? 'relevance');
 
-        if ($sort === 'price_asc') {
+        if ($sort === 'popularity') {
+            usort($products, function ($a, $b) {
+                $rankA = (int) ($a['provider_rank'] ?? 999);
+                $rankB = (int) ($b['provider_rank'] ?? 999);
+                if ($rankA !== $rankB) {
+                    return $rankA <=> $rankB;
+                }
+
+                return ($b['match_score'] ?? 0) <=> ($a['match_score'] ?? 0);
+            });
+        } elseif ($sort === 'price_asc') {
             usort($products, fn ($a, $b) => $this->sortablePrice($a) <=> $this->sortablePrice($b));
         } elseif ($sort === 'price_desc') {
             usort($products, fn ($a, $b) => $this->sortablePrice($b) <=> $this->sortablePrice($a));
@@ -750,6 +787,7 @@ class SearchOrchestratorService
     private function rankResultsLabel(array $filters): string
     {
         return match ((string) ($filters['sort'] ?? 'relevance')) {
+            'popularity' => 'Sorted by provider popularity',
             'price_asc' => 'Sorted by price: lowest to highest',
             'price_desc' => 'Sorted by price: highest to lowest',
             default => 'Ranked by exact intent match and AI relevance',

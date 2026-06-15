@@ -16,7 +16,8 @@ return [
     | Platform trust scores (0–100) used in weighted ranking
     |--------------------------------------------------------------------------
     */
-    'trust_scores' => [
+        'trust_scores' => [
+        'web_services_bridge' => 94,
         'ebay' => 92,
         'google_shopping' => 88,
         'amazon' => 85,
@@ -102,6 +103,12 @@ return [
         'travel' => [
             'agents' => [
                 ['id' => 'GoogleFlightsAgent', 'sources' => ['google_flights'], 'countries' => ['*'], 'trust' => 92, 'speed' => 78],
+            ],
+        ],
+
+        'ai_software' => [
+            'agents' => [
+                ['id' => 'WebServicesBridgeAgent', 'sources' => ['web_services_bridge'], 'countries' => ['*'], 'trust' => 94, 'speed' => 98],
             ],
         ],
 

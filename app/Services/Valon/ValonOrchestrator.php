@@ -91,7 +91,8 @@ class ValonOrchestrator
             }
         } while ($locationEngine->canExpand());
 
-        if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)) {
+        if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)
+            && ! \App\Support\WebServicesIntentParser::isActive($parsedQuery)) {
             $fallback = $this->runDemoFallback($parsedQuery, $expandedFilters, $geo);
             if ($fallback['results'] !== []) {
                 $results = $fallback['results'];

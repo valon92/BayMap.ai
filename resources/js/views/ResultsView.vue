@@ -203,8 +203,36 @@
           <div v-else>
             <TravelRouteSummary v-if="isTravelResults" :parsed="data?.parsed" class="mb-4" />
 
+            <WebServicesSummary v-if="isWebServicesResults" :parsed="data?.parsed" class="mb-4" />
+
             <div
-              v-if="isTravelResults"
+              v-if="isWebServicesResults"
+              class="web-services-results-list"
+            >
+              <section
+                v-for="group in webServiceGroups"
+                :key="group.type"
+                class="web-services-results-section"
+              >
+                <header class="web-services-results-section__header">
+                  <span class="web-services-results-section__icon" aria-hidden="true">{{ group.icon }}</span>
+                  <div>
+                    <h3 class="web-services-results-section__title">{{ group.label }}</h3>
+                    <p v-if="group.subtitle" class="web-services-results-section__subtitle">{{ group.subtitle }}</p>
+                  </div>
+                </header>
+                <div class="web-services-results-section__cards">
+                  <WebServicesCard
+                    v-for="product in group.items"
+                    :key="product.id + (product.source_key || '')"
+                    :product="product"
+                  />
+                </div>
+              </section>
+            </div>
+
+            <div
+              v-else-if="isTravelResults"
               class="travel-results-list space-y-3"
             >
               <TravelCard
@@ -298,6 +326,8 @@ import InsightScrollSection from '../components/InsightScrollSection.vue';
 import ProductCard from '../components/ProductCard.vue';
 import TravelCard from '../components/TravelCard.vue';
 import TravelRouteSummary from '../components/TravelRouteSummary.vue';
+import WebServicesCard from '../components/WebServicesCard.vue';
+import WebServicesSummary from '../components/WebServicesSummary.vue';
 import DynamicFilters from '../components/DynamicFilters.vue';
 import SearchLoadingExperience from '../components/SearchLoadingExperience.vue';
 import SearchScopeChips from '../components/SearchScopeChips.vue';
@@ -312,7 +342,7 @@ const loadingMore = ref(false);
 const currentPage = ref(1);
 const visibleResults = ref([]);
 const activeFilters = ref({});
-const perPage = 20;
+const perPage = 48;
 let debounceTimer = null;
 let lastQueryKey = '';
 
@@ -372,6 +402,51 @@ const kosovoMarketplaceLabels = computed(() => {
 const isTravelResults = computed(() => {
   const cat = String(data.value?.parsed?.category || '').toLowerCase();
   return cat === 'travel' || cat === 'travel & tourism';
+});
+
+const WEB_SERVICE_TYPES = ['domain', 'hosting', 'email', 'ssl', 'website'];
+const WEB_SERVICE_ORDER = ['domain', 'hosting', 'email', 'ssl', 'website'];
+const WEB_SERVICE_ICONS = { domain: '🌐', hosting: '🖥️', email: '✉️', ssl: '🔒', website: '🔗' };
+
+const isWebServicesResults = computed(() => {
+  const p = data.value?.parsed;
+  if (!p) return false;
+
+  const cat = String(p.category || '').toLowerCase();
+  const type = String(p.web_service_type || p.product_type || '').toLowerCase();
+  const types = Array.isArray(p.web_service_types) ? p.web_service_types : [];
+
+  if (cat === 'ai_software' && (WEB_SERVICE_TYPES.includes(type) || type === 'combo' || types.length > 0)) {
+    return true;
+  }
+
+  const first = results.value[0];
+  return Boolean(first?.price_on_request && WEB_SERVICE_TYPES.includes(String(first?.web_service_type || first?.product_type || '').toLowerCase()));
+});
+
+const webServiceGroups = computed(() => {
+  if (!isWebServicesResults.value || !results.value.length) return [];
+
+  const buckets = {};
+  for (const product of results.value) {
+    const type = String(product.web_service_type || product.product_type || 'domain').toLowerCase();
+    if (!buckets[type]) buckets[type] = [];
+    buckets[type].push(product);
+  }
+
+  const domain = String(data.value?.parsed?.domain_query || data.value?.parsed?.domain_name || '').trim();
+
+  return WEB_SERVICE_ORDER
+    .filter((type) => buckets[type]?.length)
+    .map((type) => ({
+      type,
+      icon: WEB_SERVICE_ICONS[type] || '🌐',
+      label: t(`web_services_mode_${type}`, type),
+      subtitle: type === 'domain' && domain ? domain : null,
+      items: [...buckets[type]].sort((a, b) => (
+        (a.provider_rank ?? 999) - (b.provider_rank ?? 999)
+      )),
+    }));
 });
 
 const showBookMarketplaces = computed(() => {

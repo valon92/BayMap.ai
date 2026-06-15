@@ -200,7 +200,7 @@ class CategoryCatalog
             'home_furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room', 'mobilje', 'dollap', 'karrige'],
             'health_wellness' => ['supplement', 'vitamin', 'fitness', 'yoga', 'wellness', 'protein', 'shëndet', 'shendet', 'gym', 'massage'],
             'gaming_entertainment' => ['ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming', 'game', 'console', 'lojë', 'loje'],
-            'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm'],
+            'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm', 'domain', 'domen', 'domenë', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar', 'website', 'faqe internet'],
             'construction' => ['cement', 'concrete', 'drill', 'hammer', 'construction', 'ndërtim', 'ndertim', 'material ndertimi', 'tools', 'scaffold'],
             'online_education' => ['course', 'udemy', 'certification', 'training', 'book', 'libër', 'liber', 'librin', 'roman', 'thriller', 'psikologjik', 'papritur', 'novel', 'learn', 'edukim', 'kurs', 'tutorial', 'bestseller'],
             'travel' => ['flight', 'hotel', 'travel', 'trip', 'vacation', 'udhëtim', 'udhetim', 'resort', 'airbnb', 'turizëm', 'turizem'],
@@ -243,6 +243,10 @@ class CategoryCatalog
     {
         $category = self::normalize($parsed['category'] ?? 'marketplace');
         $sq = $locale === 'sq';
+
+        if (WebServicesIntentParser::isActive($parsed)) {
+            return array_merge(self::webServicesFilters($parsed, $sq), self::webServicesSortFilter($sq));
+        }
 
         if ($category === 'marketplace') {
             return array_merge(
@@ -424,6 +428,83 @@ class CategoryCatalog
             self::select('condition', $sq ? 'Gjendja' : 'Condition', ['new', 'used', 'certified'], $parsed['condition'] ?? 'used'),
             self::select('seller_type', $sq ? 'Shitësi' : 'Seller', ['dealer', 'private'], $parsed['seller_type'] ?? null),
         );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function webServicesFilters(array $parsed, bool $sq): array
+    {
+        $types = WebServicesIntentParser::requestedTypes($parsed);
+        if ($types === []) {
+            $single = mb_strtolower((string) ($parsed['web_service_type'] ?? $parsed['product_type'] ?? 'domain'));
+            $types = in_array($single, ['combo', 'website'], true) ? ['domain', 'hosting'] : [$single];
+        }
+
+        $typeOptions = array_values(array_unique(array_merge($types, ['domain', 'hosting', 'email', 'ssl'])));
+        $defaultType = count($types) === 1 ? $types[0] : null;
+
+        $providerLabels = [
+            'godaddy' => 'GoDaddy',
+            'namecheap' => 'Namecheap',
+            'cloudflare' => 'Cloudflare',
+            'hostinger' => 'Hostinger',
+            'hostinger_hosting' => 'Hostinger',
+            'siteground' => 'SiteGround',
+            'bluehost' => 'Bluehost',
+            'ionos' => 'IONOS',
+            'digitalocean' => 'DigitalOcean',
+            'porkbun' => 'Porkbun',
+            'hetzner' => 'Hetzner',
+            'dreamhost' => 'DreamHost',
+        ];
+
+        $providerOptions = array_map(
+            fn (string $key, string $label) => ['value' => $key, 'label' => $label],
+            array_keys($providerLabels),
+            array_values($providerLabels),
+        );
+
+        return array_merge(
+            self::select(
+                'web_service_type',
+                $sq ? 'Lloji' : 'Service',
+                $typeOptions,
+                $defaultType,
+            ),
+            [[
+                'key' => 'provider',
+                'type' => 'select',
+                'label' => $sq ? 'Ofruesi' : 'Provider',
+                'options' => $providerOptions,
+                'value' => null,
+            ]],
+            self::select(
+                'billing',
+                $sq ? 'Faturimi' : 'Billing',
+                ['monthly', 'yearly'],
+                $parsed['billing'] ?? null,
+            ),
+            self::priceFilter($parsed, $sq, 0, 200, $sq ? 'Çmimi max (EUR)' : 'Max price (EUR)'),
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private static function webServicesSortFilter(bool $sq): array
+    {
+        return [[
+            'key' => 'sort',
+            'type' => 'sort',
+            'label' => $sq ? 'Rendit' : 'Sort by',
+            'options' => [
+                ['value' => 'popularity', 'label' => $sq ? 'Më i suksesshëm (default)' : 'Most popular (default)'],
+                ['value' => 'price_asc', 'label' => $sq ? 'Më i lirë → më i shtrenjtë' : 'Lowest to highest'],
+                ['value' => 'price_desc', 'label' => $sq ? 'Më i shtrenjtë → më i lirë' : 'Highest to lowest'],
+            ],
+            'value' => 'popularity',
+        ]];
     }
 
     /**

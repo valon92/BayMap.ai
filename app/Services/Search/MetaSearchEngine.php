@@ -20,7 +20,7 @@ class MetaSearchEngine
         $toCluster = [];
 
         foreach ($products as $product) {
-            if ($this->isQuoteListing($product)) {
+            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product)) {
                 $passthrough[] = $product;
 
                 continue;
@@ -54,6 +54,23 @@ class MetaSearchEngine
 
         return ($product['category'] ?? '') === 'travel'
             && in_array($mode, ['train', 'bus', 'tren', 'autobus'], true);
+    }
+
+    /**
+     * Web infrastructure bridge listings (domain, hosting, email) have no upfront price.
+     *
+     * @param  array<string, mixed>  $product
+     */
+    private function isWebServiceListing(array $product): bool
+    {
+        if (($product['category'] ?? '') !== 'ai_software') {
+            return false;
+        }
+
+        $type = mb_strtolower((string) ($product['web_service_type'] ?? $product['product_type'] ?? ''));
+
+        return in_array($type, ['domain', 'hosting', 'email', 'ssl', 'website'], true)
+            || isset($product['provider_rank']);
     }
 
     /**

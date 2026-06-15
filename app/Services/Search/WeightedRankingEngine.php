@@ -6,6 +6,7 @@ use App\Services\Agents\AgentPoolRegistry;
 use App\Support\CategoryCatalog;
 use App\Support\CountryMatcher;
 use App\Support\ShoeSize;
+use App\Support\WebServicesIntentParser;
 
 /**
  * Weighted ranking: 40% specification, 25% semantic, 15% location, 10% price, 10% trust.
@@ -25,6 +26,10 @@ class WeightedRankingEngine
     {
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
             return min(99, max(40, (int) round($this->travelScore($product, $parsed))));
+        }
+
+        if (WebServicesIntentParser::isActive($parsed) || isset($product['provider_rank'])) {
+            return min(99, max(40, (int) round($this->webServiceScore($product, $parsed))));
         }
 
         $weights = $this->agentPools->rankingWeights();
@@ -251,6 +256,32 @@ class WeightedRankingEngine
         }
 
         return min(98.0, $score);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     * @param  array<string, mixed>  $parsed
+     */
+    private function webServiceScore(array $product, array $parsed): float
+    {
+        $rank = (int) ($product['provider_rank'] ?? 50);
+        $score = 100.0 - min(48.0, max(0, $rank - 1));
+
+        if ((float) ($product['price'] ?? 0) > 0) {
+            $score += 3.0;
+        }
+
+        if (! empty($product['live'])) {
+            $score += 2.0;
+        }
+
+        $wantedType = (string) ($parsed['web_service_type'] ?? '');
+        $productType = (string) ($product['web_service_type'] ?? $product['product_type'] ?? '');
+        if ($wantedType !== '' && $wantedType !== 'combo' && $productType === $wantedType) {
+            $score += 4.0;
+        }
+
+        return min(99.0, $score);
     }
 
     /**

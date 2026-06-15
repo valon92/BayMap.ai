@@ -20,7 +20,7 @@ class SearchController extends Controller
             'location_scope' => 'nullable|string|in:auto,city,local,country,region,world,universal,global',
             'filters' => 'nullable',
             'page' => 'nullable|integer|min:1|max:50',
-            'per_page' => 'nullable|integer|min:6|max:36',
+            'per_page' => 'nullable|integer|min:6|max:48',
         ]);
 
         $query = trim($validated['q'] ?? '');

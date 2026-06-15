@@ -12,6 +12,7 @@ use App\Support\ProductCategoryResolver;
 use App\Support\SearchCountryResolver;
 use App\Support\SearchScopeResolver;
 use App\Support\TravelIntentParser;
+use App\Support\WebServicesIntentParser;
 
 /**
  * Location policy: query-named country wins; otherwise visitor IP geo.
@@ -82,6 +83,7 @@ class QueryIntentEnricher
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
         $parsed = self::mergeRealEstateIntent($parsed, $rawQuery);
         $parsed = TravelIntentParser::fromQuery($rawQuery, $parsed);
+        $parsed = WebServicesIntentParser::fromQuery($rawQuery, $parsed);
 
         if (CategoryCatalog::isBookSearch($parsed)) {
             $parsed['category'] = 'online_education';
@@ -108,6 +110,10 @@ class QueryIntentEnricher
 
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
             unset($parsed['gender'], $parsed['year'], $parsed['year_min'], $parsed['year_max']);
+        }
+
+        if (WebServicesIntentParser::isActive($parsed)) {
+            $parsed = WebServicesIntentParser::finalize($parsed);
         }
 
         if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
@@ -361,7 +367,7 @@ class QueryIntentEnricher
 
         return array_merge($visitorGeo, [
             'country' => $parsed['search_country'] ?? $visitorGeo['country'],
-            'country_code' => $parsed['search_country_code'],
+            'country_code' => $parsed['search_country_code'] ?? $visitorGeo['country_code'] ?? null,
             'city' => null,
             'search_target' => true,
             'location_source' => 'query',
@@ -454,7 +460,9 @@ class QueryIntentEnricher
     {
         $defaults = [];
 
-        if (! empty($parsed['search_target']) && CategoryCatalog::normalize($parsed['category'] ?? '') !== 'travel') {
+        if (! empty($parsed['search_target'])
+            && CategoryCatalog::normalize($parsed['category'] ?? '') !== 'travel'
+            && ! WebServicesIntentParser::isActive($parsed)) {
             $multi = $parsed['search_countries'] ?? [];
             if (! is_array($multi) || count($multi) <= 1) {
                 if (! empty($parsed['search_country'])) {
@@ -479,7 +487,8 @@ class QueryIntentEnricher
             }
         }
 
-        if (! empty($parsed['gender']) && ! isset($clientFilters['gender'])) {
+        if (! empty($parsed['gender']) && ! isset($clientFilters['gender'])
+            && ! WebServicesIntentParser::isActive($parsed)) {
             $defaults['gender'] = CategoryCatalog::normalizeGender((string) $parsed['gender']);
         }
 

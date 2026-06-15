@@ -168,7 +168,7 @@ const activeFilterChips = computed(() => {
   for (const filter of props.filters) {
     const val = active.value[filter.key];
     if (val == null || val === '') continue;
-    if (filter.type === 'sort' && String(val) === 'relevance') continue;
+    if (filter.type === 'sort' && (String(val) === 'relevance' || String(val) === 'popularity')) continue;
 
     chips.push({
       key: filter.key,
