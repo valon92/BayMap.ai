@@ -121,6 +121,15 @@ class TravelIntentParser
             if ($destination !== null) {
                 self::applyEndpoint($result, 'destination', $destination);
             }
+        } elseif (preg_match('/\b([a-zëçáéíóúäöü\- ]{2,40}?)\s*[–\-—−]\s*([a-zëçáéíóúäöü\- ]{2,40})\b/ui', $lower, $route)) {
+            $origin = self::resolvePlace(trim($route[1])) ?? self::resolveCountryHub(trim($route[1]));
+            $destination = self::resolvePlace(trim($route[2])) ?? self::resolveCountryHub(trim($route[2]));
+            if ($origin !== null) {
+                self::applyEndpoint($result, 'origin', $origin);
+            }
+            if ($destination !== null) {
+                self::applyEndpoint($result, 'destination', $destination);
+            }
         }
 
         if (preg_match('/\b(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](20\d{2})\b/u', $query, $dateMatch)) {
@@ -241,6 +250,10 @@ class TravelIntentParser
     {
         if (CategoryCatalog::normalize($parsed['category'] ?? '') !== 'travel') {
             return $parsed;
+        }
+
+        if (empty($parsed['origin_city']) || empty($parsed['destination_city'])) {
+            $parsed = self::inferEndpointsFromText($parsed);
         }
 
         if (empty($parsed['departure_airport'])) {
@@ -416,6 +429,57 @@ class TravelIntentParser
         }
 
         return null;
+    }
+
+    /**
+     * Resolve origin/destination from keywords or raw query when OpenAI omits route fields.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    private static function inferEndpointsFromText(array $parsed): array
+    {
+        $text = mb_strtolower((string) ($parsed['raw_query'] ?? ''));
+        $keywords = array_map('mb_strtolower', (array) ($parsed['keywords'] ?? []));
+        $candidates = [];
+
+        if (preg_match('/\b([a-zëçáéíóúäöü\- ]{2,40}?)\s*[–\-—−]\s*([a-zëçáéíóúäöü\- ]{2,40})\b/ui', $text, $route)) {
+            $candidates[] = trim($route[1]);
+            $candidates[] = trim($route[2]);
+        }
+
+        foreach ($keywords as $keyword) {
+            if (self::resolvePlace($keyword) !== null) {
+                $candidates[] = $keyword;
+            }
+        }
+
+        $resolved = [];
+        foreach ($candidates as $candidate) {
+            $place = self::resolvePlace($candidate);
+            if ($place === null) {
+                continue;
+            }
+            $cityKey = mb_strtolower($place['city']);
+            if (isset($resolved[$cityKey])) {
+                continue;
+            }
+            $resolved[$cityKey] = $place;
+        }
+
+        $places = array_values($resolved);
+        if (count($places) >= 2) {
+            if (empty($parsed['origin_city'])) {
+                self::applyEndpoint($parsed, 'origin', $places[0]);
+            }
+            if (empty($parsed['destination_city'])) {
+                self::applyEndpoint($parsed, 'destination', $places[1]);
+            }
+        } elseif (count($places) === 1 && empty($parsed['destination_city'])) {
+            self::applyEndpoint($parsed, 'destination', $places[0]);
+        }
+
+        return $parsed;
     }
 
     /**

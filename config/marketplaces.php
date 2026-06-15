@@ -16,6 +16,9 @@ return [
 
     'skip_mock_when_live_at_least' => 8,
 
+    /** When live connectors return nothing, query demo datasets so discovery examples still work. */
+    'demo_fallback_when_empty' => (bool) env('MARKETPLACE_DEMO_FALLBACK', true),
+
     /*
     |--------------------------------------------------------------------------
     | Intelligent agent expansion (see config/agent_pools.php)

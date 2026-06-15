@@ -517,5 +517,53 @@
     "store": "auto24",
     "url": "https://auto24-ks.com",
     "tags": ["audi", "q5", "2020", "petrol", "quattro"]
+  },
+  {
+    "id": "car-xk-a6-001",
+    "title": "Audi A6 2.0 TDI S line 2020 White — Prishtinë",
+    "image": "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=800&q=80",
+    "price": 31900,
+    "currency": "EUR",
+    "location": "Prishtinë, Kosovo",
+    "country_code": "XK",
+    "mileage": 142000,
+    "year": 2020,
+    "condition": "used",
+    "seller_type": "dealer",
+    "store": "merrjep_auto",
+    "url": "https://www.merrjep.com/auto",
+    "tags": ["audi", "a6", "white", "2020", "diesel", "automatic"]
+  },
+  {
+    "id": "car-xk-a6-002",
+    "title": "Audi A6 40 TDI 2020 Pearl White — Ferizaj",
+    "image": "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800&q=80",
+    "price": 29800,
+    "currency": "EUR",
+    "location": "Ferizaj, Kosovo",
+    "country_code": "XK",
+    "mileage": 168000,
+    "year": 2020,
+    "condition": "used",
+    "seller_type": "private",
+    "store": "auto24",
+    "url": "https://auto24-ks.com",
+    "tags": ["audi", "a6", "white", "2020", "diesel"]
+  },
+  {
+    "id": "car-xk-a6-003",
+    "title": "Audi A6 Avant 45 TFSI 2019 White — Prizren",
+    "image": "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&q=80",
+    "price": 27500,
+    "currency": "EUR",
+    "location": "Prizren, Kosovo",
+    "country_code": "XK",
+    "mileage": 175500,
+    "year": 2019,
+    "condition": "used",
+    "seller_type": "dealer",
+    "store": "kosova_motors",
+    "url": "https://kosovamotors.com",
+    "tags": ["audi", "a6", "white", "2019", "petrol", "avant"]
   }
 ]

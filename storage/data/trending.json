@@ -1,8 +1,44 @@
 [
-  { "query": "Audi A6 2020 white under 180k km", "category": "car", "count": 1240 },
-  { "query": "Gaming laptop quiet cooling", "category": "electronics", "count": 890 },
-  { "query": "Vintage flower painting living room", "category": "painting", "count": 654 },
-  { "query": "Psychological thriller unexpected ending", "category": "book", "count": 521 },
-  { "query": "Scandinavian sofa under 800 euro", "category": "furniture", "count": 412 },
-  { "query": "Rolex Submariner pre-owned authentic", "category": "luxury", "count": 388 }
+  {
+    "query": "Train ticket Paris to Zurich tomorrow",
+    "sq": "Bilet tren Paris–Zurich nesër",
+    "category": "travel",
+    "count": 1420
+  },
+  {
+    "query": "Audi A6 2020 white under 180k km",
+    "sq": "Audi A6 2020 e bardhë nën 180 mijë km",
+    "category": "automotive",
+    "count": 1240
+  },
+  {
+    "query": "Gaming laptop quiet cooling",
+    "sq": "Laptop gaming me ftohje të qetë",
+    "category": "electronics",
+    "count": 890
+  },
+  {
+    "query": "Vintage flower painting living room",
+    "sq": "Pikturë vintage me lule për dhomën e ndenjes",
+    "category": "painting",
+    "count": 654
+  },
+  {
+    "query": "Psychological thriller unexpected ending",
+    "sq": "Libër thriller me fund të papritur",
+    "category": "book",
+    "count": 521
+  },
+  {
+    "query": "White Nike Air Max 90 size 43",
+    "sq": "Nike Air Max 90 të bardha numër 43",
+    "category": "fashion",
+    "count": 760
+  },
+  {
+    "query": "Scandinavian sofa under 800 euro",
+    "sq": "Divan skandinav nën 800 euro",
+    "category": "furniture",
+    "count": 412
+  }
 ]

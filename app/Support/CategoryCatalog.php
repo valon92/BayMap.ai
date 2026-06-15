@@ -145,9 +145,12 @@ class CategoryCatalog
                 return 'car';
             case 'online_education':
                 return 'book';
+            case 'home_furniture':
+                return 'furniture';
+            case 'luxury_collectibles':
+                return 'luxury';
             case 'fashion':
             case 'sports_outdoor':
-            case 'luxury_collectibles':
                 return 'fashion';
             case 'real_estate':
                 return 'real_estate';

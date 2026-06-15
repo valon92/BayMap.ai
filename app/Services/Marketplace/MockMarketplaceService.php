@@ -41,7 +41,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
     public function search(array $parsedQuery, array $expandedFilters): array
     {
         $category = CategoryCatalog::normalize($parsedQuery['category'] ?? 'marketplace');
-        $dataset = $this->loadDataset($category);
+        $dataset = $this->loadDataset($category, $parsedQuery);
         $marketplaces = $expandedFilters['marketplaces'] ?? [];
 
         if (! empty($marketplaces)
@@ -83,8 +83,26 @@ class MockMarketplaceService implements MarketplaceSearchInterface
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function loadDataset(string $category): array
+    /**
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadDataset(string $category, array $parsedQuery = []): array
     {
+        $type = mb_strtolower((string) ($parsedQuery['product_type'] ?? ''));
+        $query = mb_strtolower((string) ($parsedQuery['raw_query'] ?? ''));
+        $artQuery = in_array($type, ['art', 'painting', 'pikturë', 'piktura'], true)
+            || preg_match('/\b(piktur|painting|canvas|oil painting|artwork)\b/u', $query);
+
+        if ($artQuery) {
+            $path = storage_path('data/products/painting.json');
+            if (File::exists($path)) {
+                $data = json_decode(File::get($path), true);
+
+                return is_array($data) ? $data : [];
+            }
+        }
+
         $key = CategoryCatalog::datasetKey($category);
         $path = storage_path("data/products/{$key}.json");
         if (! File::exists($path)) {

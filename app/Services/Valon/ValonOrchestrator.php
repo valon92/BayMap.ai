@@ -4,6 +4,8 @@ namespace App\Services\Valon;
 
 use App\Services\Agents\AgentActivationService;
 use App\Services\Marketplace\ProviderRegistry;
+use App\Contracts\FederatedSearchProviderInterface;
+use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Orchestration\ProviderDiscoveryEngine;
 use App\Services\Orchestration\SearchIntentFactory;
 use App\Services\Search\LocationExpansionEngine;
@@ -88,6 +90,15 @@ class ValonOrchestrator
                 break;
             }
         } while ($locationEngine->canExpand());
+
+        if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)) {
+            $fallback = $this->runDemoFallback($parsedQuery, $expandedFilters, $geo);
+            if ($fallback['results'] !== []) {
+                $results = $fallback['results'];
+                $workerReports = array_merge($workerReports, $fallback['report']);
+                $workerMeta = array_merge($workerMeta, $fallback['workers']);
+            }
+        }
 
         $legacyReport = $this->toLegacyReport($workerReports, $parsedQuery, $geo);
 
@@ -179,6 +190,104 @@ class ValonOrchestrator
         }
 
         return $workerMeta;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsedQuery
+     * @param  array<string, mixed>  $expandedFilters
+     * @param  array<string, mixed>  $geo
+     * @return array{
+     *   results: array<int, array<string, mixed>>,
+     *   report: array<int, array<string, mixed>>,
+     *   workers: array<int, array<string, mixed>>
+     * }
+     */
+    private function runDemoFallback(array $parsedQuery, array $expandedFilters, array $geo): array
+    {
+        $category = CategoryCatalog::normalize($parsedQuery['category'] ?? 'marketplace');
+        $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? $geo['country_code'] ?? ''));
+
+        $providers = array_values(array_filter(
+            $this->registry->all(),
+            function (FederatedSearchProviderInterface $provider) use ($category, $countryCode) {
+                if ($provider->mode() !== 'demo' || ! $provider->supportsCategory($category)) {
+                    return false;
+                }
+
+                if ($provider instanceof MockSearchProvider) {
+                    return $provider->supportsCountry($countryCode !== '' ? $countryCode : null);
+                }
+
+                return true;
+            },
+        ));
+
+        if ($providers === []) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        usort($providers, fn ($a, $b) => $a->priority() <=> $b->priority());
+        $providers = array_slice($providers, 0, (int) config('valon.max_workers', 6));
+
+        $demoFilters = $expandedFilters;
+        unset($demoFilters['marketplaces']);
+
+        $results = [];
+        $report = [];
+        $workers = [];
+        $prefix = config('valon.worker_prefix', 'ValonWorker');
+        $index = 1;
+
+        foreach ($providers as $provider) {
+            $started = microtime(true);
+
+            try {
+                $items = $provider->search($parsedQuery, $demoFilters);
+            } catch (\Throwable) {
+                $items = [];
+            }
+
+            $count = is_array($items) ? count($items) : 0;
+            $latencyMs = (int) round((microtime(true) - $started) * 1000);
+            $platform = $provider->sourceKey();
+
+            if ($count > 0) {
+                foreach ($items as $item) {
+                    $results[] = $item;
+                }
+            }
+
+            $report[] = [
+                'worker_id' => "{$prefix}-demo-{$index}",
+                'platform' => $platform,
+                'platform_label' => $provider->label(),
+                'role' => 'Demo catalog fallback',
+                'mode' => 'demo',
+                'count' => $count,
+                'status' => $count > 0 ? 'ok' : 'empty',
+                'location_tier' => $geo['city'] ?? '',
+                'latency_ms' => $latencyMs,
+                'error' => null,
+            ];
+
+            $workers[] = [
+                'id' => "{$prefix}-demo-{$index}",
+                'role' => 'Demo catalog fallback',
+                'platform' => $platform,
+                'platform_label' => $provider->label(),
+                'status' => $count > 0 ? 'ok' : 'empty',
+                'results' => $count,
+                'latency_ms' => $latencyMs,
+            ];
+
+            $index++;
+        }
+
+        return [
+            'results' => $results,
+            'report' => $report,
+            'workers' => $workers,
+        ];
     }
 
     /**

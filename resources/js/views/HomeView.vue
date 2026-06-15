@@ -37,8 +37,7 @@
       <SearchInput v-model="query" :loading="loading" @search="goSearch" />
     </div>
 
-    <ExamplePrompts @select="onExample" />
-    <TrendingSearches @select="onExample" />
+    <HomeDiscovery @select="onExample" />
   </section>
 </template>
 
@@ -48,8 +47,7 @@ import { useRouter } from 'vue-router';
 import api from '../services/api';
 import BrandLogoIcon from '../components/BrandLogoIcon.vue';
 import SearchInput from '../components/SearchInput.vue';
-import ExamplePrompts from '../components/ExamplePrompts.vue';
-import TrendingSearches from '../components/TrendingSearches.vue';
+import HomeDiscovery from '../components/HomeDiscovery.vue';
 
 const router = useRouter();
 const { tagline, taglineAlt, locale, t } = inject('i18n');

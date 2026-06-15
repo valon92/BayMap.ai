@@ -182,6 +182,105 @@
       bg-white/90 text-slate-600 border border-slate-200 hover:bg-red-50 hover:text-red-600 transition-colors;
   }
 
+  /* Home discovery — example prompts for new users */
+  .discovery-section {
+    @apply w-full max-w-4xl mx-auto mt-10 sm:mt-12 px-1 sm:px-0;
+  }
+
+  .discovery-section__intro {
+    @apply text-center mb-6 sm:mb-8 max-w-2xl mx-auto;
+  }
+
+  .discovery-section__title {
+    @apply text-base sm:text-lg font-semibold text-slate-900 mb-2;
+  }
+
+  .discovery-section__subtitle {
+    @apply text-sm text-slate-500 leading-relaxed;
+  }
+
+  .discovery-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3;
+  }
+
+  .discovery-card {
+    @apply relative flex flex-col items-start text-left gap-1.5 p-4 rounded-2xl
+      border border-slate-200/90 bg-white shadow-card
+      transition-[border-color,box-shadow,transform] duration-200
+      hover:border-blue-200 hover:shadow-card-hover hover:-translate-y-0.5
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40
+      active:scale-[0.99];
+  }
+
+  .discovery-card--skeleton {
+    @apply min-h-[7.5rem];
+  }
+
+  .discovery-card__icon {
+    @apply text-2xl leading-none mb-0.5;
+  }
+
+  .discovery-card__category {
+    @apply text-[10px] sm:text-xs font-bold uppercase tracking-wider text-blue-600;
+  }
+
+  .discovery-card__query {
+    @apply text-sm font-medium text-slate-800 leading-snug line-clamp-2 flex-1;
+  }
+
+  .discovery-card__cta {
+    @apply mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-600
+      opacity-70 group-hover:opacity-100 transition-opacity;
+  }
+
+  .discovery-trending {
+    @apply mt-10 sm:mt-12 pt-8 border-t border-slate-200/80;
+  }
+
+  .discovery-trending__header {
+    @apply text-center mb-4 sm:mb-5;
+  }
+
+  .discovery-trending__title {
+    @apply text-sm font-semibold text-slate-700;
+  }
+
+  .discovery-trending__hint {
+    @apply mt-1 text-xs text-slate-500;
+  }
+
+  .discovery-trending__list {
+    @apply flex flex-col gap-2 max-w-2xl mx-auto;
+  }
+
+  .discovery-trending__row {
+    @apply flex items-center gap-3 w-full px-4 py-3 rounded-xl text-left
+      border border-slate-200/80 bg-white/80
+      hover:border-blue-200 hover:bg-blue-50/40
+      transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30
+      active:scale-[0.99];
+  }
+
+  .discovery-trending__icon {
+    @apply text-lg shrink-0;
+  }
+
+  .discovery-trending__text {
+    @apply flex-1 min-w-0 flex flex-col gap-0.5;
+  }
+
+  .discovery-trending__query {
+    @apply text-sm font-medium text-slate-800 truncate group-hover:text-blue-800;
+  }
+
+  .discovery-trending__category {
+    @apply text-[10px] font-semibold uppercase tracking-wide text-slate-400;
+  }
+
+  .discovery-trending__count {
+    @apply text-xs font-medium text-slate-400 shrink-0 tabular-nums;
+  }
+
   .search-scope--embedded {
     @apply pt-1 border-t border-slate-100;
   }
