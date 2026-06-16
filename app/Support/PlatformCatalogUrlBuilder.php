@@ -379,13 +379,13 @@ class PlatformCatalogUrlBuilder
         $make = self::autolinaMakeSlug($make);
 
         if ($make !== '' && $make !== 'car' && $make !== 'all') {
+            if ($model !== '' && $model !== 'all') {
+                $query = rawurlencode(trim($make.' '.$model));
+
+                return $base.'/inserate?q='.$query;
+            }
+
             return $base.'/inserate/marke/'.$make.'-occasionen';
-        }
-
-        if ($model !== '' && $model !== 'all') {
-            $query = rawurlencode(trim($make.' '.$model));
-
-            return $base.'/inserate?q='.$query;
         }
 
         return $base.'/inserate';

@@ -204,7 +204,11 @@ class ProductListingNormalizer
             if ($model !== '') {
                 if ($isAutomotive) {
                     $store = strtolower((string) ($item['store'] ?? ''));
-                    $allowUnknownYear = str_contains($store, 'merrjep') || str_contains($store, 'veturaneshitje');
+                    $allowUnknownYear = str_contains($store, 'merrjep')
+                        || str_contains($store, 'veturaneshitje')
+                        || str_contains($store, 'autolina')
+                        || str_contains($store, 'autogrid')
+                        || str_contains($store, 'autoscout24');
                     $matchParsed = array_merge($parsed, ['year' => $item['year'] ?? null]);
                     if ($allowUnknownYear) {
                         unset($matchParsed['year_min'], $matchParsed['year_max']);

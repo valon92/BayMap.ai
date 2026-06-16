@@ -43,8 +43,13 @@ class CountryMatcher
             );
         }
 
-        if (str_contains($needle, 'switzerland') || $needle === 'ch') {
-            return (bool) preg_match('/switzerland|schweiz|zürich|zurich|bern|geneva|basel|lausanne/u', $loc);
+        if (str_contains($needle, 'switzerland') || str_contains($needle, 'schweiz')
+            || str_contains($needle, 'svizzera') || str_contains($needle, 'zvic') || $needle === 'ch') {
+            if ($productCountryCode !== null && strtoupper($productCountryCode) === 'CH') {
+                return true;
+            }
+
+            return (bool) preg_match('/switzerland|schweiz|suisse|svizzera|zürich|zurich|bern|geneva|basel|lausanne/u', $loc);
         }
 
         if (str_contains($needle, 'netherlands') || str_contains($needle, 'holland') || $needle === 'nl') {

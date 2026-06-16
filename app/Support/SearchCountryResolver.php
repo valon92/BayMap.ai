@@ -140,4 +140,43 @@ class SearchCountryResolver
 
         return $found;
     }
+
+    public static function countryNameForCode(string $code): ?string
+    {
+        $code = strtoupper(trim($code));
+        foreach (self::ALIASES as $meta) {
+            if (($meta['code'] ?? '') === $code) {
+                return $meta['name'];
+            }
+        }
+
+        return match ($code) {
+            'XK' => 'Kosovo',
+            default => null,
+        };
+    }
+
+    public static function codeFromCountryFilter(string $filter): ?string
+    {
+        $needle = mb_strtolower(trim($filter));
+        if ($needle === '') {
+            return null;
+        }
+
+        foreach (self::ALIASES as $alias => $meta) {
+            if ($needle === $alias || $needle === mb_strtolower($meta['name'])) {
+                return $meta['code'];
+            }
+        }
+
+        return match (true) {
+            str_contains($needle, 'kosov') || $needle === 'xk' => 'XK',
+            str_contains($needle, 'switzerland') || str_contains($needle, 'schweiz')
+                || str_contains($needle, 'svizzera') || str_contains($needle, 'zvic') || $needle === 'ch' => 'CH',
+            str_contains($needle, 'germany') || str_contains($needle, 'deutschland')
+                || str_contains($needle, 'gjermani') || $needle === 'de' => 'DE',
+            str_contains($needle, 'netherlands') || str_contains($needle, 'holland') || $needle === 'nl' => 'NL',
+            default => null,
+        };
+    }
 }

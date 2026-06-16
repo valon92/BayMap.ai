@@ -2,254 +2,106 @@
 
 namespace App\Services\Platform;
 
-use App\Support\CategoryCatalog;
-use App\Support\KosovoAutomotiveIntent;
-use App\Support\KosovoFashionPlatforms;
-use App\Support\KosovoToyIntent;
-use App\Support\KosovoToyPlatforms;
-use App\Support\LivePlatformRegistry;
-use App\Support\ProductCategoryResolver;
-use App\Support\PlatformCatalogBridge;
-use App\Support\SearchScopeResolver;
+use App\Services\Catalog\PlatformRoutingEngine;
+use App\Services\Providers\GlobalProviderRegistry;
+use App\Services\Providers\ProviderExpansionEngine;
 
 /**
  * Automatically discovers and classifies marketplaces for a parsed user intent.
- * Targeted: country (+ optional city) + product category → local platforms.
- * Universal: worldwide platforms for the product category.
+ * Uses Global Provider Registry + Provider Expansion Engine (no circular calls).
  */
 class PlatformDiscoveryService
 {
-  /**
-   * @param  array<string, mixed>  $parsed
-   * @return array{
-   *   scope: string,
-   *   country_code: string,
-   *   city: ?string,
-   *   category: string,
-   *   keys: array<int, string>,
-   *   platforms: array<int, array{key: string, label: string, country: string, source: string}>
-   * }
-   */
-  public function discover(array $parsed): array
-  {
-    $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
-    $scope = SearchScopeResolver::isUniversal($parsed) ? 'universal' : 'targeted';
-    $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
-    $city = isset($parsed['search_city']) ? (string) $parsed['search_city'] : null;
+    public function __construct(
+        private PlatformRoutingEngine $router,
+        private ProviderExpansionEngine $expansion,
+        private GlobalProviderRegistry $registry,
+    ) {}
 
-    if ($scope === 'universal') {
-      $keys = $this->globalKeysForCategory($category);
-      $countryCode = 'WW';
-    } else {
-      $keys = $this->targetedKeys($countryCode, $category, $city, $parsed);
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array{
+     *   scope: string,
+     *   country_code: string,
+     *   city: ?string,
+     *   category: string,
+     *   keys: array<int, string>,
+     *   platforms: array<int, array<string, mixed>>,
+     *   providers: array<int, array<string, mixed>>,
+     *   routing_source?: string,
+     *   discovery_engine?: string
+     * }
+     */
+    public function discover(array $parsed): array
+    {
+        $geo = [
+            'country_code' => $parsed['search_country_code'] ?? null,
+            'city' => $parsed['search_city'] ?? null,
+        ];
+
+        $discovery = $this->expansion->discoverProviders($parsed, $geo, 'country');
+
+        if ($discovery['keys'] === []) {
+            $route = $this->router->route($parsed);
+
+            return [
+                'scope' => $route['scope'],
+                'country_code' => $route['country_code'],
+                'city' => $route['city'],
+                'category' => $route['category'],
+                'keys' => $route['keys'],
+                'platforms' => $route['platforms'],
+                'providers' => [],
+                'routing_source' => $route['routing_source'],
+                'discovery_engine' => 'platform_routing_fallback',
+            ];
+        }
+
+        $providers = $discovery['providers'];
+        if ($providers === []) {
+            foreach ($discovery['keys'] as $key) {
+                $record = $this->registry->provider($key);
+                if ($record !== null) {
+                    $providers[] = $record;
+                }
+            }
+        }
+
+        $platforms = array_map(fn (array $provider) => [
+            'key' => $provider['key'],
+            'label' => $provider['provider_name'],
+            'country' => $provider['provider_country'],
+            'source' => $discovery['routing_source'] === 'database' ? 'catalog_db' : 'live',
+            'connector_type' => $provider['connector_type'],
+            'provider_type' => $provider['provider_type'],
+            'trust_score' => $provider['trust_score'],
+            'priority_score' => $provider['priority_score'],
+            'effective_priority' => $provider['effective_priority'],
+            'search_capabilities' => $provider['search_capabilities'],
+            'score' => 100 - (int) ($provider['effective_priority'] ?? 50),
+        ], $providers);
+
+        $scope = \App\Support\SearchScopeResolver::isUniversal($parsed) ? 'universal' : 'targeted';
+
+        return [
+            'scope' => $scope,
+            'country_code' => $discovery['country_codes'][0] ?? ($parsed['search_country_code'] ?? ''),
+            'city' => isset($parsed['search_city']) ? (string) $parsed['search_city'] : null,
+            'category' => \App\Support\CategoryCatalog::normalize($parsed['category'] ?? 'marketplace'),
+            'keys' => $discovery['keys'],
+            'platforms' => $platforms,
+            'providers' => $providers,
+            'routing_source' => $discovery['routing_source'],
+            'discovery_engine' => 'global_provider_registry_v1',
+        ];
     }
 
-    $cap = (int) config('live_platforms.max_workers_cap', 24);
-    if (count($keys) > $cap) {
-      $keys = array_slice($keys, 0, $cap);
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, string>
+     */
+    public function keys(array $parsed): array
+    {
+        return $this->discover($parsed)['keys'];
     }
-
-    $keys = $this->filterKeysByIntent($keys, $parsed);
-
-    return [
-      'scope' => $scope,
-      'country_code' => $countryCode,
-      'city' => $city,
-      'category' => $category,
-      'keys' => $keys,
-      'platforms' => $this->hydratePlatforms($keys),
-    ];
-  }
-
-  /**
-   * @param  array<string, mixed>  $parsed
-   * @return array<int, string>
-   */
-  public function keys(array $parsed): array
-  {
-    return $this->discover($parsed)['keys'];
-  }
-
-  /**
-   * @return array<int, string>
-   */
-  private function targetedKeys(string $countryCode, string $category, ?string $city, array $parsed): array
-  {
-    if ($countryCode === '') {
-      return [];
-    }
-
-    $fromConfig = $this->configKeysFor($countryCode, $category, $city);
-    $fromBridge = PlatformCatalogBridge::keysFor($countryCode, $category);
-    $keys = array_values(array_unique(array_merge($fromConfig, $fromBridge)));
-
-    return $this->sortKeys($keys);
-  }
-
-  /**
-   * Worldwide scope: global cross-border marketplaces only (eBay, Amazon, Decathlon, etc.).
-   *
-   * @return array<int, string>
-   */
-  private function globalKeysForCategory(string $category): array
-  {
-    $keys = [];
-
-    foreach (LivePlatformRegistry::all() as $key => $meta) {
-      if ($this->matchesCategory($meta, $category) && $this->isGlobalPlatform($meta)) {
-        $keys[] = $key;
-      }
-    }
-
-    return $this->sortKeys(array_values(array_unique($keys)));
-  }
-
-  /**
-   * @return array<int, string>
-   */
-  private function configKeysFor(string $countryCode, string $category, ?string $city): array
-  {
-    $keys = [];
-
-    foreach (LivePlatformRegistry::all() as $key => $meta) {
-      $platformCountry = strtoupper((string) ($meta['country'] ?? ''));
-      if ($platformCountry !== $countryCode) {
-        continue;
-      }
-      if (! $this->matchesCategory($meta, $category)) {
-        continue;
-      }
-      if (! $this->matchesCity($meta, $city)) {
-        continue;
-      }
-      $keys[] = $key;
-    }
-
-    return $keys;
-  }
-
-  /**
-   * @param  array<int, string>  $keys
-   * @param  array<string, mixed>  $parsed
-   * @return array<int, string>
-   */
-  private function filterKeysByIntent(array $keys, array $parsed): array
-  {
-    $country = strtoupper((string) ($parsed['search_country_code'] ?? ''));
-
-    if (KosovoToyIntent::isToySearch($parsed) && $country === 'XK') {
-      $toyKeys = array_flip(KosovoToyPlatforms::keys());
-
-      return array_values(array_filter(
-        $keys,
-        fn (string $key) => isset($toyKeys[$key]),
-      ));
-    }
-
-    if (CategoryCatalog::isAutomotive($parsed['category'] ?? '') && $country === 'XK') {
-      $autoKeys = array_flip(KosovoAutomotiveIntent::livePlatformKeys());
-
-      return array_values(array_filter(
-        $keys,
-        fn (string $key) => isset($autoKeys[$key]),
-      ));
-    }
-
-    if (ProductCategoryResolver::isFashionPlatformRelevant($parsed)) {
-      $toyKeys = array_flip(KosovoToyPlatforms::keys());
-
-      return array_values(array_filter(
-        $keys,
-        fn (string $key) => ! isset($toyKeys[$key]),
-      ));
-    }
-
-    $fashionKeys = array_flip(KosovoFashionPlatforms::keys());
-    $toyKeys = array_flip(KosovoToyPlatforms::keys());
-
-    return array_values(array_filter(
-      $keys,
-      fn (string $key) => ! isset($fashionKeys[$key]) && ! isset($toyKeys[$key]),
-    ));
-  }
-
-  /**
-   * @param  array<string, mixed>  $meta
-   */
-  private function matchesCategory(array $meta, string $category): bool
-  {
-    $cats = (array) ($meta['categories'] ?? []);
-
-    if (in_array($category, $cats, true)) {
-      return true;
-    }
-
-    return $category === 'marketplace' && in_array('marketplace', $cats, true);
-  }
-
-  /**
-   * @param  array<string, mixed>  $meta
-   */
-  private function matchesCity(array $meta, ?string $city): bool
-  {
-    $cities = (array) ($meta['cities'] ?? []);
-    if ($cities === [] || $city === null || $city === '') {
-      return true;
-    }
-
-    $cityLower = mb_strtolower($city);
-    foreach ($cities as $allowed) {
-      if (mb_strtolower((string) $allowed) === $cityLower) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * @param  array<string, mixed>  $meta
-   */
-  private function isGlobalPlatform(array $meta): bool
-  {
-    return in_array(strtoupper((string) ($meta['country'] ?? '')), ['WW', 'GLOBAL', '*'], true)
-      || ! empty($meta['global']);
-  }
-
-  /**
-   * @param  array<int, string>  $keys
-   * @return array<int, string>
-   */
-  private function sortKeys(array $keys): array
-  {
-    usort($keys, fn ($a, $b) => $this->priority($a) <=> $this->priority($b));
-
-    return $keys;
-  }
-
-  private function priority(string $key): int
-  {
-    return (int) (LivePlatformRegistry::all()[$key]['priority'] ?? 50);
-  }
-
-  /**
-   * @param  array<int, string>  $keys
-   * @return array<int, array{key: string, label: string, country: string, source: string}>
-   */
-  private function hydratePlatforms(array $keys): array
-  {
-    $platforms = [];
-
-    foreach ($keys as $key) {
-      $meta = LivePlatformRegistry::all()[$key] ?? null;
-      $platforms[] = [
-        'key' => $key,
-        'label' => LivePlatformRegistry::label($key),
-        'country' => (string) ($meta['country'] ?? ''),
-        'source' => $meta !== null ? 'live' : 'catalog',
-      ];
-    }
-
-    return $platforms;
-  }
 }

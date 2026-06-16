@@ -478,12 +478,16 @@ class QueryIntentEnricher
     {
         $defaults = [];
 
-        if (! empty($parsed['search_target'])
+            if (! empty($parsed['search_target'])
             && CategoryCatalog::normalize($parsed['category'] ?? '') !== 'travel'
             && ! WebServicesIntentParser::isActive($parsed)) {
             $multi = $parsed['search_countries'] ?? [];
             if (! is_array($multi) || count($multi) <= 1) {
-                if (! empty($parsed['search_country'])) {
+                $code = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+                $canonical = SearchCountryResolver::countryNameForCode($code);
+                if ($canonical !== null) {
+                    $defaults['country'] = $canonical;
+                } elseif (! empty($parsed['search_country'])) {
                     $defaults['country'] = $parsed['search_country'];
                 }
             }

@@ -13,7 +13,7 @@ use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
-use App\Support\ShoeSize;
+use App\Support\SearchCountryResolver;
 use App\Support\WebServicesIntentParser;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
@@ -366,11 +366,24 @@ class SearchOrchestratorService
                 }
             }
             if (! $isTravel && isset($filters['country']) && $filters['country'] !== '') {
-                $countryMatch = CountryMatcher::locationMatchesFilter(
-                    (string) ($product['location'] ?? ''),
-                    (string) $filters['country'],
-                    isset($product['country_code']) ? (string) $product['country_code'] : null,
-                );
+                $targetCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+                $productCode = strtoupper((string) ($product['country_code'] ?? ''));
+                $countryMatch = $targetCode !== '' && $productCode !== '' && $targetCode === $productCode;
+
+                if (! $countryMatch) {
+                    $filterCode = SearchCountryResolver::codeFromCountryFilter((string) $filters['country']);
+                    if ($filterCode !== null && $productCode !== '' && strtoupper($filterCode) === $productCode) {
+                        $countryMatch = true;
+                    }
+                }
+
+                if (! $countryMatch) {
+                    $countryMatch = CountryMatcher::locationMatchesFilter(
+                        (string) ($product['location'] ?? ''),
+                        (string) $filters['country'],
+                        $product['country_code'] ?? null,
+                    );
+                }
                 if (! $countryMatch && ! empty($parsed['search_countries']) && is_array($parsed['search_countries'])) {
                     foreach ($parsed['search_countries'] as $country) {
                         if (CountryMatcher::locationMatchesFilter(
@@ -629,9 +642,11 @@ class SearchOrchestratorService
         $isFashion = in_array($category, ['fashion', 'sports_outdoor'], true);
         $isAutomotive = CategoryCatalog::isAutomotive($category);
         $kosovoAutoLive = $isAutomotive && $this->isKosovoAutomotiveLiveStore($store);
+        $swissAutoLive = $isAutomotive && $this->isSwissAutomotiveLiveStore($store);
         $allowUnknown = str_contains($store, 'kleinanzeigen') || $color === 'multicolor'
             || ($isFashion && (KosovoMarketplaces::isKosovoPlatform($store) || LivePlatformRegistry::isLivePlatform($store)))
-            || $kosovoAutoLive;
+            || $kosovoAutoLive
+            || $swissAutoLive;
 
         if ($isFashion && $color !== 'multicolor') {
             return FashionIntentParser::matchesColor($product, $color, $allowUnknown);
@@ -663,7 +678,30 @@ class SearchOrchestratorService
             return true;
         }
 
+        if ($swissAutoLive) {
+            if (AutomotiveColorResolver::matchesWanted($productColor, $color, $title, false)) {
+                return true;
+            }
+
+            return true;
+        }
+
         return AutomotiveColorResolver::matchesWanted($productColor, $color, $title, $allowUnknown);
+    }
+
+    private function isSwissAutomotiveLiveStore(string $store): bool
+    {
+        return str_contains($store, 'autolina')
+            || str_contains($store, 'autogrid')
+            || str_contains($store, 'autoscout24')
+            || str_contains($store, 'car_trade24')
+            || str_contains($store, 'carlando')
+            || str_contains($store, 'carindex')
+            || str_contains($store, 'ricardo')
+            || str_contains($store, 'tutti')
+            || str_contains($store, 'troovo')
+            || str_contains($store, 'amag')
+            || str_contains($store, 'motoauto');
     }
 
     private function isKosovoAutomotiveLiveStore(string $store): bool

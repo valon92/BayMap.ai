@@ -28,7 +28,7 @@ class ValonTaskSplitter
         $max = $liveFanOut
             ? LivePlatformRegistry::maxWorkersFor($parsed)
             : (int) config('valon.max_workers', config('agent_pools.max_agents', 6));
-        $prefix = config('valon.worker_prefix', 'ValonWorker');
+        $prefix = $this->workerPrefix($category);
         $providers = $activation['providers'] ?? [];
         $agents = $activation['agents'] ?? [];
 
@@ -168,5 +168,13 @@ class ValonTaskSplitter
     private function normalizePlatform(string $sourceKey): string
     {
         return strtolower(str_replace(['.', ' ', '-'], '_', trim($sourceKey)));
+    }
+
+    private function workerPrefix(string $category): string
+    {
+        $map = (array) config('providers.worker_prefix_by_category', []);
+        $normalized = CategoryCatalog::normalize($category);
+
+        return (string) ($map[$normalized] ?? config('valon.worker_prefix', 'ValonWorker'));
     }
 }

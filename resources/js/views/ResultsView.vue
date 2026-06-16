@@ -747,9 +747,7 @@ async function fetchPage(page, append = false) {
   } else {
     data.value = response;
     visibleResults.value = response.results || [];
-    if (Object.keys(activeFilters.value).length === 0) {
-      activeFilters.value = filtersFromResponse(response);
-    }
+    activeFilters.value = filtersFromResponse(response);
   }
 
   currentPage.value = page;

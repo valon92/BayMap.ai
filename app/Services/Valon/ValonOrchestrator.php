@@ -121,9 +121,17 @@ class ValonOrchestrator
                 'provider_discovery' => [
                     'scope' => $providerDiscovery['scope'],
                     'country_code' => $providerDiscovery['country_code'],
+                    'country_codes' => $providerDiscovery['country_codes'] ?? [$providerDiscovery['country_code']],
                     'category' => $providerDiscovery['category'],
+                    'subcategory' => $providerDiscovery['subcategory'] ?? null,
                     'providers_found' => count($providerDiscovery['keys']),
-                    'platforms' => array_slice($providerDiscovery['platforms'], 0, 12),
+                    'workers_planned' => $providerDiscovery['workers_planned'] ?? count($providerDiscovery['keys']),
+                    'discovery_engine' => $providerDiscovery['discovery_engine'] ?? null,
+                    'providers' => array_slice(
+                        $providerDiscovery['providers'] ?? $providerDiscovery['platforms'] ?? [],
+                        0,
+                        12,
+                    ),
                 ],
                 'intent' => [
                     'category' => $intent['category'],

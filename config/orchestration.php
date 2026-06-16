@@ -61,6 +61,11 @@ return [
     |--------------------------------------------------------------------------
     */
     'connector_types' => [
+        'official_api',
+        'merchant_feed',
+        'search_feed',
+        'structured_scraper',
+        'search_aggregator',
         'generic',
         'woocommerce',
         'cscart',

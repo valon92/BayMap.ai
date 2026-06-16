@@ -2,11 +2,13 @@
 
 namespace App\Support;
 
+use App\Services\Catalog\PlatformCatalogRepository;
 use App\Services\Platform\PlatformDiscoveryService;
+use App\Support\CategoryCatalog;
 
 /**
- * Country + category live scraping registry (config/live_platforms.php).
- * Platform discovery is delegated to PlatformDiscoveryService for automatic classification.
+ * Country + category live scraping registry.
+ * Data source: DB global catalog (preferred) with config/live_platforms.php fallback.
  */
 class LivePlatformRegistry
 {
@@ -19,10 +21,16 @@ class LivePlatformRegistry
     public static function all(): array
     {
         if (self::$platforms === null) {
-            self::$platforms = config('live_platforms.platforms', []);
+            self::$platforms = app(PlatformCatalogRepository::class)->allPlatforms();
         }
 
         return self::$platforms;
+    }
+
+    public static function flushCache(): void
+    {
+        self::$platforms = null;
+        app(PlatformCatalogRepository::class)->flushCache();
     }
 
     /**
@@ -41,6 +49,8 @@ class LivePlatformRegistry
     }
 
     /**
+     * Direct country+category lookup (no intent filters — used by intent helpers).
+     *
      * @return array<int, string>
      */
     public static function keysFor(string $countryCode, string $category): array

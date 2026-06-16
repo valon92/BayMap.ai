@@ -14,6 +14,7 @@ class ValonWorkerRunner
     public function __construct(
         private ValonResultNormalizer $normalizer,
         private ParallelWorkerExecutor $executor,
+        private \App\Services\Providers\ProviderIntelligenceService $intelligence,
     ) {}
 
     /**
@@ -71,6 +72,8 @@ class ValonWorkerRunner
                 'results' => count($entry['items']),
                 'latency_ms' => $entry['latency_ms'],
             ];
+
+            $this->recordProviderMetric($entry, $workers);
         }
 
         return [
@@ -246,5 +249,35 @@ class ValonWorkerRunner
                 @set_time_limit((int) $previousLimit);
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     * @param  array<int, array<string, mixed>>  $workers
+     */
+    private function recordProviderMetric(array $entry, array $workers): void
+    {
+        $platform = (string) ($entry['platform'] ?? '');
+        if ($platform === '') {
+            return;
+        }
+
+        $parsed = [];
+        foreach ($workers as $worker) {
+            if (($worker['platform'] ?? '') === $platform) {
+                $parsed = (array) ($worker['task']['parsed_query'] ?? []);
+                break;
+            }
+        }
+
+        $this->intelligence->record(
+            $platform,
+            (int) ($entry['latency_ms'] ?? 0),
+            count($entry['items'] ?? []),
+            in_array($entry['status'] ?? '', ['ok', 'blocked'], true),
+            isset($parsed['category']) ? (string) $parsed['category'] : null,
+            isset($parsed['search_country_code']) ? (string) $parsed['search_country_code'] : null,
+            isset($entry['error']) ? (string) $entry['error'] : null,
+        );
     }
 }

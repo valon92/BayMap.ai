@@ -107,6 +107,8 @@ class SearchExpansionService
             'search_country_code' => $discovery['country_code'] ?: $countryCode,
             'search_scope' => $discovery['scope'],
             'discovered_platforms' => $discovery['platforms'],
+            'discovered_providers' => $discovery['providers'] ?? [],
+            'discovery_engine' => $discovery['discovery_engine'] ?? null,
             'nearby_countries' => $this->nearbyCountryLabels($countryCode),
             'marketplaces' => $marketplaces,
             'marketplace_labels' => $marketplaceLabels,
