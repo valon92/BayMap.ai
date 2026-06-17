@@ -10,6 +10,7 @@ use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
 use App\Support\KosovoToyIntent;
+use App\Support\ListingEnricher;
 
 class ProductListingNormalizer
 {
@@ -20,6 +21,12 @@ class ProductListingNormalizer
     public static function detectBrand(string $title): ?string
     {
         $upper = mb_strtoupper($title);
+        foreach (['APPLE', 'SAMSUNG', 'DELL', 'HP', 'LENOVO', 'ASUS', 'ACER', 'MICROSOFT', 'SONY', 'LG', 'MSI'] as $brand) {
+            if (str_contains($upper, $brand)) {
+                return strtolower($brand);
+            }
+        }
+
         foreach (['PUMA', 'NIKE', 'ADIDAS', 'REEBOK', 'NEW BALANCE', 'TIMBERLAND', 'UNDER ARMOUR', 'JORDAN', 'CONVERSE'] as $brand) {
             if (str_contains($upper, $brand)) {
                 return strtolower(str_replace(' ', '_', $brand));
@@ -32,9 +39,21 @@ class ProductListingNormalizer
     /**
      * @param  array<string, mixed>  $platform
      */
-    public static function detectProductType(string $title): string
+    public static function detectProductType(string $title, ?string $category = null): string
     {
         $lower = mb_strtolower($title);
+
+        if (CategoryCatalog::isElectronics($category ?? '')) {
+            return match (true) {
+                str_contains($lower, 'macbook') || str_contains($lower, 'notebook') || str_contains($lower, 'laptop') => 'laptop',
+                str_contains($lower, 'iphone') || str_contains($lower, 'galaxy') || str_contains($lower, 'smartphone') || str_contains($lower, 'phone') => 'phone',
+                str_contains($lower, 'ipad') => 'tablet',
+                str_contains($lower, 'airpods') || str_contains($lower, 'headphone') || str_contains($lower, 'earbuds') => 'headphones',
+                str_contains($lower, 'monitor') || str_contains($lower, 'display') => 'monitor',
+                str_contains($lower, 'smartwatch') || str_contains($lower, 'watch') => 'smartwatch',
+                default => 'electronics',
+            };
+        }
 
         return match (true) {
             str_contains($lower, 'sneaker') || str_contains($lower, 'atlete') || str_contains($lower, 'trainer') => 'sneakers',
@@ -57,25 +76,47 @@ class ProductListingNormalizer
     public static function finalize(array $platform, string $storeKey, array $item): array
     {
         $title = (string) ($item['title'] ?? '');
-        $brand = $item['brand'] ?? self::detectBrand($title);
+        $parsedQuery = is_array($platform['_parsed_query'] ?? null) ? $platform['_parsed_query'] : [];
+        $category = ! empty($item['category'])
+            ? CategoryCatalog::normalize((string) $item['category'])
+            : CategoryCatalog::categoryFromPlatform($platform, $parsedQuery);
 
-        return [
+        $titleHints = CategoryCatalog::isElectronics($category)
+            ? ElectronicsIntentParser::attributesFromTitle($title)
+            : [];
+
+        if ($category === 'marketplace' && ($titleHints['product_type'] ?? null) !== null) {
+            $category = 'electronics_tech';
+        }
+
+        $brand = $item['brand'] ?? $titleHints['brand'] ?? self::detectBrand($title);
+
+        $listing = [
             'id' => $storeKey.'-'.($item['product_id'] ?? md5($title)),
             'store' => $storeKey,
             'title' => $title,
             'image' => $item['image'] ?? null,
+            'images' => is_array($item['images'] ?? null) ? $item['images'] : [],
             'price' => (float) ($item['price'] ?? 0),
             'currency' => (string) ($platform['currency'] ?? 'EUR'),
             'location' => (string) ($item['location'] ?? $platform['location'] ?? ''),
             'country_code' => (string) ($platform['country'] ?? ''),
-            'condition' => 'new',
+            'condition' => (string) ($item['condition'] ?? 'new'),
             'url' => $item['url'] ?? ($platform['base_url'] ?? '#'),
             'gender' => $item['gender'] ?? null,
             'brand' => $brand,
-            'product_type' => $item['product_type'] ?? self::detectProductType($title),
+            'model' => $item['model'] ?? $titleHints['model'] ?? null,
+            'color' => $item['color'] ?? null,
+            'storage' => $item['storage'] ?? $titleHints['storage'] ?? null,
+            'ram' => $item['ram'] ?? $titleHints['ram'] ?? null,
+            'chip' => $item['chip'] ?? $titleHints['chip'] ?? null,
+            'display_size' => $item['display_size'] ?? $titleHints['display_size'] ?? null,
+            'year' => $item['year'] ?? $titleHints['year'] ?? null,
+            'product_type' => $item['product_type'] ?? $titleHints['product_type'] ?? self::detectProductType($title, $category),
             'sizes' => $item['sizes'] ?? [],
+            'category' => $category,
             'tags' => array_values(array_filter([
-                'fashion',
+                $category,
                 $storeKey,
                 strtolower((string) ($platform['country'] ?? '')),
                 $brand,
@@ -83,6 +124,8 @@ class ProductListingNormalizer
             ])),
             'live' => true,
         ];
+
+        return ListingEnricher::enrich($listing, $category);
     }
 
     /**
@@ -94,12 +137,20 @@ class ProductListingNormalizer
     {
         $title = (string) ($item['title'] ?? '');
         $brand = $item['brand'] ?? null;
+        $images = [];
+        if (! empty($item['images']) && is_array($item['images'])) {
+            $images = array_values(array_filter($item['images'], fn ($u) => is_string($u) && $u !== ''));
+        }
+        if ($images === [] && ! empty($item['image'])) {
+            $images = [(string) $item['image']];
+        }
 
-        return [
+        $listing = [
             'id' => $storeKey.'-'.($item['product_id'] ?? md5($title)),
             'store' => $storeKey,
             'title' => $title,
-            'image' => $item['image'] ?? null,
+            'image' => $images[0] ?? ($item['image'] ?? null),
+            'images' => $images,
             'price' => (float) ($item['price'] ?? 0),
             'currency' => (string) ($platform['currency'] ?? 'EUR'),
             'location' => (string) ($item['location'] ?? $platform['location'] ?? 'Germany'),
@@ -114,6 +165,13 @@ class ProductListingNormalizer
             'transmission' => $item['transmission'] ?? null,
             'color' => $item['color'] ?? null,
             'engine_liters' => $item['engine_liters'] ?? null,
+            'seller_type' => $item['seller_type'] ?? null,
+            'power_hp' => $item['power_hp'] ?? null,
+            'power_kw' => $item['power_kw'] ?? null,
+            'electric_range_km' => $item['electric_range_km'] ?? null,
+            'body_type' => $item['body_type'] ?? null,
+            'first_registration' => $item['first_registration'] ?? null,
+            'consumption' => $item['consumption'] ?? null,
             'product_type' => 'car',
             'category' => 'automotive',
             'sizes' => [],
@@ -126,6 +184,45 @@ class ProductListingNormalizer
             ])),
             'live' => true,
         ];
+
+        if (is_array($item['specs'] ?? null) && $item['specs'] !== []) {
+            $listing['specs'] = $item['specs'];
+        }
+
+        return ListingEnricher::enrich($listing, 'automotive');
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    public static function finalizeRealEstate(array $platform, string $storeKey, array $item): array
+    {
+        $title = (string) ($item['title'] ?? '');
+
+        $listing = [
+            'id' => $storeKey.'-'.($item['product_id'] ?? md5($title)),
+            'store' => $storeKey,
+            'title' => $title,
+            'image' => $item['image'] ?? null,
+            'images' => is_array($item['images'] ?? null) ? $item['images'] : [],
+            'price' => (float) ($item['price'] ?? 0),
+            'currency' => (string) ($item['currency'] ?? $platform['currency'] ?? 'CHF'),
+            'location' => (string) ($item['location'] ?? $platform['location'] ?? ''),
+            'country_code' => (string) ($item['country_code'] ?? $platform['country'] ?? ''),
+            'url' => $item['url'] ?? ($platform['base_url'] ?? '#'),
+            'category' => 'real_estate',
+            'property_type' => $item['property_type'] ?? null,
+            'listing_type' => $item['listing_type'] ?? null,
+            'rooms' => $item['rooms'] ?? $item['bedrooms'] ?? null,
+            'area_sqm' => $item['area_sqm'] ?? $item['living_space'] ?? null,
+            'condition' => (string) ($item['condition'] ?? 'used'),
+            'live' => (bool) ($item['live'] ?? true),
+            'tags' => ['real_estate', $storeKey, 'live'],
+        ];
+
+        return ListingEnricher::enrich($listing, 'real_estate');
     }
 
     /**
@@ -204,6 +301,9 @@ class ProductListingNormalizer
             if ($model !== '') {
                 if ($isAutomotive) {
                     $store = strtolower((string) ($item['store'] ?? ''));
+                    if (AutomotiveModelResolver::shouldTrustPlatformScope($store, $parsed)) {
+                        // AutoScout24 / Kleinanzeigen URLs are already scoped to make/model.
+                    } else {
                     $allowUnknownYear = str_contains($store, 'merrjep')
                         || str_contains($store, 'veturaneshitje')
                         || str_contains($store, 'autolina')
@@ -221,6 +321,7 @@ class ProductListingNormalizer
                         $allowUnknownYear,
                     )) {
                         return false;
+                    }
                     }
                 } else {
                     $title = mb_strtolower($item['title'] ?? '');

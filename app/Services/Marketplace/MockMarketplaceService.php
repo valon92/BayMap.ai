@@ -3,8 +3,10 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\MarketplaceSearchInterface;
+use App\Support\AutomotiveModelResolver;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
+use App\Support\ListingEnricher;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GlobalBookMarketplaces;
 use App\Support\ElectronicsIntentParser;
@@ -68,7 +70,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         $dataset = $this->filterForSource($dataset);
         $dataset = $this->filterForIntent($dataset, $parsedQuery);
 
-        return array_map(function (array $item) {
+        return array_map(function (array $item) use ($category) {
             $item['source'] = $this->displaySourceName();
             $item['source_key'] = $this->source;
             $item['url'] = $this->listingUrl($item['url'] ?? null);
@@ -76,7 +78,11 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             $item['sponsored'] = (bool) ($item['sponsored'] ?? false);
             $item['live'] = false;
 
-            return $item;
+            if (empty($item['category'])) {
+                $item['category'] = $category;
+            }
+
+            return ListingEnricher::enrich($item, $category);
         }, $dataset);
     }
 
@@ -215,11 +221,13 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 }
 
                 if (! empty($parsed['model'])) {
-                    $wanted = mb_strtolower((string) $parsed['model']);
-                    $title = mb_strtolower($item['title'] ?? '');
-                    $tags = array_map('mb_strtolower', $item['tags'] ?? []);
-                    if (! str_contains(str_replace(' ', '', $title), str_replace(' ', '', $wanted))
-                        && ! in_array($wanted, $tags, true)) {
+                    if (! AutomotiveModelResolver::matchesListing(
+                        (string) ($item['title'] ?? ''),
+                        isset($item['model']) ? (string) $item['model'] : null,
+                        (string) $parsed['model'],
+                        array_merge($parsed, ['year' => $item['year'] ?? null]),
+                        true,
+                    )) {
                         return false;
                     }
                 }

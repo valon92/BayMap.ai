@@ -210,6 +210,65 @@ class ElectronicsIntentParser
     }
 
     /**
+     * Extract brand, RAM, storage, screen size, chip, etc. from a product listing title.
+     *
+     * @return array<string, mixed>
+     */
+    public static function attributesFromTitle(string $title): array
+    {
+        $attrs = self::fromQuery($title);
+        $lower = mb_strtolower($title);
+
+        if (preg_match('/\b(\d+)\s*GB\s*-\s*(\d+)\s*(GB|TB)\b/ui', $title, $m)) {
+            $attrs['ram'] = ((int) $m[1]).'GB';
+            $attrs['storage'] = strtoupper($m[3]) === 'TB'
+                ? ((int) $m[2]).'TB'
+                : ((int) $m[2]).'GB';
+        } elseif (preg_match('/\b(\d+)\s*GB\s*-\s*(\d+)\s*GB\b/ui', $title, $m)) {
+            $attrs['ram'] = ((int) $m[1]).'GB';
+            $attrs['storage'] = ((int) $m[2]).'GB';
+        }
+
+        if (empty($attrs['storage']) && preg_match('/\b(\d+)\s*TB\b/i', $title, $m)) {
+            $attrs['storage'] = ((int) $m[1]).'TB';
+        }
+
+        if (preg_match('/(\d+[,.]?\d*)\s*(?:Zoll|")/ui', $title, $m)) {
+            $attrs['display_size'] = str_replace(',', '.', $m[1]).'"';
+        }
+
+        if (preg_match('/\bApple\s+(M\d+(?:\s*Pro)?(?:\s*Max)?)\b/ui', $title, $m)) {
+            $attrs['chip'] = trim($m[1]);
+        }
+
+        if (preg_match('/\((20\d{2})\)/', $title, $m)) {
+            $attrs['year'] = (int) $m[1];
+        }
+
+        if (empty($attrs['brand'])) {
+            foreach (['apple', 'samsung', 'dell', 'hp', 'lenovo', 'asus', 'acer', 'microsoft', 'sony', 'lg'] as $brand) {
+                if (str_contains($lower, $brand)) {
+                    $attrs['brand'] = $brand;
+                    break;
+                }
+            }
+        }
+
+        if (empty($attrs['product_type'])) {
+            $attrs['product_type'] = match (true) {
+                str_contains($lower, 'macbook') || str_contains($lower, 'notebook') || str_contains($lower, 'laptop') => 'laptop',
+                str_contains($lower, 'iphone') || str_contains($lower, 'galaxy') || str_contains($lower, 'smartphone') => 'phone',
+                str_contains($lower, 'ipad') => 'tablet',
+                str_contains($lower, 'airpods') || str_contains($lower, 'headphone') => 'headphones',
+                str_contains($lower, 'monitor') || str_contains($lower, 'display') => 'monitor',
+                default => null,
+            };
+        }
+
+        return array_filter($attrs, fn ($v) => $v !== null && $v !== '');
+    }
+
+    /**
      * @param  array<int, string>  $features
      */
     public static function productMatchesFeatures(array $product, array $features): bool

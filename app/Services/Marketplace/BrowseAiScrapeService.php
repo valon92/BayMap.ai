@@ -157,7 +157,9 @@ class BrowseAiScrapeService
 
             $priceRaw = (string) ($row[$fields['price'] ?? 'Price'] ?? $row['price'] ?? '');
             $price = $this->parsePrice($priceRaw);
-            if ($price < 800) {
+            $category = (string) ($config['category'] ?? $platform['category'] ?? 'automotive');
+            $minPrice = $category === 'real_estate' ? 50000 : 800;
+            if ($price > 0 && $price < $minPrice) {
                 continue;
             }
 
@@ -170,18 +172,31 @@ class BrowseAiScrapeService
             $image = $row[$fields['image'] ?? 'Image'] ?? $row['image'] ?? null;
             $location = trim((string) ($row[$fields['location'] ?? 'Location'] ?? $row['location'] ?? ($platform['location'] ?? 'Germany')));
 
-            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+            $baseItem = [
                 'product_id' => md5($title.$url),
                 'title' => $title,
                 'price' => $price,
                 'image' => is_string($image) ? $image : null,
                 'url' => $url,
                 'location' => $location,
-                'brand' => $this->brandFromTitle($title),
-                'model' => $this->modelFromTitle($title),
-                'year' => $this->yearFromTitle($title),
                 'condition' => 'used',
-            ]);
+            ];
+
+            if ($category === 'real_estate') {
+                $items[] = ProductListingNormalizer::finalize($platform, $storeKey, array_merge($baseItem, [
+                    'category' => 'real_estate',
+                    'property_type' => 'apartment',
+                    'country_code' => strtoupper((string) ($platform['country'] ?? 'CH')),
+                    'currency' => (string) ($platform['currency'] ?? 'CHF'),
+                    'live' => true,
+                ]));
+            } else {
+                $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, array_merge($baseItem, [
+                    'brand' => $this->brandFromTitle($title),
+                    'model' => $this->modelFromTitle($title),
+                    'year' => $this->yearFromTitle($title),
+                ]));
+            }
 
             if (count($items) >= 20) {
                 break;

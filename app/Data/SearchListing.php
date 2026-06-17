@@ -40,6 +40,8 @@ final class SearchListing
         public readonly ?string $transmission = null,
         public readonly ?float $engineLiters = null,
         public readonly ?string $countryCode = null,
+        /** @var array<int, string> */
+        public readonly array $images = [],
         /** @var array<string, mixed> */
         public readonly array $extensions = [],
     ) {}
@@ -51,6 +53,8 @@ final class SearchListing
         'year', 'mileage', 'seller_type', 'store', 'price_eur', 'fingerprint', 'fuel', 'color',
         'transmission', 'engine_liters', 'country_code', 'images', 'match_score', 'availability',
         'valon_worker_id', 'valon_platform', '_provider_latency_ms', 'ai_explanation', 'extensions',
+        '_marketplace_result_total', 'category', 'product_type', 'power_hp', 'power_kw',
+        'electric_range_km', 'body_type', 'first_registration', 'consumption', 'specs',
     ];
 
     /**
@@ -95,6 +99,7 @@ final class SearchListing
             transmission: isset($data['transmission']) ? (string) $data['transmission'] : null,
             engineLiters: isset($data['engine_liters']) ? (float) $data['engine_liters'] : null,
             countryCode: isset($data['country_code']) ? (string) $data['country_code'] : null,
+            images: is_array($data['images'] ?? null) ? array_values(array_filter($data['images'], 'is_string')) : [],
             extensions: $extensions,
         );
     }
@@ -133,7 +138,8 @@ final class SearchListing
             'transmission' => $this->transmission,
             'engine_liters' => $this->engineLiters,
             'country_code' => $this->countryCode,
-        ], fn ($v) => $v !== null && $v !== '');
+            'images' => $this->images !== [] ? $this->images : null,
+        ], fn ($v) => $v !== null && $v !== '' && $v !== []);
 
         return array_merge($base, array_filter(
             $this->extensions,
@@ -172,6 +178,7 @@ final class SearchListing
             transmission: $this->transmission,
             engineLiters: $this->engineLiters,
             countryCode: $this->countryCode,
+            images: $this->images,
             extensions: $this->extensions,
         );
     }

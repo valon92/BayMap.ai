@@ -47,6 +47,7 @@ return [
         'woocommerce' => 'structured_scraper',
         'cscart' => 'structured_scraper',
         'automotive' => 'structured_scraper',
+        'real_estate' => 'structured_scraper',
         'gy_digital' => 'structured_scraper',
         'api' => 'official_api',
     ],

@@ -14,6 +14,7 @@ class ScraperAdapterResolver
         WooCommerceScraperAdapter $wooCommerce,
         GenericHtmlScraperAdapter $generic,
         AutomotiveHtmlScraperAdapter $automotive,
+        RealEstateHtmlScraperAdapter $realEstate,
         GyDigitalScraperAdapter $gyDigital,
     ) {
         $this->adapters = [
@@ -21,6 +22,7 @@ class ScraperAdapterResolver
             $wooCommerce->adapterKey() => $wooCommerce,
             $generic->adapterKey() => $generic,
             $automotive->adapterKey() => $automotive,
+            $realEstate->adapterKey() => $realEstate,
             $gyDigital->adapterKey() => $gyDigital,
         ];
     }

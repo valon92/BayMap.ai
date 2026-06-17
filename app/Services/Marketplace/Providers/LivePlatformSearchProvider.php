@@ -50,7 +50,7 @@ class LivePlatformSearchProvider implements FederatedSearchProviderInterface
         $category = CategoryCatalog::normalize($category);
         $cats = (array) ($this->platformMeta['categories'] ?? []);
 
-        return in_array($category, $cats, true) || in_array('marketplace', $cats, true);
+        return in_array($category, $cats, true);
     }
 
     public function getSourceName(): string

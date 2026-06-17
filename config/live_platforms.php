@@ -10,8 +10,13 @@ return [
 
     'cache_ttl_seconds' => (int) env('LIVE_PLATFORM_CACHE_TTL', 600),
 
-    /** When false, DE automotive mock listings are omitted for platforms without live scraping. */
-    'automotive_demo_fallback' => (bool) env('LIVE_AUTOMOTIVE_DEMO_FALLBACK', false),
+    /** When true, DE/CH/NL automotive mock listings back live scrapers when sites block bots. */
+    'automotive_demo_fallback' => (bool) env('LIVE_AUTOMOTIVE_DEMO_FALLBACK', true),
+
+    /** Multi-page automotive scraping (AutoScout24, Kleinanzeigen). */
+    'automotive_max_pages' => (int) env('AUTOMOTIVE_MAX_PAGES', 10),
+
+    'automotive_max_listings_per_platform' => (int) env('AUTOMOTIVE_MAX_LISTINGS', 100),
 
     'timeout_seconds' => (int) env('LIVE_PLATFORM_TIMEOUT', 60),
 
@@ -1404,7 +1409,7 @@ return [
 
         // ── Switzerland · Real Estate ────────────────────────────────────
         'homegate_ch' => [
-            'adapter' => 'generic',
+            'adapter' => 'real_estate',
             'label' => 'Homegate',
             'country' => 'CH',
             'categories' => ['real_estate'],
@@ -1412,13 +1417,13 @@ return [
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 3,
-            'search_template' => '/mieten/immobilien/ort-{query}/trefferliste',
-            'default_query' => 'zurich',
+            'search_template' => '/kaufen/wohnung/ort-{query}/trefferliste',
+            'default_query' => 'schweiz',
             'locale' => 'de-CH',
         ],
 
         'immoscout24_ch' => [
-            'adapter' => 'generic',
+            'adapter' => 'real_estate',
             'label' => 'ImmoScout24 Switzerland',
             'country' => 'CH',
             'categories' => ['real_estate'],
@@ -1426,13 +1431,13 @@ return [
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 4,
-            'search_template' => '/mieten/{query}',
+            'search_template' => '/kaufen/wohnung',
             'default_query' => 'wohnung',
             'locale' => 'de-CH',
         ],
 
         'newhome_ch' => [
-            'adapter' => 'generic',
+            'adapter' => 'real_estate',
             'label' => 'newhome.ch',
             'country' => 'CH',
             'categories' => ['real_estate'],
@@ -1440,13 +1445,13 @@ return [
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 5,
-            'search_template' => '/mieten/suche?location={query}',
-            'default_query' => 'bern',
+            'search_template' => '/kaufen/suche?location={query}',
+            'default_query' => 'schweiz',
             'locale' => 'de-CH',
         ],
 
         'comparis_immobilien' => [
-            'adapter' => 'generic',
+            'adapter' => 'real_estate',
             'label' => 'Comparis Immobilien',
             'country' => 'CH',
             'categories' => ['real_estate'],
@@ -1454,8 +1459,8 @@ return [
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 6,
-            'search_template' => '/immobilien/marktplatz?q={query}',
-            'default_query' => 'apartment',
+            'search_template' => '/immobilien/marktplatz/wohnung-kaufen?q={query}',
+            'default_query' => 'wohnung',
             'locale' => 'de-CH',
         ],
 

@@ -32,15 +32,19 @@ class SearchResultPoolService
      *
      * @param  array<string, mixed>  $parsed
      */
-    public function estimateTotal(array $parsed, int $poolSize): int
+    public function estimateTotal(array $parsed, int $poolSize, int $marketplaceReportedTotal = 0): int
     {
         if ($poolSize === 0) {
             return 0;
         }
 
-        // With few real matches, show the actual pool size (no inflated marketplace estimate).
+        if ($marketplaceReportedTotal > $poolSize) {
+            return $marketplaceReportedTotal;
+        }
+
+        // With few real matches and no platform-reported total, show pool size only.
         if ($poolSize < 24 || ! empty($parsed['brand'])) {
-            return $poolSize;
+            return max($poolSize, $marketplaceReportedTotal);
         }
 
         $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
@@ -91,7 +95,7 @@ class SearchResultPoolService
         }
 
         return match ($category) {
-            'automotive' => 120,
+            'automotive' => 200,
             'luxury_collectibles' => 72,
             default => 48,
         };

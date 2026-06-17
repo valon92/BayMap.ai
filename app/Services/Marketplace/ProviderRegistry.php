@@ -180,6 +180,12 @@ class ProviderRegistry
                 }
             }
 
+            if ($category === 'real_estate' && LocalMarketplaceResolver::isTargeted($parsedQuery)) {
+                if (in_array($provider->sourceKey(), ['etsy', 'google_shopping', 'amazon', 'ebay'], true)) {
+                    return false;
+                }
+            }
+
             if (! $provider->supportsCategory($category)) {
                 return false;
             }

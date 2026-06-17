@@ -160,6 +160,7 @@ class SearchOrchestratorService
         ];
 
         // Step 4: Product aggregation — normalize, unify attributes, dedupe
+        $marketplaceReportedTotal = $this->extractMarketplaceReportedTotal($products);
         $products = $this->aggregation->aggregate($products);
 
         $pipeline[] = [
@@ -184,13 +185,15 @@ class SearchOrchestratorService
         ];
 
         $products = $this->applyClientFilters($products, $filters, $parsed);
+        $products = $this->stripInternalListingFields($products);
         $products = $this->ranking->rank($products, $this->intentEnricher->rankingContext($parsed, $geo));
         $products = $this->balanceMultiCountryResults($products, $parsed);
         $products = $this->dedupeListings($products);
         $pool = $this->resultPool->expand($products, $parsed);
         $pool = $this->applyClientFilters($pool, $filters, $parsed);
+        $pool = $this->stripInternalListingFields($pool);
         $pool = $this->applySort($pool, $filters);
-        $estimatedTotal = $this->resultPool->estimateTotal($parsed, count($pool));
+        $estimatedTotal = $this->resultPool->estimateTotal($parsed, count($pool), $marketplaceReportedTotal);
 
         $page = max(1, $page);
         $maxPerPage = WebServicesIntentParser::isActive($parsed) ? 48 : 36;
@@ -856,5 +859,39 @@ class SearchOrchestratorService
         $allowed = ['auto', 'city', 'local', 'country', 'region', 'world', 'universal', 'global'];
 
         return in_array($scope, $allowed, true) ? $scope : 'auto';
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $products
+     */
+    private function extractMarketplaceReportedTotal(array $products): int
+    {
+        $max = 0;
+
+        foreach ($products as $product) {
+            if (! empty($product['_marketplace_result_total'])) {
+                $max = max($max, (int) $product['_marketplace_result_total']);
+            }
+
+            $extensions = $product['extensions'] ?? [];
+            if (is_array($extensions) && ! empty($extensions['_marketplace_result_total'])) {
+                $max = max($max, (int) $extensions['_marketplace_result_total']);
+            }
+        }
+
+        return $max;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $products
+     * @return array<int, array<string, mixed>>
+     */
+    private function stripInternalListingFields(array $products): array
+    {
+        return array_map(function (array $product) {
+            unset($product['_marketplace_result_total']);
+
+            return $product;
+        }, $products);
     }
 }

@@ -11,12 +11,13 @@ class PlatformCatalogUrlBuilder
      * @param  array<string, mixed>  $platform
      * @param  array<string, mixed>  $parsed
      */
-    public static function build(array $platform, array $parsed): string
+    public static function build(array $platform, array $parsed, int $page = 1): string
     {
         return match ($platform['adapter'] ?? 'generic') {
             'cscart' => self::csCartUrl($platform, $parsed),
             'woocommerce' => self::wooCommerceUrl($platform, $parsed),
-            'automotive' => self::automotiveUrl($platform, $parsed),
+            'automotive' => self::automotiveUrl($platform, $parsed, $page),
+            'real_estate' => self::realEstateUrl($platform, $parsed),
             default => self::genericSearchUrl($platform, $parsed),
         };
     }
@@ -61,7 +62,19 @@ class PlatformCatalogUrlBuilder
         }
 
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'real_estate') {
-            return (string) ($parsed['search_city'] ?? $platform['default_query'] ?? 'apartment');
+            $city = trim((string) ($parsed['search_city'] ?? ''));
+            if ($city !== '') {
+                return $city;
+            }
+
+            $raw = mb_strtolower((string) ($parsed['raw_query'] ?? ''));
+            foreach (['zürich', 'zurich', 'bern', 'basel', 'geneva', 'genève', 'genf', 'lausanne', 'luzern', 'winterthur'] as $place) {
+                if (str_contains($raw, $place)) {
+                    return $place === 'zürich' ? 'zurich' : $place;
+                }
+            }
+
+            return (string) ($platform['default_query'] ?? 'schweiz');
         }
 
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'sports_outdoor') {
@@ -283,7 +296,44 @@ class PlatformCatalogUrlBuilder
      * @param  array<string, mixed>  $platform
      * @param  array<string, mixed>  $parsed
      */
-    private static function automotiveUrl(array $platform, array $parsed): string
+    private static function realEstateUrl(array $platform, array $parsed): string
+    {
+        $key = strtolower((string) ($platform['_key'] ?? ''));
+        $listing = SwissRealEstateIntent::listingType($parsed);
+        $segment = $listing === 'sale' ? 'kaufen' : 'mieten';
+        $query = rawurlencode(self::searchTerm($platform, $parsed));
+        $slug = str_replace('%20', '-', $query);
+        $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
+
+        if (str_contains($key, 'homegate')) {
+            return $base.'/'.$segment.'/wohnung/ort-'.$slug.'/trefferliste';
+        }
+
+        if (str_contains($key, 'immoscout24')) {
+            return $base.'/'.$segment.'/wohnung';
+        }
+
+        if (str_contains($key, 'newhome')) {
+            return $base.'/'.$segment.'/suche?location='.$query;
+        }
+
+        if (str_contains($key, 'comparis')) {
+            $type = $listing === 'sale' ? 'wohnung-kaufen' : 'wohnung-mieten';
+
+            return $base.'/immobilien/marktplatz/'.$type.'?q='.$query;
+        }
+
+        $template = (string) ($platform['search_template'] ?? '/'.$segment.'?q={query}');
+        $template = str_replace('mieten', $segment, $template);
+
+        return $base.str_replace('{query}', $query, $template);
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function automotiveUrl(array $platform, array $parsed, int $page = 1): string
     {
         $scraper = (string) ($platform['scraper'] ?? $platform['_key'] ?? '');
 
@@ -321,6 +371,14 @@ class PlatformCatalogUrlBuilder
         $url = str_replace('{query}', $query, $url);
 
         $params = self::automotiveSearchParams($parsed, $scraper);
+        if ($page > 1) {
+            if (str_contains($scraper, 'kleinanzeigen')) {
+                $params['page'] = $page;
+            } elseif (str_contains($scraper, 'autoscout')) {
+                $params['page'] = $page;
+            }
+        }
+
         if ($params !== []) {
             $url .= (str_contains($url, '?') ? '&' : '?').http_build_query($params);
         }

@@ -62,8 +62,7 @@ class MockSearchProvider implements FederatedSearchProviderInterface
             return true;
         }
 
-        return in_array($category, $this->categories, true)
-            || in_array('marketplace', $this->categories, true);
+        return in_array($category, $this->categories, true);
     }
 
     /**

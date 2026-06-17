@@ -3,6 +3,8 @@
 namespace App\Services\Marketplace\Scrapers;
 
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
+use App\Support\CategoryCatalog;
+use App\Support\ListingEnricher;
 use App\Support\PlatformCatalogUrlBuilder;
 
 class GenericHtmlScraperAdapter implements ScraperAdapterInterface
@@ -27,9 +29,10 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
     public function scrape(array $platform, array $parsedQuery): array
     {
         $storeKey = (string) ($platform['_key'] ?? 'generic');
+        $platform['_parsed_query'] = $parsedQuery;
         $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
         $referer = rtrim((string) ($platform['base_url'] ?? ''), '/').'/';
-        $html = $this->http->get($searchUrl, $platform['locale'] ?? null, $referer);
+        $html = $this->http->get($searchUrl, $platform['locale'] ?? null, $referer, $storeKey);
 
         if ($html === '') {
             return [];
@@ -242,9 +245,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         }
 
         $image = $node['image'] ?? null;
-        if (is_array($image)) {
-            $image = $image[0] ?? null;
-        }
+        $images = ListingEnricher::imagesFromJsonLd($image);
 
         $seen[$title] = true;
         $brand = str_contains((string) ($platform['scraper'] ?? ''), 'apple') ? 'apple' : null;
@@ -253,8 +254,10 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
             'title' => $title,
             'url' => $url,
             'price' => $price,
-            'image' => is_string($image) ? $image : null,
+            'image' => $images[0] ?? null,
+            'images' => $images,
             'brand' => $brand,
+            'category' => (string) ($platform['category'] ?? CategoryCatalog::categoryFromPlatform($platform)),
             'location' => (string) ($platform['location'] ?? 'Switzerland'),
         ]);
     }

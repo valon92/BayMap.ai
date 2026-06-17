@@ -21,7 +21,7 @@ class MetaSearchEngine
         $toCluster = [];
 
         foreach ($products as $product) {
-            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product) || $this->isAutomotivePriceOnRequest($product)) {
+            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product) || $this->isAutomotivePriceOnRequest($product) || $this->isRealEstateListing($product)) {
                 $passthrough[] = $product;
 
                 continue;
@@ -108,6 +108,18 @@ class MetaSearchEngine
         $price = (float) ($product['price'] ?? $product['price_eur'] ?? 0);
 
         return $price <= 0;
+    }
+
+    /**
+     * Real-estate listings are unique assets — skip cross-marketplace clustering.
+     *
+     * @param  array<string, mixed>  $product
+     */
+    private function isRealEstateListing(array $product): bool
+    {
+        return CategoryCatalog::normalize($product['category'] ?? '') === 'real_estate'
+            || ($product['sqm'] ?? null) !== null
+            || isset($product['property_type']);
     }
 
     /**

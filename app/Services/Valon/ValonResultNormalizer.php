@@ -2,6 +2,8 @@
 
 namespace App\Services\Valon;
 
+use App\Support\ListingEnricher;
+
 /**
  * Normalizes raw platform listings into Valon worker output schema.
  */
@@ -22,20 +24,31 @@ class ValonResultNormalizer
         'price_label', 'billing_period', 'brand_color', 'brand_bg', 'logo_url', 'price_on_request',
     ];
 
+    /** @var array<int, string> */
+    private const PRODUCT_PASSTHROUGH = [
+        'category', 'product_type', 'model', 'fuel', 'transmission', 'color', 'engine_liters',
+        'seller_type', 'power_hp', 'power_kw', 'electric_range_km', 'body_type',
+        'first_registration', 'consumption', 'specs', 'gender', 'sizes', 'storage', 'ram',
+        'property_type', 'listing_type', 'rooms', 'area_sqm', 'author', 'format', 'genre', 'language',
+        'chip', 'display_size',
+    ];
+
     /**
      * @param  array<string, mixed>  $item
      * @return array<string, mixed>
      */
     public function normalize(array $item, string $workerId, string $platform, string $sourceLabel): array
     {
-        $images = [];
-        if (! empty($item['image'])) {
-            $images[] = $item['image'];
+        $images = is_array($item['images'] ?? null)
+            ? array_values(array_unique(array_filter(
+                $item['images'],
+                fn ($url) => is_string($url) && $url !== '' && ! $this->isPlaceholderImage($url),
+            )))
+            : [];
+
+        if ($images === [] && ! empty($item['image']) && is_string($item['image']) && ! $this->isPlaceholderImage($item['image'])) {
+            $images = [(string) $item['image']];
         }
-        if (! empty($item['images']) && is_array($item['images'])) {
-            $images = array_merge($images, $item['images']);
-        }
-        $images = array_values(array_unique(array_filter($images)));
 
         $source = (string) ($item['source'] ?? '');
         if ($source === '') {
@@ -90,6 +103,32 @@ class ValonResultNormalizer
             }
         }
 
+        foreach (self::PRODUCT_PASSTHROUGH as $field) {
+            if (! array_key_exists($field, $item)) {
+                continue;
+            }
+            $value = $item[$field];
+            if ($value !== null && $value !== '' && $value !== []) {
+                $normalized[$field] = $value;
+            }
+        }
+
+        if (! empty($item['_marketplace_result_total'])) {
+            $normalized['_marketplace_result_total'] = (int) $item['_marketplace_result_total'];
+        }
+
+        $enriched = ListingEnricher::enrich(array_merge($item, $normalized));
+        if (! empty($enriched['images'])) {
+            $normalized['images'] = $enriched['images'];
+            $normalized['image'] = $enriched['image'] ?? $normalized['image'];
+        }
+        if (! empty($enriched['specs'])) {
+            $normalized['specs'] = $enriched['specs'];
+        }
+        if (! empty($enriched['category']) && empty($normalized['category'])) {
+            $normalized['category'] = $enriched['category'];
+        }
+
         return $normalized;
     }
 
@@ -118,5 +157,11 @@ class ValonResultNormalizer
         }
 
         return 'unknown';
+    }
+
+    private function isPlaceholderImage(string $url): bool
+    {
+        return str_contains($url, 'images.unsplash.com/photo-1618843479313')
+            || str_contains($url, 'images.unsplash.com/photo-1472851294608');
     }
 }

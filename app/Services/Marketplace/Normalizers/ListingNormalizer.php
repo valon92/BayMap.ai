@@ -30,11 +30,19 @@ class ListingNormalizer
         $storage = $listing->storage ?? $this->extractStorage($listing->title, $listing->tags);
         $year = $listing->year ?? $this->extractYear($listing->title, $listing->tags);
         $fingerprint = $this->fingerprint($listing->title, $brand, $storage);
+        $images = $listing->images !== [] ? $listing->images : (is_array($raw['images'] ?? null) ? $raw['images'] : []);
+        $images = array_values(array_unique(array_filter(
+            $images,
+            fn ($url) => is_string($url) && $url !== '' && ! $this->isPlaceholderImage($url),
+        )));
+        $image = $listing->image !== '' && ! $this->isPlaceholderImage($listing->image)
+            ? $listing->image
+            : ($images[0] ?? '');
 
         return new SearchListing(
             id: $listing->id,
             title: $listing->title,
-            image: $listing->image ?: 'https://images.unsplash.com/photo-1472851294608-062f824d2349?w=800&q=80',
+            image: $image,
             price: $listing->price,
             currency: $listing->currency,
             location: $listing->location,
@@ -60,7 +68,29 @@ class ListingNormalizer
             transmission: $listing->transmission,
             engineLiters: $listing->engineLiters,
             countryCode: $listing->countryCode,
-            extensions: $listing->extensions,
+            images: $images,
+            extensions: array_merge($listing->extensions, array_filter([
+                'power_hp' => $raw['power_hp'] ?? null,
+                'power_kw' => $raw['power_kw'] ?? null,
+                'electric_range_km' => $raw['electric_range_km'] ?? null,
+                'body_type' => $raw['body_type'] ?? null,
+                'first_registration' => $raw['first_registration'] ?? null,
+                'consumption' => $raw['consumption'] ?? null,
+                'specs' => $raw['specs'] ?? null,
+                'category' => $raw['category'] ?? null,
+                'product_type' => $raw['product_type'] ?? null,
+                'gender' => $raw['gender'] ?? null,
+                'sizes' => $raw['sizes'] ?? null,
+                'rooms' => $raw['rooms'] ?? null,
+                'area_sqm' => $raw['area_sqm'] ?? null,
+                'property_type' => $raw['property_type'] ?? null,
+                'format' => $raw['format'] ?? null,
+                'genre' => $raw['genre'] ?? null,
+                'author' => $raw['author'] ?? null,
+                'ram' => $raw['ram'] ?? null,
+                'chip' => $raw['chip'] ?? null,
+                'display_size' => $raw['display_size'] ?? null,
+            ], fn ($v) => $v !== null && $v !== '' && $v !== [])),
         );
     }
 
@@ -163,5 +193,11 @@ class ListingNormalizer
         }
 
         return null;
+    }
+
+    private function isPlaceholderImage(string $url): bool
+    {
+        return str_contains($url, 'images.unsplash.com/photo-1618843479313')
+            || str_contains($url, 'images.unsplash.com/photo-1472851294608');
     }
 }

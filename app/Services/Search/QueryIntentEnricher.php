@@ -252,6 +252,14 @@ class QueryIntentEnricher
             $parsed['currency'] = 'GBP';
         }
 
+        if (empty($parsed['currency']) && strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'CH') {
+            $parsed['currency'] = 'CHF';
+        }
+
+        if (empty($parsed['listing_type'])) {
+            $parsed['listing_type'] = \App\Support\SwissRealEstateIntent::listingType($parsed);
+        }
+
         if (empty($parsed['property_type'])) {
             $parsed['property_type'] = preg_match('/\b(banes|banesa|apartament|apartment|flat)\b/ui', $rawQuery)
                 ? 'apartment'

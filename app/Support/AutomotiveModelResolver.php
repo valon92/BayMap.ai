@@ -16,6 +16,27 @@ class AutomotiveModelResolver
     ];
 
     /**
+     * Live marketplace search URLs already encode make/model (e.g. /lst/bmw/5).
+     *
+     * @param  array<string, mixed>  $parsed
+     */
+    public static function shouldTrustPlatformScope(string $storeKey, array $parsed): bool
+    {
+        if (! CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
+            return false;
+        }
+
+        if (empty($parsed['brand']) || empty($parsed['model'])) {
+            return false;
+        }
+
+        $store = strtolower(trim($storeKey));
+
+        return str_contains($store, 'autoscout24')
+            || $store === 'kleinanzeigen';
+    }
+
+    /**
      * Catalog path slug for live scrapers (e.g. golf-7 → golf).
      */
     public static function catalogSlug(string $brand, string $model): string
@@ -59,10 +80,8 @@ class AutomotiveModelResolver
         $generation = self::generationFromModel($queryModel);
 
         if ($base !== '') {
-            $basePattern = '/\b'.preg_quote(str_replace('-', ' ', $base), '/').'\b/u';
-            $baseMatch = preg_match($basePattern, $titleLower) === 1
-                || str_contains($itemModelLower, $base)
-                || str_contains($itemModelLower, str_replace(' ', '', $base));
+            $brand = mb_strtolower((string) ($parsed['brand'] ?? ''));
+            $baseMatch = self::titleMatchesBaseModel($titleLower, $itemModelLower, $base, $brand);
             if (! $baseMatch) {
                 return false;
             }
@@ -95,8 +114,14 @@ class AutomotiveModelResolver
             return $range !== null && $year >= $range[0] && $year <= $range[1];
         }
 
-        if ($itemModelLower !== '' && $base !== '' && str_contains($itemModelLower, $base)) {
-            return true;
+        if ($itemModelLower !== '' && $base !== '') {
+            if (preg_match('/^\d{1,2}$/', $base)) {
+                if (self::titleMatchesNumericSeries($itemModelLower, $base, mb_strtolower((string) ($parsed['brand'] ?? '')))) {
+                    return true;
+                }
+            } elseif (str_contains($itemModelLower, $base)) {
+                return true;
+            }
         }
 
         return false;
@@ -156,6 +181,11 @@ class AutomotiveModelResolver
     public static function generationFromModel(string $model): ?int
     {
         $model = mb_strtolower(trim($model));
+        // Bare digits are model series (BMW 5, VW Golf without generation) — not MK/generation.
+        if (preg_match('/^\d{1,2}$/', $model)) {
+            return null;
+        }
+
         if (preg_match('/\b(?:mk\s*)?(\d{1,2})\s*$/i', $model, $match)) {
             return (int) $match[1];
         }
@@ -246,5 +276,56 @@ class AutomotiveModelResolver
             8 => 'viii',
             default => (string) $number,
         };
+    }
+
+    private static function titleMatchesBaseModel(
+        string $titleLower,
+        string $itemModelLower,
+        string $base,
+        string $brand,
+    ): bool {
+        if ($itemModelLower !== '') {
+            if (preg_match('/^\d{1,2}$/', $base)) {
+                if (self::titleMatchesNumericSeries($itemModelLower, $base, $brand)) {
+                    return true;
+                }
+            } elseif (str_contains($itemModelLower, $base) || str_contains($itemModelLower, str_replace(' ', '', $base))) {
+                return true;
+            }
+        }
+
+        if (preg_match('/^\d{1,2}$/', $base)) {
+            return self::titleMatchesNumericSeries($titleLower, $base, $brand);
+        }
+
+        $basePattern = '/\b'.preg_quote(str_replace('-', ' ', $base), '/').'\b/u';
+
+        return preg_match($basePattern, $titleLower) === 1;
+    }
+
+    private static function titleMatchesNumericSeries(string $titleLower, string $series, string $brand): bool
+    {
+        if (preg_match('/\b[mxzi]\s*'.preg_quote($series, '/').'\b/u', $titleLower) === 1) {
+            return false;
+        }
+
+        if (preg_match('/\b'.preg_quote($series, '/').'\s*series\b/u', $titleLower) === 1) {
+            return true;
+        }
+
+        if (preg_match('/\b'.preg_quote($series, '/').'er\b/u', $titleLower) === 1) {
+            return true;
+        }
+
+        if (preg_match('/(?<![a-z])'.preg_quote($series, '/').'\d{2}[a-z]{0,3}\b/u', $titleLower) === 1) {
+            return true;
+        }
+
+        if (($brand === 'bmw' || str_contains($titleLower, 'bmw'))
+            && preg_match('/\bbmw\s+'.preg_quote($series, '/').'(?:\s+series|\s|$)/u', $titleLower) === 1) {
+            return true;
+        }
+
+        return false;
     }
 }

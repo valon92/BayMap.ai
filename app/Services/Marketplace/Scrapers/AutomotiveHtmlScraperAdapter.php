@@ -7,6 +7,8 @@ use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveModelResolver;
+use App\Support\AutoScout24ListingParser;
+use App\Support\GermanAutomotiveIntent;
 use App\Support\PlatformCatalogUrlBuilder;
 
 class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
@@ -33,24 +35,89 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
     {
         $storeKey = (string) ($platform['_key'] ?? 'automotive');
         $scraper = (string) ($platform['scraper'] ?? $storeKey);
-        $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
+        $maxListings = (int) config('live_platforms.automotive_max_listings_per_platform', 100);
+        $maxPages = (int) config('live_platforms.automotive_max_pages', 5);
+        $multiPage = GermanAutomotiveIntent::isGermanSearch($parsedQuery)
+            && GermanAutomotiveIntent::supportsMultiPageScraping($storeKey);
 
         if ($this->browseAi->shouldUse($storeKey)) {
+            $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
             $structured = $this->browseAi->scrapeListings($storeKey, $searchUrl, $platform, $parsedQuery);
             if ($structured !== []) {
-                return $structured;
+                return ProductListingNormalizer::filterForIntent($structured, $parsedQuery);
             }
         }
 
-        $html = $this->http->get($searchUrl, $platform['locale'] ?? 'de-DE', null, $storeKey);
+        $raw = [];
+        $platformTotal = null;
+        $pagesToFetch = $multiPage ? max(1, $maxPages) : 1;
 
-        if ($html === '') {
-            return [];
+        for ($page = 1; $page <= $pagesToFetch && count($raw) < $maxListings; $page++) {
+            $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery, $page);
+            $html = $this->http->get($searchUrl, $platform['locale'] ?? 'de-DE', null, $storeKey);
+
+            if ($html === '') {
+                break;
+            }
+
+            [$pageItems, $reportedTotal] = $this->parseAutomotiveHtml($html, $scraper, $storeKey, $platform, $parsedQuery);
+            if ($platformTotal === null && $reportedTotal !== null && $reportedTotal > 0) {
+                $platformTotal = $reportedTotal;
+            }
+
+            if ($pageItems === []) {
+                break;
+            }
+
+            $raw = array_merge($raw, $pageItems);
+
+            if (! $multiPage || count($pageItems) < 12) {
+                break;
+            }
         }
 
-        $raw = match (true) {
-            str_contains($scraper, 'autoscout') => $this->parseAutoScout24($html, $storeKey, $platform),
-            str_contains($scraper, 'kleinanzeigen') => $this->parseKleinanzeigen($html, $storeKey, $platform, $parsedQuery),
+        $raw = ProductListingNormalizer::filterForIntent($raw, $parsedQuery);
+        $raw = array_slice($raw, 0, $maxListings);
+
+        if ($raw === []
+            && GermanAutomotiveIntent::isGermanSearch($parsedQuery)
+            && GermanAutomotiveIntent::shouldUseCatalogFallback($storeKey)) {
+            $raw = GermanAutomotiveIntent::catalogFallback($storeKey, $parsedQuery);
+        }
+
+        $raw = ProductListingNormalizer::filterForIntent($raw, $parsedQuery);
+        $raw = array_slice($raw, 0, $maxListings);
+
+        if ($platformTotal !== null && $raw !== []) {
+            $raw[0]['_marketplace_result_total'] = $platformTotal;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @return array{0: array<int, array<string, mixed>>, 1: int|null}
+     */
+    private function parseAutomotiveHtml(
+        string $html,
+        string $scraper,
+        string $storeKey,
+        array $platform,
+        array $parsedQuery,
+    ): array {
+        if (str_contains($scraper, 'autoscout')) {
+            return $this->parseAutoScout24WithTotal($html, $storeKey, $platform);
+        }
+
+        if (str_contains($scraper, 'kleinanzeigen')) {
+            return [
+                $this->parseKleinanzeigen($html, $storeKey, $platform, $parsedQuery),
+                $this->extractKleinanzeigenTotal($html),
+            ];
+        }
+
+        $items = match (true) {
             str_contains($scraper, 'autouncle') => $this->parseAutoUncle($html, $storeKey, $platform),
             str_contains($scraper, 'autolina') => $this->parseAutolina($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'autogrid') => $this->parseAutogrid($html, $storeKey, $platform, $parsedQuery),
@@ -62,7 +129,33 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             default => $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery),
         };
 
-        return ProductListingNormalizer::filterForIntent($raw, $parsedQuery);
+        return [$items, null];
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @return array{0: array<int, array<string, mixed>>, 1: int|null}
+     */
+    private function parseAutoScout24WithTotal(string $html, string $storeKey, array $platform): array
+    {
+        if (! preg_match('/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s', $html, $match)) {
+            return [[], null];
+        }
+
+        $data = json_decode($match[1], true);
+        $pageProps = $data['props']['pageProps'] ?? [];
+        $total = isset($pageProps['numberOfResults']) ? (int) $pageProps['numberOfResults'] : null;
+
+        return [$this->parseAutoScout24($html, $storeKey, $platform), $total];
+    }
+
+    private function extractKleinanzeigenTotal(string $html): ?int
+    {
+        if (preg_match('/(\d{1,3}(?:\.\d{3})*)\s*Ergebnisse/u', $html, $match)) {
+            return (int) str_replace('.', '', $match[1]);
+        }
+
+        return null;
     }
 
     /**
@@ -109,31 +202,65 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             $url = str_starts_with($path, 'http') ? $path : $baseUrl.$path;
             $color = AutomotiveColorResolver::extractFromAutoScoutUrl($path);
 
-            $images = (array) ($listing['images'] ?? []);
-            $image = is_string($images[0] ?? null) ? $images[0] : null;
+            $images = AutoScout24ListingParser::collectImages($listing);
+            $image = $images[0] ?? null;
 
-            $year = $this->yearFromVehicleDetails((array) ($listing['vehicleDetails'] ?? []));
-            $mileage = $this->mileageFromVehicle($vehicle, (array) ($listing['vehicleDetails'] ?? []));
+            $detailSpecs = AutoScout24ListingParser::parseVehicleDetails((array) ($listing['vehicleDetails'] ?? []));
+            $year = $detailSpecs['year'] ?? $this->yearFromVehicleDetails((array) ($listing['vehicleDetails'] ?? []));
+            $mileage = $detailSpecs['mileage'] ?? $this->mileageFromVehicle($vehicle, (array) ($listing['vehicleDetails'] ?? []));
+            $fuel = $detailSpecs['fuel'] ?? (string) ($vehicle['fuel'] ?? '');
+            $transmission = $detailSpecs['transmission'] ?? (string) ($vehicle['transmission'] ?? '');
+            $sellerType = AutoScout24ListingParser::normalizeSellerType((string) (($listing['seller']['type'] ?? '') ?: ''));
+            $powerHp = $detailSpecs['power_hp'] ?? null;
+            $powerKw = $detailSpecs['power_kw'] ?? null;
+            $electricRange = $detailSpecs['electric_range_km'] ?? null;
+            $firstRegistration = $detailSpecs['first_registration'] ?? null;
+            $consumption = $detailSpecs['consumption'] ?? null;
+            $bodyType = (string) ($vehicle['bodyType'] ?? $vehicle['body'] ?? '');
+
             $engineLiters = AutomotiveEngineResolver::litersFromCcm(
                 isset($vehicle['engineDisplacementInCCM']) ? (string) $vehicle['engineDisplacementInCCM'] : null,
-            ) ?? AutomotiveEngineResolver::extractFromTitle($title, (string) ($vehicle['fuel'] ?? ''));
+            ) ?? AutomotiveEngineResolver::extractFromTitle($title, $fuel);
+
+            $specPayload = array_filter([
+                'year' => $year,
+                'mileage' => $mileage,
+                'fuel' => $fuel,
+                'transmission' => $transmission,
+                'power_hp' => $powerHp,
+                'power_kw' => $powerKw,
+                'electric_range_km' => $electricRange,
+                'body_type' => $bodyType !== '' ? $bodyType : null,
+                'seller_type' => $sellerType,
+                'first_registration' => $firstRegistration,
+                'consumption' => $consumption,
+            ], fn ($v) => $v !== null && $v !== '');
 
             $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
                 'product_id' => (string) ($listing['id'] ?? md5($title.$url)),
                 'title' => $title,
                 'price' => $price,
                 'image' => $image,
+                'images' => $images,
                 'url' => $url,
                 'location' => $locationLabel,
                 'brand' => mb_strtolower($make),
                 'model' => mb_strtolower($model),
                 'year' => $year,
                 'mileage' => $mileage,
-                'fuel' => (string) ($vehicle['fuel'] ?? ''),
-                'transmission' => (string) ($vehicle['transmission'] ?? ''),
+                'fuel' => $fuel,
+                'transmission' => $transmission,
                 'condition' => (($vehicle['offerType'] ?? 'U') === 'N') ? 'new' : 'used',
                 'color' => $color,
                 'engine_liters' => $engineLiters,
+                'seller_type' => $sellerType,
+                'power_hp' => $powerHp,
+                'power_kw' => $powerKw,
+                'electric_range_km' => $electricRange,
+                'body_type' => $bodyType !== '' ? $bodyType : null,
+                'first_registration' => $firstRegistration,
+                'consumption' => $consumption,
+                'specs' => AutoScout24ListingParser::buildSpecChips($specPayload),
             ]);
         }
 

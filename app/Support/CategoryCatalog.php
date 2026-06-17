@@ -119,6 +119,30 @@ class CategoryCatalog
     }
 
     /**
+     * Resolve canonical category from platform config and/or search intent.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     */
+    public static function categoryFromPlatform(array $platform, array $parsedQuery = []): string
+    {
+        if (! empty($parsedQuery['category'])) {
+            return self::normalize((string) $parsedQuery['category']);
+        }
+
+        if (! empty($platform['category'])) {
+            return self::normalize((string) $platform['category']);
+        }
+
+        $categories = $platform['categories'] ?? [];
+        if (is_array($categories) && $categories !== []) {
+            return self::normalize((string) $categories[0]);
+        }
+
+        return 'marketplace';
+    }
+
+    /**
      * @param  array<string, mixed>  $parsed
      */
     public static function isBookSearch(array $parsed): bool
@@ -360,7 +384,7 @@ class CategoryCatalog
                 self::rangeFilter('bedrooms', $sq ? 'Dhoma' : 'Bedrooms', 1, 8, $parsed['bedrooms'] ?? null),
                 self::select('listing_type', $sq ? 'Lloji' : 'Listing', ['rent', 'sale'], $parsed['listing_type'] ?? null),
                 self::select('property_type', $sq ? 'Prona' : 'Property', ['apartment', 'house', 'land', 'commercial'], $parsed['property_type'] ?? null),
-                self::priceFilter($parsed, $sq, 100, 500000),
+                self::priceFilter($parsed, $sq, 50000, 5000000),
             ),
             'industrial_b2b' => array_merge(
                 self::select('equipment_type', $sq ? 'Pajisja' : 'Equipment', ['machinery', 'tools', 'safety', 'packaging', 'logistics'], $parsed['equipment_type'] ?? null),
