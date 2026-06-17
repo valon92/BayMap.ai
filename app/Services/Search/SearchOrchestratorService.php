@@ -14,6 +14,7 @@ use App\Support\FashionIntentParser;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
 use App\Support\SearchCountryResolver;
+use App\Support\ShoeSize;
 use App\Support\WebServicesIntentParser;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
