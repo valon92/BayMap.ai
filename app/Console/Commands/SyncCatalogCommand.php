@@ -31,7 +31,9 @@ class SyncCatalogCommand extends Command
         $catalog->flushCache();
 
         $this->info('Catalog sync complete.');
-        $this->line("  Platforms in config: {$stats['platforms']}");
+        $live = count((array) config('live_platforms.platforms', []));
+        $global = count(CatalogSyncService::allConfigPlatforms()) - $live;
+        $this->line("  Platforms in config: {$stats['platforms']} (live: {$live}, global A-Z: {$global})");
         $this->line("  Created: {$stats['created']}, Updated: {$stats['updated']}");
         $this->line('  Active platforms in DB: '.count($catalog->allPlatforms()));
 

@@ -45,7 +45,7 @@ class PlatformCatalogRepository
     {
         if (! $this->isActive()) {
             return config('catalog.fallback_to_config', true)
-                ? (array) config('live_platforms.platforms', [])
+                ? CatalogSyncService::allConfigPlatforms()
                 : [];
         }
 
@@ -64,7 +64,7 @@ class PlatformCatalogRepository
             }
 
             if ($map === [] && config('catalog.fallback_to_config', true)) {
-                return (array) config('live_platforms.platforms', []);
+                return CatalogSyncService::allConfigPlatforms();
             }
 
             return $map;

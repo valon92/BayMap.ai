@@ -9,7 +9,7 @@ use App\Models\Catalog\PlatformCity;
 use Illuminate\Support\Arr;
 
 /**
- * Imports platforms from config/live_platforms.php into the database catalog.
+ * Imports platforms from config/live_platforms.php + database/data/global_platforms_a_z.php.
  */
 class CatalogSyncService
 {
@@ -20,11 +20,23 @@ class CatalogSyncService
     public function __construct(private PlatformCatalogRepository $catalog) {}
 
     /**
+     * @return array<string, array<string, mixed>>
+     */
+    public static function allConfigPlatforms(): array
+    {
+        $live = (array) config('live_platforms.platforms', []);
+        $globalPath = database_path('data/global_platforms_a_z.php');
+        $global = is_file($globalPath) ? (array) require $globalPath : [];
+
+        return array_merge($live, $global);
+    }
+
+    /**
      * @return array{platforms: int, created: int, updated: int}
      */
     public function syncPlatformsFromConfig(): array
     {
-        $configPlatforms = (array) config('live_platforms.platforms', []);
+        $configPlatforms = self::allConfigPlatforms();
         $created = 0;
         $updated = 0;
         $curator = app(PlatformCuratorService::class);
