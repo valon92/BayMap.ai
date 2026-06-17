@@ -21,7 +21,7 @@ class MetaSearchEngine
         $toCluster = [];
 
         foreach ($products as $product) {
-            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product) || $this->isAutomotivePriceOnRequest($product) || $this->isRealEstateListing($product)) {
+            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product) || $this->isAutomotivePriceOnRequest($product) || $this->isRealEstateListing($product) || $this->isFashionListing($product)) {
                 $passthrough[] = $product;
 
                 continue;
@@ -120,6 +120,18 @@ class MetaSearchEngine
         return CategoryCatalog::normalize($product['category'] ?? '') === 'real_estate'
             || ($product['sqm'] ?? null) !== null
             || isset($product['property_type']);
+    }
+
+    /**
+     * Fashion listings differ by store, size, and condition — keep each marketplace card separate.
+     *
+     * @param  array<string, mixed>  $product
+     */
+    private function isFashionListing(array $product): bool
+    {
+        $category = CategoryCatalog::normalize($product['category'] ?? '');
+
+        return in_array($category, ['fashion', 'sports_outdoor'], true);
     }
 
     /**

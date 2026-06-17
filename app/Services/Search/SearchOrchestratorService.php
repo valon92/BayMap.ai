@@ -2,20 +2,6 @@
 
 namespace App\Services\Search;
 
-use App\Support\AutomotiveColorResolver;
-use App\Support\AutomotiveEngineResolver;
-use App\Support\AutomotiveIntentParser;
-use App\Support\BookIntentParser;
-use App\Support\CategoryCatalog;
-use App\Support\LocalMarketplaceResolver;
-use App\Support\CountryMatcher;
-use App\Support\ElectronicsIntentParser;
-use App\Support\FashionIntentParser;
-use App\Support\KosovoMarketplaces;
-use App\Support\LivePlatformRegistry;
-use App\Support\SearchCountryResolver;
-use App\Support\ShoeSize;
-use App\Support\WebServicesIntentParser;
 use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
 use App\Services\Geo\GeoLocationService;
@@ -24,6 +10,20 @@ use App\Services\Marketplace\EbayOAuthService;
 use App\Services\Marketplace\MarketplaceAggregator;
 use App\Services\Marketplace\SerpApiShoppingService;
 use App\Services\Orchestration\SearchIntentFactory;
+use App\Support\AutomotiveColorResolver;
+use App\Support\AutomotiveEngineResolver;
+use App\Support\AutomotiveIntentParser;
+use App\Support\BookIntentParser;
+use App\Support\CategoryCatalog;
+use App\Support\CountryMatcher;
+use App\Support\ElectronicsIntentParser;
+use App\Support\FashionIntentParser;
+use App\Support\KosovoMarketplaces;
+use App\Support\LivePlatformRegistry;
+use App\Support\LocalMarketplaceResolver;
+use App\Support\SearchCountryResolver;
+use App\Support\ShoeSize;
+use App\Support\WebServicesIntentParser;
 
 /**
  * Unified search pipeline: AI intent → federated multi-source search → aggregation → meta compare → exact rank.
@@ -188,6 +188,7 @@ class SearchOrchestratorService
         $products = $this->applyClientFilters($products, $filters, $parsed);
         $products = $this->stripInternalListingFields($products);
         $products = $this->ranking->rank($products, $this->intentEnricher->rankingContext($parsed, $geo));
+        $products = $this->interleaveMarketplaceSources($products, $parsed);
         $products = $this->balanceMultiCountryResults($products, $parsed);
         $products = $this->dedupeListings($products);
         $pool = $this->resultPool->expand($products, $parsed);
@@ -286,7 +287,7 @@ class SearchOrchestratorService
 
         return array_values(array_filter($products, function (array $product) use ($filters, $parsed) {
             $isTravel = CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel';
-            $isWebServices = \App\Support\WebServicesIntentParser::isActive($parsed);
+            $isWebServices = WebServicesIntentParser::isActive($parsed);
 
             if (isset($filters['price_min']) && ($product['price'] ?? 0) < (float) $filters['price_min']) {
                 return false;
@@ -734,6 +735,53 @@ class SearchOrchestratorService
         }
 
         return false;
+    }
+
+    /**
+     * Round-robin listings across Kosovo fashion stores so one shop does not fill the whole page.
+     *
+     * @param  array<int, array<string, mixed>>  $products
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, array<string, mixed>>
+     */
+    private function interleaveMarketplaceSources(array $products, array $parsed): array
+    {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+        if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return $products;
+        }
+
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+        if ($countryCode !== 'XK' && $countryCode !== '') {
+            return $products;
+        }
+
+        $buckets = [];
+        foreach ($products as $product) {
+            $key = (string) ($product['source_key'] ?? $product['store'] ?? 'unknown');
+            $buckets[$key][] = $product;
+        }
+
+        if (count($buckets) <= 1) {
+            return $products;
+        }
+
+        $interleaved = [];
+        $hasItems = true;
+
+        while ($hasItems) {
+            $hasItems = false;
+            foreach ($buckets as &$bucket) {
+                if ($bucket === []) {
+                    continue;
+                }
+                $interleaved[] = array_shift($bucket);
+                $hasItems = true;
+            }
+            unset($bucket);
+        }
+
+        return $interleaved;
     }
 
     /**

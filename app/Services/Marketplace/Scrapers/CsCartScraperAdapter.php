@@ -8,7 +8,10 @@ use App\Support\PlatformCatalogUrlBuilder;
 
 class CsCartScraperAdapter implements ScraperAdapterInterface
 {
-    public function __construct(private ScraperHttpClient $http) {}
+    public function __construct(
+        private ScraperHttpClient $http,
+        private ProductGalleryEnricher $galleryEnricher,
+    ) {}
 
     public function adapterKey(): string
     {
@@ -60,7 +63,10 @@ class CsCartScraperAdapter implements ScraperAdapterInterface
             }
         }
 
-        return ProductListingNormalizer::filterForIntent($all, $parsedQuery);
+        return $this->galleryEnricher->enrichFromDetailPages(
+            ProductListingNormalizer::filterForIntent($all, $parsedQuery),
+            isset($platform['locale']) ? (string) $platform['locale'] : null,
+        );
     }
 
     /**

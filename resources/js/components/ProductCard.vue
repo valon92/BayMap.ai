@@ -132,45 +132,6 @@
         <p class="text-[13px] font-semibold text-blue-600 tabular-nums leading-none">
           {{ formatPrice(product.price, product.currency) }}
         </p>
-        <span
-          v-if="product.offer_count > 1"
-          class="px-1 py-px rounded text-[8px] font-medium text-blue-700 bg-blue-50 border border-blue-100"
-        >
-          {{ product.offer_count }} {{ t('offers') }}
-        </span>
-      </div>
-
-      <div
-        v-if="hasMultipleOffers"
-        class="mt-0.5"
-      >
-        <button
-          type="button"
-          class="text-[9px] font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
-          @click.stop="showOffers = !showOffers"
-        >
-          {{ showOffers ? t('hide_offers') : t('compare_prices') }}
-        </button>
-        <ul
-          v-if="showOffers"
-          class="mt-1 space-y-0.5 max-h-20 overflow-y-auto"
-        >
-          <li
-            v-for="(offer, index) in product.offers"
-            :key="`${offer.source_key || offer.source}-${index}`"
-          >
-            <a
-              :href="offer.url"
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              class="flex items-center justify-between gap-1 text-[9px] text-slate-600 hover:text-blue-600"
-              @click.stop
-            >
-              <span class="truncate">{{ offer.source }}</span>
-              <span class="shrink-0 font-medium tabular-nums">{{ formatPrice(offer.price, offer.currency) }}</span>
-            </a>
-          </li>
-        </ul>
       </div>
 
       <p
@@ -292,7 +253,6 @@ const props = defineProps({
 
 const { t } = inject('i18n');
 
-const showOffers = ref(false);
 const activeImageIndex = ref(0);
 const imageBroken = ref(false);
 const lightboxOpen = ref(false);
@@ -534,10 +494,6 @@ watch(
     lightboxLoaded.value = false;
   },
 );
-
-const hasMultipleOffers = computed(() => {
-  return Array.isArray(props.product.offers) && props.product.offers.length > 1;
-});
 
 const scoreClass = computed(() => {
   const s = props.product.match_score || 0;
