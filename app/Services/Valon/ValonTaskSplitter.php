@@ -5,6 +5,8 @@ namespace App\Services\Valon;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Support\CategoryCatalog;
 use App\Support\LivePlatformRegistry;
+use App\Support\SwissFashionMarketplaces;
+use App\Support\UniversalMarketplaceBridge;
 
 /**
  * Splits Valon intent into stateless Valon Worker execution units.
@@ -26,7 +28,7 @@ class ValonTaskSplitter
         $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
         $liveFanOut = LivePlatformRegistry::shouldFanOut($parsed, $countryCode);
         $max = $liveFanOut
-            ? LivePlatformRegistry::maxWorkersFor($parsed)
+            ? $this->maxWorkersForFanOut($parsed, $activation)
             : (int) config('valon.max_workers', config('agent_pools.max_agents', 6));
         $prefix = $this->workerPrefix($category);
         $providers = $activation['providers'] ?? [];
@@ -63,6 +65,10 @@ class ValonTaskSplitter
 
                 $platformKey = $this->normalizePlatform($provider->sourceKey());
                 if (isset($usedPlatforms[$platformKey])) {
+                    continue;
+                }
+
+                if ($this->shouldSkipAntiBotFashionWorker($parsed, $activation, $platformKey)) {
                     continue;
                 }
 
@@ -176,5 +182,64 @@ class ValonTaskSplitter
         $normalized = CategoryCatalog::normalize($category);
 
         return (string) ($map[$normalized] ?? config('valon.worker_prefix', 'ValonWorker'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $activation
+     */
+    private function maxWorkersForFanOut(array $parsed, array $activation): int
+    {
+        $localMax = LivePlatformRegistry::maxWorkersFor($parsed);
+        $bridgeReserve = 0;
+
+        if (UniversalMarketplaceBridge::shouldAugmentLocalSearch()) {
+            foreach ($activation['providers'] ?? [] as $provider) {
+                if ($provider instanceof FederatedSearchProviderInterface
+                    && UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())
+                    && $provider->isAvailable()) {
+                    $bridgeReserve++;
+                }
+            }
+        }
+
+        $cap = (int) config('live_platforms.max_workers_cap', 24);
+
+        return min($localMax + $bridgeReserve, $cap);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $activation
+     */
+    private function shouldSkipAntiBotFashionWorker(array $parsed, array $activation, string $platformKey): bool
+    {
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+        $category = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
+
+        if ($countryCode !== 'CH' || ! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return false;
+        }
+
+        if (! SwissFashionMarketplaces::isPlatform($platformKey)) {
+            return false;
+        }
+
+        if (! UniversalMarketplaceBridge::allowsBridge('google_shopping', $countryCode, $category)) {
+            return false;
+        }
+
+        if (! in_array('google_shopping', UniversalMarketplaceBridge::providerKeys(), true)) {
+            return false;
+        }
+
+        foreach ($activation['providers'] ?? [] as $provider) {
+            if ($provider instanceof FederatedSearchProviderInterface
+                && $provider->sourceKey() === 'google_shopping'
+                && $provider->isAvailable()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -4,6 +4,8 @@ namespace App\Services\Valon;
 
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Orchestration\ParallelWorkerExecutor;
+use App\Services\Providers\ProviderIntelligenceService;
+use App\Support\LivePlatformRegistry;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -14,7 +16,7 @@ class ValonWorkerRunner
     public function __construct(
         private ValonResultNormalizer $normalizer,
         private ParallelWorkerExecutor $executor,
-        private \App\Services\Providers\ProviderIntelligenceService $intelligence,
+        private ProviderIntelligenceService $intelligence,
     ) {}
 
     /**
@@ -173,7 +175,11 @@ class ValonWorkerRunner
     {
         $platform = strtolower((string) ($job['platform'] ?? ''));
 
-        if (\App\Support\LivePlatformRegistry::isLivePlatform($platform)) {
+        if ($this->isAntiBotPlatform($platform)) {
+            return (int) config('valon.anti_bot_timeout_seconds', 10);
+        }
+
+        if (LivePlatformRegistry::isLivePlatform($platform)) {
             return (int) config('valon.melodiapx_timeout_seconds', 120);
         }
 

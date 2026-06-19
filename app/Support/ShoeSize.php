@@ -59,7 +59,7 @@ class ShoeSize
 
     public static function extractFromText(string $text): ?string
     {
-        if (preg_match('/\b(?:size|nr|numri|madh[eë]sia|number)\s*[:#]?\s*(\d{2}(?:[.,]\d)?)\b/ui', $text, $m)) {
+        if (preg_match('/\b(?:size|nr|numri|numer|madh[eë]sia|number)\s*[:#]?\s*(\d{2}(?:[.,]\d)?)\b/ui', $text, $m)) {
             return self::normalize($m[1]);
         }
         if (preg_match('/\b(\d{2})[.,](\d)\b/u', $text, $m)) {

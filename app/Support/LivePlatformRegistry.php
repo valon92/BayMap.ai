@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Services\Catalog\PlatformCatalogRepository;
 use App\Services\Platform\PlatformDiscoveryService;
-use App\Support\CategoryCatalog;
 
 /**
  * Country + category live scraping registry.
@@ -73,6 +72,10 @@ class LivePlatformRegistry
         }
 
         $keys = array_values(array_unique(array_merge($keys, PlatformCatalogBridge::keysFor($countryCode, $category))));
+
+        if ($countryCode === 'CH' && in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return SwissFashionMarketplaces::ORDERED_KEYS;
+        }
 
         usort($keys, fn ($a, $b) => self::priorityFor($a) <=> self::priorityFor($b));
 

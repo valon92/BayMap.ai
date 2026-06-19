@@ -150,11 +150,38 @@ const kosovoFashionWorkers = [
   { name: 'Minimax Fashion', initial: 'MX' },
 ];
 
+const swissFashionWorkers = [
+  { name: 'Zalando CH', initial: 'ZA' },
+  { name: 'ABOUT YOU CH', initial: 'AY' },
+  { name: 'Manor', initial: 'MA' },
+  { name: 'PKZ', initial: 'PK' },
+  { name: 'Ochsner Shoes', initial: 'OS' },
+  { name: 'Dosenbach', initial: 'DO' },
+  { name: 'Jelmoli', initial: 'JE' },
+  { name: 'Globus', initial: 'GL' },
+  { name: 'Bonprix', initial: 'BO' },
+  { name: 'H&M CH', initial: 'HM' },
+  { name: 'C&A CH', initial: 'CA' },
+  { name: 'Mango CH', initial: 'MG' },
+  { name: 'Galaxus', initial: 'GX' },
+  { name: 'Ricardo', initial: 'RI' },
+  { name: 'Anibis', initial: 'AN' },
+];
+
 const workerPreviews = computed(() => {
   const q = (props.query || '').toLowerCase();
   const kosovo = /\b(kosov|kosove|prishtin|ferizaj|xk)\b/u.test(q);
+  const swiss = /\b(zvic|schweiz|switzerland|swiss)\b/u.test(q);
   const fashion = /\b(nike|puma|adidas|patika|këpuc|kepuce|mabthje|mbathje|meshkuj|atlete|fashion|sneaker|shoes|qanta|çant|veshje|veshmbathje)\b/u.test(q)
     || /\b(numer|nr|madh[eë]sia|size)\s*\d{2}/u.test(q);
+
+  if (swiss && fashion) {
+    return swissFashionWorkers.map((worker, idx) => ({
+      id: `FashionWorker-${idx + 1}`,
+      name: worker.name,
+      initial: worker.initial,
+    }));
+  }
 
   if (kosovo && fashion) {
     return kosovoFashionWorkers.map((worker, idx) => ({

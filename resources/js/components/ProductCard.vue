@@ -86,24 +86,40 @@
 
     <div
       v-if="hasGallery && galleryImages.length > 1"
-      class="flex gap-1 px-2 pt-1.5 overflow-x-auto scrollbar-thin"
+      class="flex items-center gap-0.5 px-1 pt-1.5"
     >
       <button
-        v-for="(thumb, index) in galleryImages.slice(0, 8)"
-        :key="`${product.id}-thumb-${index}`"
+        v-if="activeImageIndex > 0"
         type="button"
-        class="shrink-0 h-9 w-12 rounded overflow-hidden border-2 transition-colors"
-        :class="index === activeImageIndex ? 'border-blue-500' : 'border-transparent opacity-70 hover:opacity-100'"
-        @click.stop="activeImageIndex = index; openLightbox(index)"
+        class="shrink-0 flex h-9 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        :aria-label="t('gallery_prev')"
+        @click.stop="prevImage"
       >
-        <img :src="thumb" :alt="`${displayTitle} ${index + 1}`" class="h-full w-full object-cover" loading="lazy" />
+        ‹
       </button>
-      <span
-        v-if="galleryImages.length > 8"
-        class="shrink-0 self-center text-[9px] text-slate-500 px-1"
+
+      <div class="flex min-w-0 flex-1 justify-center gap-1 overflow-hidden">
+        <button
+          v-for="item in visibleCardThumbnails"
+          :key="`${product.id}-thumb-${item.index}`"
+          type="button"
+          class="h-9 w-12 shrink-0 rounded overflow-hidden border-2 transition-colors"
+          :class="item.index === activeImageIndex ? 'border-blue-500' : 'border-transparent opacity-70 hover:opacity-100'"
+          @click.stop="selectImage(item.index)"
+        >
+          <img :src="item.url" :alt="`${displayTitle} ${item.index + 1}`" class="h-full w-full object-cover" loading="lazy" />
+        </button>
+      </div>
+
+      <button
+        v-if="activeImageIndex < galleryImages.length - 1"
+        type="button"
+        class="shrink-0 flex h-9 w-6 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        :aria-label="t('gallery_next')"
+        @click.stop="nextImage"
       >
-        +{{ galleryImages.length - 8 }}
-      </span>
+        ›
+      </button>
     </div>
 
     <div class="relative flex flex-col flex-1 p-2 gap-1 min-h-0 pr-9">
@@ -226,17 +242,39 @@
 
         <div
           v-if="galleryImages.length > 1"
-          class="flex shrink-0 gap-2 overflow-x-auto px-4 pb-4 scrollbar-thin"
+          class="flex shrink-0 items-center gap-2 px-4 pb-4"
         >
           <button
-            v-for="(thumb, index) in galleryImages"
-            :key="`${product.id}-lightbox-thumb-${index}`"
+            v-if="lightboxIndex > 0"
             type="button"
-            class="h-14 w-20 shrink-0 overflow-hidden rounded border-2 transition-colors"
-            :class="index === lightboxIndex ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'"
-            @click.stop="lightboxIndex = index; lightboxLoaded = false"
+            class="flex h-11 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xl text-white transition-colors hover:bg-white/20"
+            :aria-label="t('gallery_prev')"
+            @click.stop="lightboxPrev"
           >
-            <img :src="thumb" :alt="`${displayTitle} ${index + 1}`" class="h-full w-full object-cover" />
+            ‹
+          </button>
+
+          <div class="flex min-w-0 flex-1 justify-center gap-2 overflow-hidden">
+            <button
+              v-for="item in visibleLightboxThumbnails"
+              :key="`${product.id}-lightbox-thumb-${item.index}`"
+              type="button"
+              class="h-14 w-20 shrink-0 overflow-hidden rounded border-2 transition-colors"
+              :class="item.index === lightboxIndex ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'"
+              @click.stop="selectLightboxImage(item.index)"
+            >
+              <img :src="item.url" :alt="`${displayTitle} ${item.index + 1}`" class="h-full w-full object-cover" />
+            </button>
+          </div>
+
+          <button
+            v-if="lightboxIndex < galleryImages.length - 1"
+            type="button"
+            class="flex h-11 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xl text-white transition-colors hover:bg-white/20"
+            :aria-label="t('gallery_next')"
+            @click.stop="lightboxNext"
+          >
+            ›
           </button>
         </div>
       </div>
@@ -300,6 +338,44 @@ const hasGallery = computed(() => galleryImages.value.length > 1);
 const displayImage = computed(() => galleryImages.value[activeImageIndex.value] ?? null);
 
 const lightboxImage = computed(() => galleryImages.value[lightboxIndex.value] ?? null);
+
+const CARD_THUMB_WINDOW = 4;
+const LIGHTBOX_THUMB_WINDOW = 5;
+
+function thumbWindowStart(activeIndex, total, windowSize) {
+  if (total <= windowSize) {
+    return 0;
+  }
+
+  const maxStart = total - windowSize;
+  const centered = activeIndex - Math.floor(windowSize / 2);
+
+  return Math.min(Math.max(centered, 0), maxStart);
+}
+
+function buildVisibleThumbnails(activeIndex, windowSize) {
+  const images = galleryImages.value;
+  const start = thumbWindowStart(activeIndex, images.length, windowSize);
+
+  return images
+    .slice(start, start + windowSize)
+    .map((url, offset) => ({ url, index: start + offset }));
+}
+
+const visibleCardThumbnails = computed(() => buildVisibleThumbnails(activeImageIndex.value, CARD_THUMB_WINDOW));
+
+const visibleLightboxThumbnails = computed(() => buildVisibleThumbnails(lightboxIndex.value, LIGHTBOX_THUMB_WINDOW));
+
+function selectImage(index) {
+  activeImageIndex.value = index;
+  imageBroken.value = false;
+}
+
+function selectLightboxImage(index) {
+  lightboxLoaded.value = false;
+  lightboxIndex.value = index;
+  activeImageIndex.value = index;
+}
 
 function openLightbox(index = activeImageIndex.value) {
   if (!galleryImages.value.length) {

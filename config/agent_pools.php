@@ -16,7 +16,7 @@ return [
     | Platform trust scores (0–100) used in weighted ranking
     |--------------------------------------------------------------------------
     */
-        'trust_scores' => [
+    'trust_scores' => [
         'web_services_bridge' => 94,
         'ebay' => 92,
         'google_shopping' => 88,
@@ -29,6 +29,21 @@ return [
         'etsy' => 78,
         'driloni' => 82,
         'melodiapx' => 88,
+        'zalando_ch' => 90,
+        'aboutyou_ch' => 88,
+        'manor_ch' => 86,
+        'pkz_ch' => 85,
+        'ochsner_shoes_ch' => 84,
+        'dosenbach_ch' => 83,
+        'jelmoli_ch' => 87,
+        'globus_ch' => 88,
+        'bonprix_ch' => 82,
+        'hm_ch' => 84,
+        'ca_ch' => 83,
+        'mango_ch' => 85,
+        'galaxus_ch' => 89,
+        'ricardo_ch' => 86,
+        'anibis_ch' => 84,
         'jumbo_ks' => 92,
         'mytoys_ks' => 88,
         'thetoyshop_ks' => 86,
@@ -47,6 +62,7 @@ return [
         'fashion' => [
             'agents' => [
                 ['id' => 'KosovoFashionPlatformAgent', 'sources' => ['melodiapx', 'albi_online', 'driloni', 'butiku_regina', 'vedude_fashion', 'arjana_shop', 'ssprint_fashion', 'am_fashion', 'waikiki_kosovo', 'minimax_fashion'], 'countries' => ['XK'], 'trust' => 90, 'speed' => 95],
+                ['id' => 'SwissFashionPlatformAgent', 'sources' => ['zalando_ch', 'aboutyou_ch', 'manor_ch', 'pkz_ch', 'ochsner_shoes_ch', 'dosenbach_ch', 'jelmoli_ch', 'globus_ch', 'bonprix_ch', 'hm_ch', 'ca_ch', 'mango_ch', 'galaxus_ch', 'ricardo_ch', 'anibis_ch'], 'countries' => ['CH'], 'trust' => 91, 'speed' => 88],
                 ['id' => 'KosovoFashionLiveAgent', 'sources' => ['melodiapx', 'driloni'], 'countries' => ['XK'], 'trust' => 92, 'speed' => 98],
                 ['id' => 'LocalMarketplaceAgent', 'sources' => ['melodiapx', 'driloni'], 'countries' => ['XK'], 'trust' => 88, 'speed' => 95],
                 ['id' => 'BalkanScraperAgent', 'sources' => ['merrjep', 'dyqani', 'pazar3', 'gjirafa50', 'tregu'], 'countries' => ['XK', 'AL', 'MK'], 'trust' => 75, 'speed' => 88],

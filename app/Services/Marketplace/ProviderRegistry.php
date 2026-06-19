@@ -8,16 +8,17 @@ use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiFlightsSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
 use App\Services\Marketplace\Providers\WebServicesSearchProvider;
-use App\Support\LivePlatformRegistry;
 use App\Support\CategoryCatalog;
 use App\Support\DutchCarMarketplaces;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
 use App\Support\GlobalBookMarketplaces;
-use App\Support\KosovoCarMarketplaces;
 use App\Support\KosovoMarketplaces;
+use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
+use App\Support\PlatformCatalogBridge;
 use App\Support\SwissCarMarketplaces;
+use App\Support\SwissFashionMarketplaces;
 use App\Support\SwissRealEstateMarketplaces;
 use App\Support\UKRealEstateMarketplaces;
 use App\Support\UniversalMarketplaceBridge;
@@ -117,7 +118,10 @@ class ProviderRegistry
             }
             if (LocalMarketplaceResolver::isTargeted($parsedQuery)) {
                 if (UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())
-                    && UniversalMarketplaceBridge::allowsBridge($provider->sourceKey(), $countryCode, $category)) {
+                    && UniversalMarketplaceBridge::allowsBridge($provider->sourceKey(), $countryCode, $category)
+                    && UniversalMarketplaceBridge::shouldAugmentLocalSearch()
+                    && $provider->isAvailable()
+                    && ! in_array($provider->sourceKey(), LocalMarketplaceResolver::excludedGlobalProviders($countryCode, $category), true)) {
                     return $provider->supportsCategory($category);
                 }
 
@@ -469,5 +473,50 @@ class ProviderRegistry
         }
 
         return array_values($byKey);
+    }
+
+    /**
+     * On-demand catalog demo providers for country fashion (includes live platform keys).
+     *
+     * @return array<int, MockSearchProvider>
+     */
+    public function catalogFashionDemoProviders(string $countryCode, string $category): array
+    {
+        if (! config('live_platforms.fashion_demo_fallback', true)) {
+            return [];
+        }
+
+        $category = CategoryCatalog::normalize($category);
+        if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return [];
+        }
+
+        $countryCode = strtoupper($countryCode);
+        if ($countryCode === '') {
+            return [];
+        }
+
+        $keys = PlatformCatalogBridge::keysFor($countryCode, $category);
+        if ($keys === []) {
+            return [];
+        }
+
+        $providers = [];
+        foreach ($keys as $key) {
+            $label = SwissFashionMarketplaces::label($key)
+                ?: LivePlatformRegistry::label($key)
+                ?: PlatformCatalogBridge::label($key)
+                ?: ucfirst(str_replace('_', ' ', $key));
+
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: $label,
+                priority: 72,
+                categories: ['fashion', 'sports_outdoor', 'marketplace'],
+                countries: [$countryCode],
+            );
+        }
+
+        return $providers;
     }
 }

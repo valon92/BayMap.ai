@@ -3,14 +3,15 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\MarketplaceSearchInterface;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-
+use App\Support\SwissFashionMarketplaces;
+use App\Support\UniversalMarketplaceBridge;
 /**
  * Google Shopping results via SerpAPI (aggregates many online stores).
+ *
  * @see https://serpapi.com/google-shopping-api
  */
-use App\Support\UniversalMarketplaceBridge;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SerpApiShoppingService implements MarketplaceSearchInterface
 {
@@ -94,12 +95,69 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
             'country_code' => strtoupper($countryCode),
             'condition' => 'new',
             'url' => $item['link'] ?? $item['product_link'] ?? 'https://www.google.com/shopping',
-            'source' => $item['source'] ?? 'Google Shopping',
-            'source_key' => 'google_shopping',
+            'source' => $this->resolveSourceLabel($item, $countryCode),
+            'source_key' => $this->resolveSourceKey($item, $countryCode),
             'affiliate_ready' => true,
             'sponsored' => false,
             'tags' => ['google_shopping', 'live', 'bridge'],
             'live' => true,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function resolveSourceLabel(array $item, string $countryCode): string
+    {
+        $mapped = $this->mapSwissFashionSource($item, $countryCode);
+
+        return $mapped['label'] ?? (string) ($item['source'] ?? 'Google Shopping');
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function resolveSourceKey(array $item, string $countryCode): string
+    {
+        $mapped = $this->mapSwissFashionSource($item, $countryCode);
+
+        return $mapped['key'] ?? 'google_shopping';
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array{key: string, label: string}|null
+     */
+    private function mapSwissFashionSource(array $item, string $countryCode): ?array
+    {
+        if (strtoupper($countryCode) !== 'CH') {
+            return null;
+        }
+
+        $haystack = mb_strtolower(implode(' ', array_filter([
+            (string) ($item['source'] ?? ''),
+            (string) ($item['link'] ?? ''),
+            (string) ($item['product_link'] ?? ''),
+        ])));
+
+        foreach (SwissFashionMarketplaces::ORDERED_KEYS as $key) {
+            $label = SwissFashionMarketplaces::label($key);
+            $url = SwissFashionMarketplaces::url($key) ?? '';
+            $host = parse_url($url, PHP_URL_HOST) ?: '';
+            $host = mb_strtolower(str_replace('www.', '', $host));
+            $slug = str_replace('_ch', '', $key);
+
+            if ($host !== '' && str_contains($haystack, $host)) {
+                return ['key' => $key, 'label' => $label];
+            }
+
+            if (str_contains($haystack, str_replace('_', '', $slug))
+                || str_contains($haystack, str_replace('_', '-', $slug))
+                || str_contains($haystack, mb_strtolower($label))) {
+                return ['key' => $key, 'label' => $label];
+            }
+        }
+
+        return null;
     }
 }

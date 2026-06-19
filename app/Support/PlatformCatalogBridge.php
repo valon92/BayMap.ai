@@ -50,6 +50,7 @@ class PlatformCatalogBridge
         $key = strtolower(trim($key));
 
         return KosovoCarMarketplaces::label($key)
+            ?: SwissFashionMarketplaces::label($key)
             ?: SwissCarMarketplaces::label($key)
             ?: UKRealEstateMarketplaces::label($key)
             ?: SwissRealEstateMarketplaces::label($key)
@@ -58,7 +59,6 @@ class PlatformCatalogBridge
             ?: GermanCarMarketplaces::label($key)
             ?: GermanElectronicsMarketplaces::label($key)
             ?: SwissElectronicsMarketplaces::label($key)
-            ?: SwissFashionMarketplaces::label($key)
             ?: '';
     }
 

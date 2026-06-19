@@ -184,8 +184,11 @@ class AgentActivationService
         foreach ($ordered as $provider) {
             $key = $provider->sourceKey();
             $sourceKeys[] = $key;
+            $agentId = $countryCode === 'CH' && in_array($category, ['fashion', 'sports_outdoor'], true)
+                ? 'SwissFashionPlatformAgent'
+                : 'LivePlatformAgent';
             $agents[] = [
-                'id' => 'LivePlatformAgent',
+                'id' => $agentId,
                 'score' => 100.0,
                 'sources' => [$key],
                 'trust' => (int) ($this->pools->trustScore($key) ?: 85),
@@ -213,7 +216,7 @@ class AgentActivationService
      */
     private function activateUniversalBridge(array $parsed, array $expanded, array $geo, string $countryCode, string $category): array
     {
-        $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
+        $allProviders = $this->registry->all();
         $wanted = UniversalMarketplaceBridge::providerKeys();
         $ordered = [];
         $agents = [];
@@ -225,6 +228,9 @@ class AgentActivationService
                 continue;
             }
             if (! UniversalMarketplaceBridge::allowsBridge($key, $countryCode, $category)) {
+                continue;
+            }
+            if (in_array($key, LocalMarketplaceResolver::excludedGlobalProviders($countryCode, $category), true)) {
                 continue;
             }
             if (! $provider->isAvailable()) {

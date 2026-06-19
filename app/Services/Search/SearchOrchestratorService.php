@@ -23,6 +23,7 @@ use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
 use App\Support\SearchCountryResolver;
 use App\Support\ShoeSize;
+use App\Support\SwissFashionMarketplaces;
 use App\Support\WebServicesIntentParser;
 
 /**
@@ -427,8 +428,10 @@ class SearchOrchestratorService
                 return false;
             }
             if (isset($filters['size']) && $filters['size'] !== '' && ! ShoeSize::productHasSize($product, (string) $filters['size'])) {
-                // Keep Kosovo local stores visible — buyer verifies sizes on the shop page
-                if (! KosovoMarketplaces::isKosovoPlatform((string) ($product['store'] ?? ''))) {
+                $store = (string) ($product['store'] ?? $product['source_key'] ?? '');
+                // Keep local store listings visible — buyer verifies sizes on the shop page
+                if (! KosovoMarketplaces::isKosovoPlatform($store)
+                    && ! SwissFashionMarketplaces::isPlatform($store)) {
                     return false;
                 }
             }
@@ -751,8 +754,7 @@ class SearchOrchestratorService
             return $products;
         }
 
-        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
-        if ($countryCode !== 'XK' && $countryCode !== '') {
+        if (empty($parsed['search_target'])) {
             return $products;
         }
 

@@ -6,15 +6,16 @@ use App\Contracts\MarketplaceSearchInterface;
 use App\Support\AutomotiveModelResolver;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
-use App\Support\ListingEnricher;
 use App\Support\DutchCarMarketplaces;
-use App\Support\GlobalBookMarketplaces;
 use App\Support\ElectronicsIntentParser;
 use App\Support\GermanCarMarketplaces;
-use App\Support\KosovoCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
+use App\Support\GlobalBookMarketplaces;
+use App\Support\KosovoCarMarketplaces;
 use App\Support\KosovoMarketplaces;
+use App\Support\ListingEnricher;
 use App\Support\SwissCarMarketplaces;
+use App\Support\SwissFashionMarketplaces;
 use Illuminate\Support\Facades\File;
 
 /**
@@ -159,6 +160,17 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             ));
         }
 
+        if (SwissFashionMarketplaces::isPlatform($this->source)) {
+            return array_values(array_filter($items, function (array $item) {
+                if (($item['store'] ?? '') === $this->source) {
+                    return true;
+                }
+
+                return ($item['store'] ?? 'general') === 'general'
+                    && $this->locationMatchesCountry($item, 'CH');
+            }));
+        }
+
         if (GlobalBookMarketplaces::isPlatform($this->source)) {
             return array_values(array_filter(
                 $items,
@@ -257,6 +269,11 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             }
 
             if (CategoryCatalog::isLocalFashion($parsed['category'] ?? '')) {
+                if (! empty($parsed['search_target']) && ! empty($parsed['search_country_code'])
+                    && ! $this->locationMatchesCountry($item, (string) $parsed['search_country_code'])) {
+                    return false;
+                }
+
                 if (! empty($parsed['brand']) && ! $this->matchesFashionBrand($item, (string) $parsed['brand'])) {
                     return false;
                 }
@@ -264,7 +281,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 if (! empty($parsed['size']) && ! empty($item['sizes'])) {
                     $wanted = (string) $parsed['size'];
                     $sizes = array_map('strval', $item['sizes']);
-                    if (! in_array($wanted, $sizes, true) && ! KosovoMarketplaces::isKosovoPlatform((string) ($item['store'] ?? ''))) {
+                    $localStore = (string) ($item['store'] ?? '');
+                    $allowUnknownSize = KosovoMarketplaces::isKosovoPlatform($localStore)
+                        || SwissFashionMarketplaces::isPlatform($localStore);
+                    if (! in_array($wanted, $sizes, true) && ! $allowUnknownSize) {
                         return false;
                     }
                 }
@@ -467,6 +487,10 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             return KosovoMarketplaces::label($this->source);
         }
 
+        if (SwissFashionMarketplaces::url($this->source)) {
+            return SwissFashionMarketplaces::label($this->source);
+        }
+
         return match ($this->source) {
             'mobile.de' => 'mobile.de',
             'autoscout24', 'autoscout24_ch' => 'AutoScout24 Switzerland',
@@ -487,6 +511,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         $catalogUrl = SwissCarMarketplaces::url($this->source)
             ?? DutchCarMarketplaces::url($this->source)
             ?? GermanElectronicsMarketplaces::url($this->source)
+            ?? SwissFashionMarketplaces::url($this->source)
             ?? KosovoMarketplaces::url($this->source);
         if ($catalogUrl) {
             return $catalogUrl;

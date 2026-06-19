@@ -9,9 +9,11 @@ return [
 
     'worker_prefix' => 'ValonWorker',
 
-    'max_workers' => (int) env('VALON_MAX_WORKERS', 10),
+    'max_workers' => (int) env('VALON_MAX_WORKERS', 15),
 
     'worker_timeout_seconds' => (int) env('VALON_WORKER_TIMEOUT', 15),
+
+    'anti_bot_timeout_seconds' => (int) env('VALON_ANTI_BOT_TIMEOUT', 10),
 
     'melodiapx_timeout_seconds' => (int) env('VALON_MELODIA_PX_TIMEOUT', 120),
 
@@ -24,6 +26,7 @@ return [
         'LivePlatformAgent' => 'Live platform catalog search',
         'UniversalBridgeAgent' => 'Global marketplace bridge (Google Shopping / eBay)',
         'KosovoFashionPlatformAgent' => 'Kosovo fashion platform search',
+        'SwissFashionPlatformAgent' => 'Switzerland fashion platform search',
         'KosovoFashionLiveAgent' => 'Kosovo fashion live catalog search',
         'LocalMarketplaceAgent' => 'Local marketplace search',
         'BalkanScraperAgent' => 'Balkan marketplace search',

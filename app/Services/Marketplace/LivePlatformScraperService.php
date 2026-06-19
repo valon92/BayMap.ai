@@ -24,7 +24,7 @@ class LivePlatformScraperService
             return [];
         }
 
-        $cacheKey = 'live:'.$platformKey.':v31:'.md5(json_encode([
+        $cacheKey = 'live:'.$platformKey.':v32:'.md5(json_encode([
             $parsedQuery['brand'] ?? '',
             $parsedQuery['model'] ?? '',
             $parsedQuery['year_min'] ?? '',

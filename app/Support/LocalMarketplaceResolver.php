@@ -154,6 +154,23 @@ class LocalMarketplaceResolver
             $excluded = array_values(array_filter($excluded, fn (string $key) => $key !== 'ebay'));
         }
 
+        $allowBridge = (array) config('live_platforms.local_search.allow_bridge_categories', []);
+        foreach ($allowBridge as $rule) {
+            if (! is_string($rule) || ! str_contains($rule, ':')) {
+                continue;
+            }
+            [$ruleCountry, $ruleCategory] = explode(':', $rule, 2);
+            $countryMatch = $ruleCountry === '*' || strtoupper($ruleCountry) === $countryCode;
+            $categoryMatch = $ruleCategory === '*' || CategoryCatalog::normalize($ruleCategory) === $category;
+            if ($countryMatch && $categoryMatch) {
+                $excluded = array_values(array_filter(
+                    $excluded,
+                    fn (string $key) => ! in_array($key, ['ebay', 'google_shopping'], true),
+                ));
+                break;
+            }
+        }
+
         return $excluded;
     }
 

@@ -373,18 +373,38 @@ function workerMatchesResults(worker, items) {
   });
 }
 
+function workerPlatformKey(worker) {
+  return normalizePlatformToken(worker.platform_label || worker.platform);
+}
+
+function workerPriority(worker, items) {
+  if (worker.status === 'blocked') return 0;
+  if ((worker.results ?? 0) > 0) return 3;
+  if (workerMatchesResults(worker, items)) return 2;
+  return 1;
+}
+
 const valonWorkerChips = computed(() => {
   const workers = data.value?.meta?.valon?.workers ?? [];
   const pool = results.value;
   const poolSize = data.value?.meta?.pool_size ?? pool.length;
 
-  return workers
+  const ranked = workers
     .filter((w) => {
+      if (poolSize > 0) {
+        if (w.status === 'blocked') {
+          return !workers.some(
+            (other) =>
+              other !== w
+              && workerPlatformKey(other) === workerPlatformKey(w)
+              && ((other.results ?? 0) > 0 || workerMatchesResults(other, pool)),
+          );
+        }
+        return (w.results ?? 0) > 0 || workerMatchesResults(w, pool);
+      }
+
       if (w.status === 'blocked') {
         return true;
-      }
-      if (poolSize > 0) {
-        return workerMatchesResults(w, pool);
       }
       if ((w.results ?? 0) > 0) {
         return true;
@@ -392,20 +412,35 @@ const valonWorkerChips = computed(() => {
 
       return !String(w.id || '').includes('demo');
     })
-    .map((w) => {
-      const count = w.status === 'blocked'
-        ? t('worker_blocked')
-        : w.results != null
-          ? ` · ${w.results}`
-          : '';
+    .sort((a, b) => workerPriority(b, pool) - workerPriority(a, pool));
 
-      return {
-        id: w.id,
-        role: w.role,
-        label: `${w.platform_label || w.platform}${count}`,
-        blocked: w.status === 'blocked',
-      };
-    });
+  const seen = new Set();
+  const deduped = [];
+  for (const w of ranked) {
+    const key = workerPlatformKey(w);
+    if (key && seen.has(key)) {
+      continue;
+    }
+    if (key) {
+      seen.add(key);
+    }
+    deduped.push(w);
+  }
+
+  return deduped.map((w) => {
+    const count = w.status === 'blocked'
+      ? t('worker_blocked')
+      : w.results != null
+        ? ` · ${w.results}`
+        : '';
+
+    return {
+      id: w.id,
+      role: w.role,
+      label: `${w.platform_label || w.platform}${count}`,
+      blocked: w.status === 'blocked',
+    };
+  });
 });
 
 const displayQuery = computed(() => {
@@ -548,6 +583,18 @@ const localMarketplaceSections = computed(() => {
   const labels = data.value?.meta?.marketplace_labels ?? [];
   const code = String(p.search_country_code || '').toUpperCase();
   if (!labels.length || !code || code === 'XK') return [];
+
+  const pool = results.value;
+  if (pool.length) {
+    const fromResults = [...new Set(pool.map((item) => item.source).filter(Boolean))];
+    if (fromResults.length) {
+      return [{
+        code,
+        title: t('local_marketplaces_searched', { country: countryDisplayName(code, p) }),
+        labels: fromResults,
+      }];
+    }
+  }
 
   return [{
     code,

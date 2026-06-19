@@ -6,6 +6,7 @@ use App\Support\CategoryCatalog;
 use App\Support\GlobalBookMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
+use App\Support\SwissFashionMarketplaces;
 use App\Support\UniversalMarketplaceBridge;
 
 /**
@@ -245,7 +246,8 @@ class SearchExpansionService
         if (LivePlatformRegistry::keysFor($countryCode, $category) !== []) {
             $labels = [];
             foreach ($marketplaces as $key) {
-                $label = LivePlatformRegistry::label($key);
+                $label = LivePlatformRegistry::label($key)
+                    ?: SwissFashionMarketplaces::label($key);
                 if ($label !== '') {
                     $labels[] = $label;
                 }

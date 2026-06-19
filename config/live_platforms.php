@@ -13,6 +13,9 @@ return [
     /** When true, DE/CH/NL automotive mock listings back live scrapers when sites block bots. */
     'automotive_demo_fallback' => (bool) env('LIVE_AUTOMOTIVE_DEMO_FALLBACK', true),
 
+    /** When true, country fashion catalogs back live scrapers when anti-bot blocks HTML scraping. */
+    'fashion_demo_fallback' => (bool) env('LIVE_FASHION_DEMO_FALLBACK', true),
+
     /** Multi-page automotive scraping (AutoScout24, Kleinanzeigen). */
     'automotive_max_pages' => (int) env('AUTOMOTIVE_MAX_PAGES', 10),
 
@@ -39,9 +42,10 @@ return [
     'local_search' => [
         'exclude_global' => ['amazon', 'etsy', 'facebook_marketplace'],
         'allow_ebay_categories' => ['DE:automotive'],
+        'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor'],
         'by_country' => [
             'CH' => [
-                'exclude_global' => ['ebay', 'google_shopping', 'amazon', 'etsy'],
+                'exclude_global' => ['amazon', 'etsy'],
             ],
             'DE' => [
                 'exclude_global' => ['google_shopping'],
@@ -395,10 +399,10 @@ return [
             'locale' => 'de-DE',
         ],
 
-        // ── Switzerland · Fashion ────────────────────────────────────────
+        // ── Switzerland · Fashion (FashionWorker-1 … FashionWorker-15) ───
         'zalando_ch' => [
             'adapter' => 'generic',
-            'label' => 'Zalando Switzerland',
+            'label' => 'Zalando CH',
             'country' => 'CH',
             'categories' => ['fashion', 'sports_outdoor'],
             'base_url' => 'https://www.zalando.ch',
@@ -411,7 +415,7 @@ return [
 
         'aboutyou_ch' => [
             'adapter' => 'generic',
-            'label' => 'ABOUT YOU Switzerland',
+            'label' => 'ABOUT YOU CH',
             'country' => 'CH',
             'categories' => ['fashion', 'sports_outdoor'],
             'base_url' => 'https://www.aboutyou.ch',
@@ -422,69 +426,146 @@ return [
             'locale' => 'de-CH',
         ],
 
-        'ochsnersport_ch' => [
+        'pkz_ch' => [
             'adapter' => 'generic',
-            'label' => 'Ochsner Sport',
+            'label' => 'PKZ',
             'country' => 'CH',
             'categories' => ['fashion', 'sports_outdoor'],
-            'base_url' => 'https://www.ochsnersport.com',
+            'base_url' => 'https://www.pkz.ch',
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 5,
-            'search_template' => '/ch-de/search?q={query}',
+            'search_template' => '/ch/de/search?q={query}',
             'locale' => 'de-CH',
         ],
 
-        'intersport_ch' => [
+        'ochsner_shoes_ch' => [
             'adapter' => 'generic',
-            'scraper' => 'shopify',
-            'label' => 'Intersport Switzerland',
+            'label' => 'Ochsner Shoes',
             'country' => 'CH',
             'categories' => ['fashion', 'sports_outdoor'],
-            'base_url' => 'https://www.intersport.ch',
+            'base_url' => 'https://www.ochsner-shoes.ch',
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 6,
-            'search_template' => '/search?q={query}&type=product',
-            'locale' => 'de-CH',
-        ],
-
-        'sportxx_ch' => [
-            'adapter' => 'generic',
-            'label' => 'SportXX',
-            'country' => 'CH',
-            'categories' => ['fashion', 'sports_outdoor'],
-            'base_url' => 'https://www.sportxx.ch',
-            'location' => 'Switzerland',
-            'currency' => 'CHF',
-            'priority' => 7,
             'search_template' => '/de/search?q={query}',
             'locale' => 'de-CH',
         ],
 
-        'decathlon_ch' => [
+        'dosenbach_ch' => [
             'adapter' => 'generic',
-            'label' => 'Decathlon Switzerland',
+            'label' => 'Dosenbach',
             'country' => 'CH',
             'categories' => ['fashion', 'sports_outdoor'],
-            'base_url' => 'https://www.decathlon.ch',
+            'base_url' => 'https://www.dosenbach.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 7,
+            'search_template' => '/de/search?query={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'jelmoli_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Jelmoli',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.jelmoli.ch',
             'location' => 'Switzerland',
             'currency' => 'CHF',
             'priority' => 8,
-            'search_template' => '/de/search?Ntt={query}',
+            'search_template' => '/shop/de/search?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'globus_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Globus',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.globus.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 9,
+            'search_template' => '/de/search?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'bonprix_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Bonprix',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.bonprix.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 10,
+            'search_template' => '/ch/search/?q={query}',
             'locale' => 'de-CH',
         ],
 
         'hm_ch' => [
             'adapter' => 'generic',
-            'label' => 'H&M Switzerland',
+            'label' => 'H&M CH',
             'country' => 'CH',
             'categories' => ['fashion', 'sports_outdoor'],
             'base_url' => 'https://www2.hm.com',
             'location' => 'Switzerland',
             'currency' => 'CHF',
-            'priority' => 9,
+            'priority' => 11,
             'search_template' => '/de_ch/search-results.html?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'ca_ch' => [
+            'adapter' => 'generic',
+            'label' => 'C&A CH',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://www.c-and-a.com',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 12,
+            'search_template' => '/ch/de/shop/search/{query}',
+            'locale' => 'de-CH',
+        ],
+
+        'mango_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Mango CH',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor'],
+            'base_url' => 'https://shop.mango.com',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 13,
+            'search_template' => '/ch/search?q={query}',
+            'locale' => 'de-CH',
+        ],
+
+        'ricardo_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Ricardo',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor', 'marketplace'],
+            'base_url' => 'https://www.ricardo.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 14,
+            'search_template' => '/de/s/{query}',
+            'locale' => 'de-CH',
+        ],
+
+        'anibis_ch' => [
+            'adapter' => 'generic',
+            'label' => 'Anibis',
+            'country' => 'CH',
+            'categories' => ['fashion', 'sports_outdoor', 'marketplace'],
+            'base_url' => 'https://www.anibis.ch',
+            'location' => 'Switzerland',
+            'currency' => 'CHF',
+            'priority' => 15,
+            'search_template' => '/de/q?q={query}',
             'locale' => 'de-CH',
         ],
 

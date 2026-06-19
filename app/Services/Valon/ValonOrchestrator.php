@@ -2,18 +2,23 @@
 
 namespace App\Services\Valon;
 
+use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Agents\AgentActivationService;
 use App\Services\Marketplace\ProviderRegistry;
-use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Orchestration\ProviderDiscoveryEngine;
 use App\Services\Orchestration\SearchIntentFactory;
 use App\Services\Search\LocationExpansionEngine;
 use App\Support\CategoryCatalog;
 use App\Support\GermanCarMarketplaces;
+use App\Support\KosovoAutomotiveIntent;
 use App\Support\KosovoMarketplaces;
+use App\Support\KosovoToyIntent;
 use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
+use App\Support\SwissFashionMarketplaces;
+use App\Support\UniversalMarketplaceBridge;
+use App\Support\WebServicesIntentParser;
 
 /**
  * Valon AI — role-based multi-agent orchestrator.
@@ -91,10 +96,35 @@ class ValonOrchestrator
             }
         } while ($locationEngine->canExpand());
 
+        $category = CategoryCatalog::normalize($parsedQuery['category'] ?? 'marketplace');
+        $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? $geo['country_code'] ?? ''));
+
+        if ($results === []
+            && config('live_platforms.fashion_demo_fallback', true)
+            && in_array($category, ['fashion', 'sports_outdoor'], true)
+            && $countryCode !== ''
+            && $countryCode !== 'XK'
+            && LocalMarketplaceResolver::isTargeted($parsedQuery)
+            && ! $this->shouldSkipFashionDemoFallback($countryCode, $category)) {
+            $catalogFallback = $this->runCatalogFashionFallback(
+                $parsedQuery,
+                $expandedFilters,
+                $geo,
+                $countryCode,
+                $category,
+                count($workerMeta),
+            );
+            if ($catalogFallback['results'] !== []) {
+                $results = $catalogFallback['results'];
+                $workerReports = $catalogFallback['report'];
+                $workerMeta = $catalogFallback['workers'];
+            }
+        }
+
         if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)
-            && ! \App\Support\WebServicesIntentParser::isActive($parsedQuery)
-            && ! \App\Support\KosovoToyIntent::shouldSkipDemoFallback($parsedQuery)
-            && ! \App\Support\KosovoAutomotiveIntent::shouldSkipDemoFallback($parsedQuery)) {
+            && ! WebServicesIntentParser::isActive($parsedQuery)
+            && ! KosovoToyIntent::shouldSkipDemoFallback($parsedQuery)
+            && ! KosovoAutomotiveIntent::shouldSkipDemoFallback($parsedQuery)) {
             $fallback = $this->runDemoFallback($parsedQuery, $expandedFilters, $geo, count($workerMeta));
             if ($fallback['results'] !== []) {
                 $results = $fallback['results'];
@@ -102,6 +132,8 @@ class ValonOrchestrator
                 $workerMeta = array_merge($workerMeta, $fallback['workers']);
             }
         }
+
+        [$workerReports, $workerMeta] = $this->consolidateWorkerTelemetry($workerReports, $workerMeta, $results);
 
         $legacyReport = $this->toLegacyReport($workerReports, $parsedQuery, $geo);
 
@@ -311,6 +343,100 @@ class ValonOrchestrator
     }
 
     /**
+     * Country fashion catalog fallback — one demo worker per registered local store when live scrapers fail.
+     *
+     * @return array{
+     *   results: array<int, array<string, mixed>>,
+     *   report: array<int, array<string, mixed>>,
+     *   workers: array<int, array<string, mixed>>
+     * }
+     */
+    private function runCatalogFashionFallback(
+        array $parsedQuery,
+        array $expandedFilters,
+        array $geo,
+        string $countryCode,
+        string $category,
+        int $workerOffset = 0,
+    ): array {
+        $providers = $this->registry->catalogFashionDemoProviders($countryCode, $category);
+        if ($providers === []) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $demoFilters = $expandedFilters;
+        unset($demoFilters['marketplaces']);
+
+        $targetResults = max(
+            24,
+            (int) config('marketplaces.demo_fallback_target_results', 8) * 3,
+        );
+
+        $results = [];
+        $report = [];
+        $workers = [];
+        $prefix = $this->workerPrefixForCategory($category);
+        $index = 1;
+
+        foreach ($providers as $provider) {
+            $started = microtime(true);
+
+            try {
+                $items = $provider->search($parsedQuery, $demoFilters);
+            } catch (\Throwable) {
+                $items = [];
+            }
+
+            $count = is_array($items) ? count($items) : 0;
+            $latencyMs = (int) round((microtime(true) - $started) * 1000);
+            $platform = $provider->sourceKey();
+            $workerId = SwissFashionMarketplaces::workerIdFor($platform) ?? "{$prefix}-{$index}";
+            $platformLabel = SwissFashionMarketplaces::label($platform) ?: $provider->label();
+
+            if ($count > 0) {
+                foreach ($items as $item) {
+                    $results[] = $item;
+                }
+            }
+
+            $report[] = [
+                'worker_id' => $workerId,
+                'platform' => $platform,
+                'platform_label' => $platformLabel,
+                'role' => 'Local catalog',
+                'mode' => 'demo',
+                'count' => $count,
+                'status' => $count > 0 ? 'ok' : 'ok',
+                'location_tier' => $geo['city'] ?? '',
+                'latency_ms' => $latencyMs,
+                'error' => null,
+            ];
+
+            $workers[] = [
+                'id' => $workerId,
+                'role' => 'Local catalog',
+                'platform' => $platform,
+                'platform_label' => $platformLabel,
+                'status' => $count > 0 ? 'ok' : 'ok',
+                'results' => $count,
+                'latency_ms' => $latencyMs,
+            ];
+
+            $index++;
+
+            if (count($results) >= $targetResults) {
+                break;
+            }
+        }
+
+        return [
+            'results' => $results,
+            'report' => $report,
+            'workers' => $workers,
+        ];
+    }
+
+    /**
      * @param  array<int, FederatedSearchProviderInterface>  $providers
      * @return array<int, FederatedSearchProviderInterface>
      */
@@ -337,6 +463,73 @@ class ValonOrchestrator
         return array_merge($local, $global);
     }
 
+    private function shouldSkipFashionDemoFallback(string $countryCode, string $category): bool
+    {
+        if (! UniversalMarketplaceBridge::allowsBridge('google_shopping', $countryCode, $category)) {
+            return false;
+        }
+
+        return in_array('google_shopping', UniversalMarketplaceBridge::providerKeys(), true);
+    }
+
+    private function workerPrefixForCategory(string $category): string
+    {
+        $map = (array) config('providers.worker_prefix_by_category', []);
+        $normalized = CategoryCatalog::normalize($category);
+
+        return (string) ($map[$normalized] ?? config('valon.worker_prefix', 'ValonWorker'));
+    }
+
+    /**
+     * Drop redundant worker rows when catalog fallback succeeded after blocked live scrapers.
+     *
+     * @param  array<int, array<string, mixed>>  $reports
+     * @param  array<int, array<string, mixed>>  $workers
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, mixed>>}
+     */
+    private function consolidateWorkerTelemetry(array $reports, array $workers, array $results): array
+    {
+        $catalogSuccess = [];
+        foreach ($reports as $row) {
+            $platform = strtolower((string) ($row['platform'] ?? ''));
+            if ($platform === '') {
+                continue;
+            }
+            if (($row['count'] ?? 0) > 0 && ($row['mode'] ?? '') === 'demo') {
+                $catalogSuccess[$platform] = true;
+            }
+        }
+
+        $hasResults = $results !== [];
+
+        $filter = function (array $row) use ($catalogSuccess, $hasResults): bool {
+            $platform = strtolower((string) ($row['platform'] ?? ''));
+            $status = (string) ($row['status'] ?? 'ok');
+            $count = (int) ($row['count'] ?? $row['results'] ?? 0);
+            $mode = (string) ($row['mode'] ?? '');
+
+            if ($status === 'blocked' && isset($catalogSuccess[$platform])) {
+                return false;
+            }
+
+            if ($mode === 'live' && $count === 0 && isset($catalogSuccess[$platform])) {
+                return false;
+            }
+
+            if ($hasResults && $count === 0) {
+                return false;
+            }
+
+            return true;
+        };
+
+        $reports = array_values(array_filter($reports, $filter));
+        $workers = array_values(array_filter($workers, $filter));
+
+        return [$reports, $workers];
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $workerReports
      * @return array<int, array<string, mixed>>
@@ -345,7 +538,7 @@ class ValonOrchestrator
     {
         $code = strtoupper((string) ($parsedQuery['search_country_code'] ?? $geo['country_code'] ?? ''));
 
-        return array_map(function (array $row) use ($code, $parsedQuery) {
+        return array_map(function (array $row) use ($parsedQuery) {
             $platform = $row['platform'] ?? '';
             $status = $row['status'] ?? 'ok';
 
@@ -359,6 +552,7 @@ class ValonOrchestrator
                 'source' => $platform,
                 'label' => LivePlatformRegistry::label($platform)
                     ?: KosovoMarketplaces::label($platform)
+                    ?: SwissFashionMarketplaces::label($platform)
                     ?: ($row['platform_label'] ?? $platform),
                 'mode' => $row['mode'] ?? 'demo',
                 'count' => $row['count'] ?? 0,
