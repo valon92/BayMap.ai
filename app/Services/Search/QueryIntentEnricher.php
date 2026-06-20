@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Support\AutomotiveIntentParser;
+use App\Support\AutomotiveModelResolver;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
@@ -118,6 +119,12 @@ class QueryIntentEnricher
 
         if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
             $parsed = AutomotiveIntentParser::normalizeYearFields($parsed);
+            if (! empty($parsed['brand']) && ! empty($parsed['model'])) {
+                $parsed['model'] = AutomotiveModelResolver::normalizeModelForBrand(
+                    (string) $parsed['brand'],
+                    (string) $parsed['model'],
+                );
+            }
             if (! empty($parsed['year_min']) && ! empty($parsed['year_max']) && (int) $parsed['year_min'] !== (int) $parsed['year_max']) {
                 unset($parsed['year']);
             }

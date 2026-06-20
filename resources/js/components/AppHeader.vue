@@ -1,9 +1,14 @@
 <template>
   <header class="relative z-20 px-4 sm:px-6 lg:px-8 py-5 overflow-x-clip max-w-full min-w-0">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
-      <router-link to="/" class="header-brand group">
+      <a
+        href="/"
+        class="header-brand group"
+        :aria-label="'BuyMap.ai'"
+        @click.prevent="goHome"
+      >
         <BrandLogoIcon size="md" full />
-      </router-link>
+      </a>
 
       <div class="flex items-center gap-3">
         <button
@@ -38,12 +43,25 @@
 
 <script setup>
 import { ref, onMounted, inject } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import api from '../services/api';
 import { initLocaleFromGeo } from '../i18n';
 import BrandLogoIcon from './BrandLogoIcon.vue';
 
 const { locale, t, setLocale, localeOptions } = inject('i18n');
+const route = useRoute();
+const router = useRouter();
 const geo = ref(null);
+
+function goHome() {
+  if (route.name === 'home') {
+    window.dispatchEvent(new CustomEvent('buymap:home-reset'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  router.push({ name: 'home' });
+}
 
 onMounted(async () => {
   geo.value = await initLocaleFromGeo(api);

@@ -34,7 +34,7 @@
       </p>
       <p v-else class="mb-8" />
 
-      <SearchInput v-model="query" :loading="loading" @search="goSearch" />
+      <SearchInput ref="searchInput" v-model="query" :loading="loading" @search="goSearch" />
     </div>
 
     <HomeDiscovery @select="onExample" />
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { ref, inject } from 'vue';
+import { ref, inject, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../services/api';
 import BrandLogoIcon from '../components/BrandLogoIcon.vue';
@@ -53,6 +53,26 @@ const router = useRouter();
 const { tagline, taglineAlt, locale, t } = inject('i18n');
 const query = ref('');
 const loading = ref(false);
+const searchInput = ref(null);
+
+function resetHome() {
+  query.value = '';
+  loading.value = false;
+  api.clearSearchImage();
+  searchInput.value?.reset?.();
+}
+
+function onHomeReset() {
+  resetHome();
+}
+
+onMounted(() => {
+  window.addEventListener('buymap:home-reset', onHomeReset);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('buymap:home-reset', onHomeReset);
+});
 
 function goSearch(payload) {
   const text = typeof payload === 'string' ? payload : (payload?.query || '');
@@ -61,7 +81,9 @@ function goSearch(payload) {
   api.saveSearchImage(image);
   loading.value = true;
 
-  const scope = typeof payload === 'object' ? (payload?.locationScope || api.getLocationScope()) : api.getLocationScope();
+  const market = typeof payload === 'object'
+    ? (payload?.marketSelection || api.getMarketSelection())
+    : api.getMarketSelection();
 
   router.push({
     name: 'search',
@@ -69,7 +91,7 @@ function goSearch(payload) {
       q: text || (image ? 'visual product search' : ''),
       locale: locale.value,
       has_image: image ? '1' : '0',
-      scope,
+      ...api.marketQueryParams(market),
     },
   });
 }

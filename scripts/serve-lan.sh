@@ -71,4 +71,16 @@ fi
 
 echo "Starting BuyMap on 0.0.0.0:${PORT} ..."
 print_iphone_url
-exec php artisan serve --host=0.0.0.0 --port="${PORT}"
+
+PHP_OPTS=(
+  -d "max_execution_time=${SEARCH_MAX_EXECUTION_SECONDS:-300}"
+  -d "memory_limit=512M"
+  -d "default_socket_timeout=25"
+)
+
+# Parallel workers when pcntl is available (much faster on iPhone/LAN searches).
+if php -r 'exit(function_exists("pcntl_fork") ? 0 : 1);' 2>/dev/null; then
+  export ORCHESTRATION_ENABLE_FORK=true
+fi
+
+exec php "${PHP_OPTS[@]}" artisan serve --host=0.0.0.0 --port="${PORT}"

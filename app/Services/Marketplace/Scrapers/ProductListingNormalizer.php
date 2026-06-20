@@ -3,8 +3,10 @@
 namespace App\Services\Marketplace\Scrapers;
 
 use App\Support\AutomotiveColorResolver;
+use App\Support\AutomotiveDisplayNormalizer;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveModelResolver;
+use App\Support\AutoScout24ListingParser;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
@@ -137,6 +139,9 @@ class ProductListingNormalizer
     {
         $title = (string) ($item['title'] ?? '');
         $brand = $item['brand'] ?? null;
+        $countryCode = strtoupper((string) ($platform['country'] ?? 'DE'));
+        $countryLabel = AutomotiveDisplayNormalizer::platformCountryLabel($platform);
+        $item = AutomotiveDisplayNormalizer::normalizeListingFields($item, $countryLabel);
         $images = [];
         if (! empty($item['images']) && is_array($item['images'])) {
             $images = array_values(array_filter($item['images'], fn ($u) => is_string($u) && $u !== ''));
@@ -153,8 +158,8 @@ class ProductListingNormalizer
             'images' => $images,
             'price' => (float) ($item['price'] ?? 0),
             'currency' => (string) ($platform['currency'] ?? 'EUR'),
-            'location' => (string) ($item['location'] ?? $platform['location'] ?? 'Germany'),
-            'country_code' => (string) ($platform['country'] ?? 'DE'),
+            'location' => (string) ($item['location'] ?? $countryLabel),
+            'country_code' => $countryCode,
             'condition' => (string) ($item['condition'] ?? 'used'),
             'url' => $item['url'] ?? ($platform['base_url'] ?? '#'),
             'brand' => $brand,
@@ -178,7 +183,7 @@ class ProductListingNormalizer
             'tags' => array_values(array_filter([
                 'automotive',
                 $storeKey,
-                'de',
+                strtolower($countryCode),
                 $brand,
                 'live',
             ])),
@@ -187,6 +192,24 @@ class ProductListingNormalizer
 
         if (is_array($item['specs'] ?? null) && $item['specs'] !== []) {
             $listing['specs'] = $item['specs'];
+        } else {
+            $specPayload = array_filter([
+                'year' => $listing['year'],
+                'mileage' => $listing['mileage'],
+                'fuel' => $listing['fuel'],
+                'transmission' => $listing['transmission'],
+                'power_hp' => $listing['power_hp'],
+                'power_kw' => $listing['power_kw'],
+                'electric_range_km' => $listing['electric_range_km'],
+                'body_type' => $listing['body_type'],
+                'seller_type' => $listing['seller_type'],
+                'first_registration' => $listing['first_registration'],
+                'consumption' => $listing['consumption'],
+            ], fn ($v) => $v !== null && $v !== '');
+
+            if ($specPayload !== []) {
+                $listing['specs'] = AutoScout24ListingParser::buildSpecChips($specPayload);
+            }
         }
 
         return ListingEnricher::enrich($listing, 'automotive');
@@ -234,6 +257,12 @@ class ProductListingNormalizer
     {
         $brand = mb_strtolower((string) ($parsed['brand'] ?? ''));
         $model = mb_strtolower((string) ($parsed['model'] ?? ''));
+        if ($model !== '' && CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
+            $model = mb_strtolower(AutomotiveModelResolver::normalizeModelForBrand(
+                (string) ($parsed['brand'] ?? ''),
+                (string) ($parsed['model'] ?? ''),
+            ));
+        }
         $size = trim((string) ($parsed['size'] ?? ''));
         $wantedColor = trim((string) ($parsed['color'] ?? ''));
         $wantedEngine = isset($parsed['engine_liters']) ? (float) $parsed['engine_liters'] : null;

@@ -91,7 +91,7 @@
           />
         </div>
 
-        <SearchScopeChips v-model="locationScope" :disabled="loading" variant="embedded" />
+        <MarketRegionPicker v-model="marketSelection" :disabled="loading" variant="embedded" />
       </div>
     </div>
   </form>
@@ -100,7 +100,7 @@
 <script setup>
 import { ref, computed, watch, inject } from 'vue';
 import api from '../services/api';
-import SearchScopeChips from './SearchScopeChips.vue';
+import MarketRegionPicker from './MarketRegionPicker.vue';
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -115,12 +115,12 @@ const imagePreview = ref(null);
 const imageBase64 = ref(null);
 const fileInput = ref(null);
 const cameraInput = ref(null);
-const locationScope = ref(api.getLocationScope());
+const marketSelection = ref(api.getMarketSelection());
 const focused = ref(false);
 
 const canSearch = computed(() => query.value.trim().length >= 3 || !!imageBase64.value);
 
-watch(locationScope, (v) => api.setLocationScope(v));
+watch(marketSelection, (v) => api.setMarketSelection(v));
 watch(() => props.modelValue, (v) => { query.value = v; });
 watch(query, (v) => emit('update:modelValue', v));
 
@@ -155,14 +155,26 @@ function clearImage() {
   imageBase64.value = null;
 }
 
+function reset() {
+  query.value = '';
+  clearImage();
+  marketSelection.value = { mode: 'auto', countryCode: null, countryCodes: [], continentCode: null };
+  api.setMarketSelection(marketSelection.value);
+  try {
+    localStorage.setItem('powerbook_market_picker_open', '0');
+  } catch {
+    // ignore
+  }
+}
+
 function onSubmit() {
   if (!canSearch.value) return;
   emit('search', {
     query: query.value.trim(),
     imageBase64: imageBase64.value,
-    locationScope: locationScope.value,
+    marketSelection: marketSelection.value,
   });
 }
 
-defineExpose({ clearImage });
+defineExpose({ clearImage, reset });
 </script>

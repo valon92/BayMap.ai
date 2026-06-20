@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\GeoController;
+use App\Http\Controllers\Api\MarketController;
 use App\Http\Controllers\Api\MetaController;
 use App\Http\Controllers\Api\SearchController;
 use Illuminate\Support\Facades\Route;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [MetaController::class, 'health']);
 Route::get('/geo', [GeoController::class, 'detect']);
+Route::get('/markets', [MarketController::class, 'index']);
 Route::get('/trending', [MetaController::class, 'trending']);
 Route::get('/examples', [MetaController::class, 'examples']);
 Route::post('/search', [SearchController::class, 'search']);

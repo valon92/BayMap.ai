@@ -48,7 +48,8 @@ class AgentActivationService
                 : ['agents' => [], 'source_keys' => [], 'providers' => []];
 
             if (UniversalMarketplaceBridge::enabled()
-                && ($keys === [] ? UniversalMarketplaceBridge::useWhenNoLocalPlatforms() : UniversalMarketplaceBridge::shouldAugmentLocalSearch())) {
+                && ($keys === [] ? UniversalMarketplaceBridge::useWhenNoLocalPlatforms() : UniversalMarketplaceBridge::shouldAugmentLocalSearch())
+                && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category)) {
                 $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
 
                 return $this->mergeActivation($live, $bridge);
@@ -63,7 +64,8 @@ class AgentActivationService
 
         if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {
             $live = $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
-            if (UniversalMarketplaceBridge::shouldAugmentLocalSearch()) {
+            if (UniversalMarketplaceBridge::shouldAugmentLocalSearch()
+                && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category)) {
                 $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
 
                 return $this->mergeActivation($live, $bridge);
@@ -464,5 +466,17 @@ class AgentActivationService
         }
 
         return $hasLive ? 0.85 : 0.55;
+    }
+
+    /**
+     * @param  array<string, mixed>  $expanded
+     */
+    private function shouldSkipBridgeForMultiCountry(array $expanded, string $category): bool
+    {
+        if (! ($expanded['_multi_country_search'] ?? false)) {
+            return false;
+        }
+
+        return CategoryCatalog::isAutomotive($category);
     }
 }

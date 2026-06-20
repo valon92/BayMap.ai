@@ -38,6 +38,8 @@ class ParallelWorkerExecutor
      */
     private function executeSequential(array $jobs, callable $runner, int $concurrency): array
     {
+        @set_time_limit((int) config('search.max_execution_seconds', 300));
+
         $live = array_values(array_filter($jobs, fn ($j) => ($j['provider']->mode() ?? '') === 'live'));
         $demo = array_values(array_filter($jobs, fn ($j) => ($j['provider']->mode() ?? '') !== 'live'));
         $ordered = array_merge($live, $demo);

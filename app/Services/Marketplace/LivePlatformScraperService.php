@@ -24,9 +24,15 @@ class LivePlatformScraperService
             return [];
         }
 
-        $cacheKey = 'live:'.$platformKey.':v32:'.md5(json_encode([
-            $parsedQuery['brand'] ?? '',
-            $parsedQuery['model'] ?? '',
+        $brand = (string) ($parsedQuery['brand'] ?? '');
+        $model = (string) ($parsedQuery['model'] ?? '');
+        if ($brand !== '' && $model !== '') {
+            $model = \App\Support\AutomotiveModelResolver::normalizeModelForBrand($brand, $model);
+        }
+
+        $cacheKey = 'live:'.$platformKey.':v36:'.md5(json_encode([
+            $brand,
+            $model,
             $parsedQuery['year_min'] ?? '',
             $parsedQuery['year_max'] ?? '',
             $parsedQuery['fuel'] ?? '',

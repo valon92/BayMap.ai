@@ -10,9 +10,14 @@ class ScraperHttpClient
 {
     public function __construct(private BrowseAiScrapeService $browseAi) {}
 
-    public function get(string $url, ?string $locale = null, ?string $referer = null, ?string $platformKey = null): string
-    {
-        $html = $this->fetchDirect($url, $locale, $referer);
+    public function get(
+        string $url,
+        ?string $locale = null,
+        ?string $referer = null,
+        ?string $platformKey = null,
+        ?int $timeoutSeconds = null,
+    ): string {
+        $html = $this->fetchDirect($url, $locale, $referer, $timeoutSeconds);
         if ($html !== '') {
             return $html;
         }
@@ -33,8 +38,13 @@ class ScraperHttpClient
         return '';
     }
 
-    private function fetchDirect(string $url, ?string $locale, ?string $referer): string
+    private function fetchDirect(string $url, ?string $locale, ?string $referer, ?int $timeoutSeconds = null): string
     {
+        $timeoutSeconds ??= (int) config('live_platforms.listing_timeout_seconds', 18);
+        $timeoutSeconds = min(
+            $timeoutSeconds,
+            (int) config('valon.live_platform_timeout_seconds', 18)
+        );
         $acceptLanguage = match ($locale) {
             'de-DE' => 'de-DE,de;q=0.9,en;q=0.8',
             'de-CH' => 'de-CH,de;q=0.9,en;q=0.8',
@@ -56,7 +66,8 @@ class ScraperHttpClient
         }
 
         try {
-            $response = Http::timeout((int) config('live_platforms.timeout_seconds', 60))
+            $response = Http::timeout($timeoutSeconds)
+                ->connectTimeout(min(10, $timeoutSeconds))
                 ->withHeaders($headers)
                 ->get($url);
 

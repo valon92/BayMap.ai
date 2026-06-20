@@ -6,6 +6,7 @@ use App\Services\Ai\AiRequestParserService;
 use App\Services\Ai\ProductVisionService;
 use App\Services\Geo\GeoLocationService;
 use App\Services\Geo\LocalLandmarkResolverService;
+use App\Services\Market\MarketIntentService;
 use App\Services\Marketplace\EbayOAuthService;
 use App\Services\Marketplace\MarketplaceAggregator;
 use App\Services\Marketplace\SerpApiShoppingService;
@@ -46,6 +47,7 @@ class SearchOrchestratorService
         private SerpApiShoppingService $serpApi,
         private QueryIntentEnricher $intentEnricher,
         private SearchResultPoolService $resultPool,
+        private MarketIntentService $marketIntent,
     ) {}
 
     /**
@@ -60,6 +62,8 @@ class SearchOrchestratorService
         ?string $locationScope = 'auto',
         int $page = 1,
         int $perPage = 12,
+        ?string $marketMode = null,
+        ?string $marketCode = null,
     ): array {
         $started = microtime(true);
         $geo = $this->geo->resolve();
@@ -104,6 +108,7 @@ class SearchOrchestratorService
             $parsed['raw_query'] = $visionAnalysis['search_query'] ?? $parsed['raw_query'];
         }
         $parsed = $this->intentEnricher->enrich($parsed, $query);
+        $parsed = $this->marketIntent->apply($parsed, $marketMode, $marketCode, $locale);
         $parsed['category'] = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
         $searchGeo = $this->intentEnricher->searchGeo($geo, $parsed);
         if (empty($parsed['search_target'])) {
@@ -376,6 +381,16 @@ class SearchOrchestratorService
                 $productCode = strtoupper((string) ($product['country_code'] ?? ''));
                 $countryMatch = $targetCode !== '' && $productCode !== '' && $targetCode === $productCode;
 
+                if (! $countryMatch && ! empty($parsed['search_countries']) && is_array($parsed['search_countries']) && $productCode !== '') {
+                    foreach ($parsed['search_countries'] as $country) {
+                        $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+                        if ($code !== '' && $code === $productCode) {
+                            $countryMatch = true;
+                            break;
+                        }
+                    }
+                }
+
                 if (! $countryMatch) {
                     $filterCode = SearchCountryResolver::codeFromCountryFilter((string) $filters['country']);
                     if ($filterCode !== null && $productCode !== '' && strtoupper($filterCode) === $productCode) {
@@ -407,7 +422,16 @@ class SearchOrchestratorService
                 }
             } elseif (! $isTravel && ! empty($parsed['search_countries']) && is_array($parsed['search_countries']) && count($parsed['search_countries']) > 1) {
                 $countryMatch = false;
+                $productCode = strtoupper((string) ($product['country_code'] ?? ''));
                 foreach ($parsed['search_countries'] as $country) {
+                    $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+                    if ($productCode !== '' && $code !== '' && $productCode === $code) {
+                        $countryMatch = true;
+                        break;
+                    }
+                    if ($productCode !== '' && $code !== '' && $productCode !== $code) {
+                        continue;
+                    }
                     if (CountryMatcher::locationMatchesFilter(
                         (string) ($product['location'] ?? ''),
                         (string) ($country['search_country'] ?? ''),
@@ -509,6 +533,15 @@ class SearchOrchestratorService
                 if (is_array($targetCountries) && count($targetCountries) > 1) {
                     $countryMatch = false;
                     foreach ($targetCountries as $country) {
+                        $code = strtoupper((string) ($country['search_country_code'] ?? ''));
+                        $productCode = strtoupper((string) ($product['country_code'] ?? ''));
+                        if ($productCode !== '' && $code !== '' && $productCode === $code) {
+                            $countryMatch = true;
+                            break;
+                        }
+                        if ($productCode !== '' && $code !== '' && $productCode !== $code) {
+                            continue;
+                        }
                         if (CountryMatcher::locationMatchesFilter(
                             (string) ($product['location'] ?? ''),
                             (string) ($country['search_country'] ?? ''),
@@ -750,11 +783,18 @@ class SearchOrchestratorService
     private function interleaveMarketplaceSources(array $products, array $parsed): array
     {
         $category = CategoryCatalog::normalize($parsed['category'] ?? '');
-        if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+        $countries = $parsed['search_countries'] ?? [];
+        $isMultiCountry = is_array($countries) && count($countries) > 1;
+
+        if (! $isMultiCountry && ! in_array($category, ['fashion', 'sports_outdoor'], true)) {
             return $products;
         }
 
-        if (empty($parsed['search_target'])) {
+        if (! $isMultiCountry && empty($parsed['search_target'])) {
+            return $products;
+        }
+
+        if ($isMultiCountry && CategoryCatalog::isAutomotive($category)) {
             return $products;
         }
 
@@ -814,16 +854,28 @@ class SearchOrchestratorService
 
         foreach ($products as $product) {
             $placed = false;
+            $productCode = strtoupper((string) ($product['country_code'] ?? ''));
+
             foreach ($countries as $country) {
                 $code = strtoupper((string) ($country['search_country_code'] ?? ''));
                 if ($code === '' || ! isset($buckets[$code])) {
                     continue;
                 }
 
+                if ($productCode !== '' && $productCode === $code) {
+                    $buckets[$code][] = $product;
+                    $placed = true;
+                    break;
+                }
+
+                if ($productCode !== '' && $productCode !== $code) {
+                    continue;
+                }
+
                 if (CountryMatcher::locationMatchesFilter(
                     (string) ($product['location'] ?? ''),
                     (string) ($country['search_country'] ?? ''),
-                    isset($product['country_code']) ? (string) $product['country_code'] : null,
+                    $productCode !== '' ? $productCode : null,
                 )) {
                     $buckets[$code][] = $product;
                     $placed = true;
@@ -907,7 +959,7 @@ class SearchOrchestratorService
     private function normalizeLocationScope(?string $scope): string
     {
         $scope = strtolower((string) $scope);
-        $allowed = ['auto', 'city', 'local', 'country', 'region', 'world', 'universal', 'global'];
+        $allowed = ['auto', 'city', 'local', 'country', 'region', 'continent', 'world', 'universal', 'global'];
 
         return in_array($scope, $allowed, true) ? $scope : 'auto';
     }

@@ -69,28 +69,32 @@ class AutoScout24ListingParser
                 continue;
             }
 
-            if (str_contains($label, 'leistung') || str_contains($label, 'power') || str_contains($label, 'speedometer')) {
+            if (str_contains($label, 'leistung') || str_contains($label, 'power') || str_contains($label, 'speedometer') || str_contains($label, 'potenza')) {
                 if (preg_match('/(\d+)\s*kW\s*\((\d+)\s*PS\)/u', $data, $match)) {
                     $out['power_kw'] = (int) $match[1];
                     $out['power_hp'] = (int) $match[2];
+                } elseif (preg_match('/(\d+)\s*PS/u', $data, $match)) {
+                    $out['power_hp'] = (int) $match[1];
+                } elseif (preg_match('/(\d+)\s*kW/u', $data, $match)) {
+                    $out['power_kw'] = (int) $match[1];
                 }
-            } elseif (str_contains($label, 'kilometer') || str_contains($label, 'mileage')) {
+            } elseif (str_contains($label, 'kilometer') || str_contains($label, 'mileage') || str_contains($label, 'chilometr')) {
                 $out['mileage_label'] = $data;
                 if (preg_match('/([\d\.]+)/', $data, $match)) {
                     $out['mileage'] = (int) str_replace('.', '', $match[1]);
                 }
-            } elseif (str_contains($label, 'erstzulassung') || str_contains($label, 'registration')) {
+            } elseif (str_contains($label, 'erstzulassung') || str_contains($label, 'registration') || str_contains($label, 'immatricolazione') || str_contains($label, 'immatriculation')) {
                 $out['first_registration'] = $data;
                 if (preg_match('/(\d{4})/', $data, $match)) {
                     $out['year'] = (int) $match[1];
                 }
-            } elseif (str_contains($label, 'verbrauch') || str_contains($label, 'consumption')) {
+            } elseif (str_contains($label, 'verbrauch') || str_contains($label, 'consumption') || str_contains($label, 'consommation') || str_contains($label, 'consumo')) {
                 $out['consumption'] = $data;
-            } elseif (str_contains($label, 'kraftstoff') || str_contains($label, 'fuel')) {
+            } elseif (str_contains($label, 'kraftstoff') || str_contains($label, 'fuel') || str_contains($label, 'carburante') || str_contains($label, 'carburant')) {
                 $out['fuel'] = $data;
-            } elseif (str_contains($label, 'getriebe') || str_contains($label, 'transmission')) {
+            } elseif (str_contains($label, 'getriebe') || str_contains($label, 'transmission') || str_contains($label, 'cambio') || str_contains($label, 'boîte') || str_contains($label, 'boite')) {
                 $out['transmission'] = $data;
-            } elseif (str_contains($label, 'reichweite') || str_contains($label, 'range')) {
+            } elseif (str_contains($label, 'reichweite') || str_contains($label, 'range') || str_contains($label, 'autonomia')) {
                 if (preg_match('/(\d+)/', $data, $match)) {
                     $out['electric_range_km'] = (int) $match[1];
                 }
@@ -109,8 +113,8 @@ class AutoScout24ListingParser
         $lower = mb_strtolower($sellerType);
 
         return match (true) {
-            str_contains($lower, 'dealer') || str_contains($lower, 'händler') => 'dealer',
-            str_contains($lower, 'private') || str_contains($lower, 'privat') => 'private',
+            str_contains($lower, 'dealer') || str_contains($lower, 'händler') || str_contains($lower, 'concession') || str_contains($lower, 'profession') => 'dealer',
+            str_contains($lower, 'private') || str_contains($lower, 'privat') || str_contains($lower, 'particul') => 'private',
             default => $sellerType,
         };
     }

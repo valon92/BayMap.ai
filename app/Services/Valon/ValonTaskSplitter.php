@@ -30,9 +30,20 @@ class ValonTaskSplitter
         $max = $liveFanOut
             ? $this->maxWorkersForFanOut($parsed, $activation)
             : (int) config('valon.max_workers', config('agent_pools.max_agents', 6));
+        $max = min($max, (int) config('search.max_workers', 12));
+
+        $multiCountryCount = (int) ($expanded['_multi_country_count'] ?? 0);
+        if (($expanded['_multi_country_search'] ?? false) && $multiCountryCount > 1) {
+            $perCountryCap = max(3, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
+            $max = min($max, $perCountryCap);
+        }
         $prefix = $this->workerPrefix($category);
         $providers = $activation['providers'] ?? [];
         $agents = $activation['agents'] ?? [];
+
+        if (($expanded['_multi_country_search'] ?? false) && CategoryCatalog::isAutomotive($category)) {
+            [$agents, $providers] = $this->prioritizeLocalAutomotiveWorkers($agents, $providers, $countryCode);
+        }
 
         $providerByKey = [];
         foreach ($providers as $provider) {
@@ -131,6 +142,66 @@ class ValonTaskSplitter
     }
 
     /**
+     * @param  array<int, array<string, mixed>>  $agents
+     * @param  array<int, FederatedSearchProviderInterface>  $providers
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, FederatedSearchProviderInterface>}
+     */
+    private function prioritizeLocalAutomotiveWorkers(array $agents, array $providers, string $countryCode): array
+    {
+        usort($agents, function (array $a, array $b) use ($countryCode): int {
+            $aLocal = $this->isLocalAutomotiveWorker($a, $countryCode) ? 0 : 1;
+            $bLocal = $this->isLocalAutomotiveWorker($b, $countryCode) ? 0 : 1;
+
+            return $aLocal <=> $bLocal;
+        });
+
+        $local = [];
+        $other = [];
+        foreach ($providers as $provider) {
+            if ($this->isLocalAutomotiveProvider($provider, $countryCode)) {
+                $local[] = $provider;
+            } else {
+                $other[] = $provider;
+            }
+        }
+
+        usort($local, fn (FederatedSearchProviderInterface $a, FederatedSearchProviderInterface $b) => $a->priority() <=> $b->priority());
+
+        return [$agents, array_merge($local, $other)];
+    }
+
+    /**
+     * @param  array<string, mixed>  $agent
+     */
+    private function isLocalAutomotiveWorker(array $agent, string $countryCode): bool
+    {
+        $source = (string) (($agent['sources'] ?? [])[0] ?? '');
+
+        return $source !== '' && $this->isLocalAutomotiveSource($source, $countryCode);
+    }
+
+    private function isLocalAutomotiveProvider(FederatedSearchProviderInterface $provider, string $countryCode): bool
+    {
+        return $this->isLocalAutomotiveSource($provider->sourceKey(), $countryCode);
+    }
+
+    private function isLocalAutomotiveSource(string $sourceKey, string $countryCode): bool
+    {
+        if (UniversalMarketplaceBridge::isBridgeProvider($sourceKey)) {
+            return false;
+        }
+
+        if (str_contains(strtolower($sourceKey), '_ww') || str_contains(strtolower($sourceKey), 'worldwide')) {
+            return false;
+        }
+
+        $meta = LivePlatformRegistry::platform($sourceKey);
+
+        return $meta !== null
+            && strtoupper((string) ($meta['country'] ?? '')) === strtoupper($countryCode);
+    }
+
+    /**
      * @param  array<string, mixed>  $intent
      * @param  array<string, mixed>  $expanded
      * @return array<string, mixed>
@@ -204,7 +275,7 @@ class ValonTaskSplitter
 
         $cap = (int) config('live_platforms.max_workers_cap', 24);
 
-        return min($localMax + $bridgeReserve, $cap);
+        return min($localMax + $bridgeReserve, $cap, (int) config('search.max_workers', 12));
     }
 
     /**

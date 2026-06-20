@@ -138,6 +138,7 @@ class LocalSearchTierService
             'city', 'local' => ['city'],
             'country' => ['city', 'country'],
             'region' => ['city', 'country', 'region'],
+            'continent' => ['city', 'country', 'region', 'europe'],
             'europe' => ['city', 'country', 'region', 'europe'],
             default => null,
         };

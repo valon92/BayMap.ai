@@ -32,6 +32,8 @@ class CsCartScraperAdapter implements ScraperAdapterInterface
         $all = [];
         $seen = [];
 
+        $listingTimeout = (int) config('live_platforms.listing_timeout_seconds', 25);
+
         for ($page = 1; $page <= $maxPages; $page++) {
             $separator = str_contains($catalogUrl, '?') ? '&' : '?';
             $url = $catalogUrl.$separator.'items_per_page='.$itemsPerPage;
@@ -39,7 +41,7 @@ class CsCartScraperAdapter implements ScraperAdapterInterface
                 $url .= '&page='.$page;
             }
 
-            $html = $this->http->get($url, $platform['locale'] ?? null);
+            $html = $this->http->get($url, $platform['locale'] ?? null, null, null, $listingTimeout);
             if ($html === '') {
                 break;
             }
@@ -81,14 +83,14 @@ class CsCartScraperAdapter implements ScraperAdapterInterface
         $footwear = KosovoFashionIntent::isFootwearType((string) ($parsedQuery['product_type'] ?? ''));
 
         if ($hasBrandHash || ($footwear && ! empty($parsedQuery['size']))) {
-            return 5;
+            return 1;
         }
 
         if (! empty($parsedQuery['size']) || ! empty($parsedQuery['max_price'])) {
-            return 3;
+            return 2;
         }
 
-        return 9;
+        return 2;
     }
 
     /**

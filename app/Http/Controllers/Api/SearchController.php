@@ -17,7 +17,9 @@ class SearchController extends Controller
             'q' => 'nullable|string|max:500',
             'image' => 'nullable|string|max:12000000',
             'locale' => 'nullable|string|in:en,sq',
-            'location_scope' => 'nullable|string|in:auto,city,local,country,region,world,universal,global',
+            'location_scope' => 'nullable|string|in:auto,city,local,country,region,continent,world,universal,global',
+            'market_mode' => 'nullable|string|in:auto,global,continent,country,countries',
+            'market_code' => 'nullable|string|max:96',
             'filters' => 'nullable',
             'page' => 'nullable|integer|min:1|max:50',
             'per_page' => 'nullable|integer|min:6|max:48',
@@ -34,6 +36,8 @@ class SearchController extends Controller
             return response()->json(['message' => 'Provide text (3+ chars) or a product image.'], 422);
         }
 
+        @set_time_limit((int) config('search.max_execution_seconds', 300));
+
         $filters = $validated['filters'] ?? [];
         if (is_string($filters)) {
             $filters = json_decode($filters, true) ?? [];
@@ -47,6 +51,8 @@ class SearchController extends Controller
             $validated['location_scope'] ?? 'auto',
             (int) ($validated['page'] ?? 1),
             (int) ($validated['per_page'] ?? 12),
+            $validated['market_mode'] ?? null,
+            $validated['market_code'] ?? null,
         );
 
         return response()->json($result);

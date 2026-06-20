@@ -179,8 +179,12 @@ class ValonWorkerRunner
             return (int) config('valon.anti_bot_timeout_seconds', 10);
         }
 
+        if (in_array($platform, ['melodiapx', 'driloni'], true)) {
+            return (int) config('valon.melodiapx_timeout_seconds', 35);
+        }
+
         if (LivePlatformRegistry::isLivePlatform($platform)) {
-            return (int) config('valon.melodiapx_timeout_seconds', 120);
+            return (int) config('valon.live_platform_timeout_seconds', 18);
         }
 
         return $defaultTimeoutSeconds;
@@ -211,8 +215,8 @@ class ValonWorkerRunner
             ];
         }
 
-        $previousLimit = ini_get('max_execution_time');
-        @set_time_limit($timeoutSeconds + 5);
+        $jobLimit = max($timeoutSeconds, (int) config('valon.live_platform_timeout_seconds', 18)) + 8;
+        @set_time_limit($jobLimit);
 
         try {
             $items = $provider->search($job['parsed_query'], $job['expanded_filters']);
@@ -251,9 +255,7 @@ class ValonWorkerRunner
                 'error' => $e->getMessage(),
             ];
         } finally {
-            if ($previousLimit !== false) {
-                @set_time_limit((int) $previousLimit);
-            }
+            @set_time_limit((int) config('search.max_execution_seconds', 300));
         }
     }
 

@@ -34,6 +34,7 @@ class MarketplaceAggregator
         $report = [];
         $workers = [];
         $agentPlans = [];
+        $countryCount = count($countries);
 
         foreach ($countries as $country) {
             if (empty($country['search_country_code'])) {
@@ -48,6 +49,8 @@ class MarketplaceAggregator
             $expanded = $expandedFilters;
             $expanded['search_country_code'] = $country['search_country_code'];
             $expanded['marketplaces'] = \App\Support\LivePlatformRegistry::keysFromParsed($perCountry);
+            $expanded['_multi_country_search'] = true;
+            $expanded['_multi_country_count'] = $countryCount;
 
             $batch = $this->coordinator->search($perCountry, $expanded, $geo);
             $results = array_merge($results, $batch['results'] ?? []);

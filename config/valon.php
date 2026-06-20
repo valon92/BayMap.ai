@@ -15,7 +15,9 @@ return [
 
     'anti_bot_timeout_seconds' => (int) env('VALON_ANTI_BOT_TIMEOUT', 10),
 
-    'melodiapx_timeout_seconds' => (int) env('VALON_MELODIA_PX_TIMEOUT', 120),
+    'melodiapx_timeout_seconds' => (int) env('VALON_MELODIA_PX_TIMEOUT', 35),
+
+    'live_platform_timeout_seconds' => (int) env('VALON_LIVE_PLATFORM_TIMEOUT', 18),
 
     /*
     |--------------------------------------------------------------------------

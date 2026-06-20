@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Scrapers;
 use App\Services\Marketplace\BrowseAiScrapeService;
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
 use App\Support\AutomotiveColorResolver;
+use App\Support\AutomotiveDisplayNormalizer;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveModelResolver;
 use App\Support\AutoScout24ListingParser;
@@ -175,6 +176,7 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
         }
 
         $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.autoscout24.de'), '/');
+        $countryLabel = AutomotiveDisplayNormalizer::platformCountryLabel($platform);
         $items = [];
 
         foreach (array_slice($listings, 0, self::MAX_LISTINGS) as $listing) {
@@ -193,7 +195,6 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 
             $location = (array) ($listing['location'] ?? []);
             $city = (string) ($location['city'] ?? '');
-            $countryLabel = (string) ($platform['location'] ?? 'Germany');
             $locationLabel = $city !== ''
                 ? $city.', '.$countryLabel
                 : $countryLabel;
@@ -208,8 +209,12 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             $detailSpecs = AutoScout24ListingParser::parseVehicleDetails((array) ($listing['vehicleDetails'] ?? []));
             $year = $detailSpecs['year'] ?? $this->yearFromVehicleDetails((array) ($listing['vehicleDetails'] ?? []));
             $mileage = $detailSpecs['mileage'] ?? $this->mileageFromVehicle($vehicle, (array) ($listing['vehicleDetails'] ?? []));
-            $fuel = $detailSpecs['fuel'] ?? (string) ($vehicle['fuel'] ?? '');
-            $transmission = $detailSpecs['transmission'] ?? (string) ($vehicle['transmission'] ?? '');
+            $fuel = AutomotiveDisplayNormalizer::normalizeFuelDisplay(
+                $detailSpecs['fuel'] ?? (string) ($vehicle['fuel'] ?? ''),
+            ) ?? '';
+            $transmission = AutomotiveDisplayNormalizer::normalizeTransmissionDisplay(
+                $detailSpecs['transmission'] ?? (string) ($vehicle['transmission'] ?? ''),
+            ) ?? '';
             $sellerType = AutoScout24ListingParser::normalizeSellerType((string) (($listing['seller']['type'] ?? '') ?: ''));
             $powerHp = $detailSpecs['power_hp'] ?? null;
             $powerKw = $detailSpecs['power_kw'] ?? null;
@@ -417,17 +422,22 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
                 $year = $this->yearFromTitle($title);
             }
 
-            $locationLabel = (string) ($platform['location'] ?? 'Switzerland');
-            if (preg_match('/translate="no"[^>]*>(\d{4}\s+[^<]+)</i', $row, $locMatch)) {
+            $locationLabel = AutomotiveDisplayNormalizer::platformCountryLabel($platform);
+            if (preg_match('/class="[^"]*\bregion-or-title\b[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<div[^>]*tabindex="0"/i', $row, $regionMatch)) {
+                $loc = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($regionMatch[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+                if ($loc !== '' && preg_match('/\d{4}\s/u', $loc)) {
+                    $locationLabel = $loc.', '.$locationLabel;
+                }
+            } elseif (preg_match('/translate="no"[^>]*>(\d{4}\s+[^<]+)</i', $row, $locMatch)) {
                 $loc = trim(html_entity_decode($locMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
                 if ($loc !== '' && ! preg_match('/^[A-Z]{2,}$/u', $loc)) {
-                    $locationLabel = $loc.', Switzerland';
+                    $locationLabel = $loc.', '.$locationLabel;
                 }
             }
 
             $image = null;
             if (preg_match('/src="(https:\/\/[^"]+autolina[^"]+)"/i', $row, $imgMatch)) {
-                $image = html_entity_decode($imgMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $image = html_entity_decode(urldecode($imgMatch[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             }
 
             $url = str_starts_with($path, 'http') ? $path : $baseUrl.$path;
@@ -435,6 +445,18 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             if (preg_match('/\/(\d+)$/', $path, $idMatch)) {
                 $productId = $idMatch[1];
             }
+
+            $vehicleData = $this->extractAutolinaVehicleData($row);
+            $images = $this->buildAutolinaGallery($row, $image, $productId);
+            if ($images === [] && $image !== null) {
+                $images = [$image];
+            }
+
+            $mileage = $vehicleData['mileage'] ?? null;
+            $fuel = AutomotiveDisplayNormalizer::normalizeFuelDisplay($vehicleData['fuel'] ?? null);
+            $transmission = AutomotiveDisplayNormalizer::normalizeTransmissionDisplay($vehicleData['transmission'] ?? null);
+            $powerHp = $vehicleData['power_hp'] ?? null;
+            $powerKw = $vehicleData['power_kw'] ?? null;
 
             $model = $this->modelFromTitle($title) ?? mb_strtolower($variant);
             if (! AutomotiveModelResolver::matchesListing(
@@ -446,22 +468,38 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
                 continue;
             }
 
+            $specPayload = array_filter([
+                'year' => $year,
+                'mileage' => $mileage,
+                'fuel' => $fuel,
+                'transmission' => $transmission,
+                'power_hp' => $powerHp,
+                'power_kw' => $powerKw,
+            ], fn ($v) => $v !== null && $v !== '');
+
             $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
                 'product_id' => $productId !== '' ? $productId : md5($title.$url),
                 'title' => $title,
                 'price' => $price,
-                'image' => $image,
+                'image' => $images[0] ?? $image,
+                'images' => $images,
                 'url' => $url,
                 'location' => $locationLabel,
                 'brand' => $this->brandFromTitle($title) ?? mb_strtolower($brand),
                 'model' => $this->modelFromTitle($title) ?? mb_strtolower($variant),
                 'year' => $year,
+                'mileage' => $mileage,
+                'fuel' => $fuel,
+                'transmission' => $transmission,
+                'power_hp' => $powerHp,
+                'power_kw' => $powerKw,
                 'condition' => 'used',
                 'color' => AutomotiveColorResolver::extractFromText($title),
                 'engine_liters' => AutomotiveEngineResolver::extractFromTitle(
                     $title,
                     isset($parsedQuery['fuel']) ? (string) $parsedQuery['fuel'] : null,
                 ),
+                'specs' => $specPayload !== [] ? AutoScout24ListingParser::buildSpecChips($specPayload) : [],
             ]);
         }
 
@@ -1033,6 +1071,107 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
         }
 
         return 0.0;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractAutolinaVehicleData(string $row): array
+    {
+        $out = [];
+
+        if (! preg_match('/class="[^"]*\bvehicle-data\b[^"]*"[^>]*>([\s\S]*?)(?=tabindex="0"[^>]*class="[^"]*\bfavorite\b)/i', $row, $dataMatch)) {
+            return $out;
+        }
+
+        preg_match_all('/<div[^>]*ng-star-inserted[^>]*>([\s\S]*?)<\/div>/i', (string) $dataMatch[1], $cells);
+
+        foreach ($cells[1] ?? [] as $cell) {
+            $value = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($cell), ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+            if ($value === '' || $value === '-') {
+                continue;
+            }
+
+            if (preg_match('/^\d{4}$/', $value)) {
+                continue;
+            }
+
+            if (preg_match("/(\d[\d\s'’.]*)\s*km\b/iu", $value, $match)) {
+                $digits = preg_replace('/[^\d]/', '', $match[1]) ?? '';
+                if ($digits !== '') {
+                    $out['mileage'] = (int) $digits;
+                }
+
+                continue;
+            }
+
+            if (preg_match('/(\d+)\s*kW\s*\((\d+)\s*PS\)/u', $value, $match)) {
+                $out['power_kw'] = (int) $match[1];
+                $out['power_hp'] = (int) $match[2];
+
+                continue;
+            }
+
+            if (preg_match('/(\d+)\s*PS\b/iu', $value, $match)) {
+                $out['power_hp'] = (int) $match[1];
+
+                continue;
+            }
+
+            if (preg_match('/^(Mild-Hybrid\s+Diesel\/Elektro|Elektro\/Benzin|Elettrica\/Benzina|Diesel\/Elektro|Diesel|Benzin|Elektro|Hybrid|Elettrica|Elettrico|Elettrica\/Diesel)$/iu', $value)) {
+                $out['fuel'] = $value;
+
+                continue;
+            }
+
+            if (preg_match('/^(Automatik|Manuell|Manuale|Automatico|Semiautomatico|Schaltgetriebe)$/iu', $value)) {
+                $out['transmission'] = $value;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildAutolinaGallery(string $row, ?string $firstImage, string $productId): array
+    {
+        if ($firstImage === null || $firstImage === '') {
+            return [];
+        }
+
+        $firstImage = html_entity_decode(urldecode($firstImage), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $photoCount = 1;
+        if (preg_match('/class="[^"]*\bcircles\b[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<div[^>]*make-logo/i', $row, $circlesSection)) {
+            $photoCount = max(1, substr_count((string) $circlesSection[1], 'ng-star-inserted'));
+        }
+
+        if (preg_match('#(https://api\.autolina\.ch/auto-bild/[^"\s]+/(\d+))_1\.jpg#i', $firstImage, $match)) {
+            $base = $match[1];
+            $images = [];
+            $limit = min(max($photoCount, 1), 12);
+
+            for ($i = 1; $i <= $limit; $i++) {
+                $images[] = $base.'_'.$i.'.jpg';
+            }
+
+            return $images;
+        }
+
+        if ($productId !== '' && preg_match('#(https://api\.autolina\.ch/auto-bild/[^"\s]+/)#i', $firstImage, $match)) {
+            $images = [];
+            $limit = min(max($photoCount, 1), 12);
+
+            for ($i = 1; $i <= $limit; $i++) {
+                $images[] = $match[1].$productId.'_'.$i.'.jpg';
+            }
+
+            return $images;
+        }
+
+        return [$firstImage];
     }
 
     /**

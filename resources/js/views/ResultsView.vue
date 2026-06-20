@@ -76,9 +76,9 @@
         </p>
 
         <div v-if="!loading">
-          <SearchScopeChips
-            :model-value="activeScope"
-            @update:model-value="onScopeChange"
+          <MarketRegionPicker
+            v-model="activeMarket"
+            @update:model-value="onMarketChange"
           />
           <p v-if="scopeSummary" class="text-[11px] text-slate-500 mt-2 px-1">{{ scopeSummary }}</p>
         </div>
@@ -330,7 +330,7 @@ import WebServicesCard from '../components/WebServicesCard.vue';
 import WebServicesSummary from '../components/WebServicesSummary.vue';
 import DynamicFilters from '../components/DynamicFilters.vue';
 import SearchLoadingExperience from '../components/SearchLoadingExperience.vue';
-import SearchScopeChips from '../components/SearchScopeChips.vue';
+import MarketRegionPicker from '../components/MarketRegionPicker.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -686,7 +686,7 @@ const hasDetailInsights = computed(() => Boolean(
 
 const uploadedPreview = ref(null);
 
-const activeScope = ref(api.getLocationScope());
+const activeMarket = ref(api.getMarketSelection());
 
 const showParsedTags = computed(() => {
   const cat = data.value?.parsed?.category;
@@ -757,10 +757,15 @@ function submitEditedQuery() {
   });
 }
 
-function onScopeChange(scope) {
-  activeScope.value = scope;
-  api.setLocationScope(scope);
-  router.replace({ query: { ...route.query, scope } });
+function onMarketChange(selection) {
+  activeMarket.value = selection;
+  api.setMarketSelection(selection);
+  router.replace({
+    query: {
+      ...route.query,
+      ...api.marketQueryParams(selection),
+    },
+  });
 }
 
 function filtersFromResponse(response) {
@@ -778,14 +783,19 @@ async function fetchPage(page, append = false) {
   const imageBase64 = api.loadSearchImage();
   const hasImage = route.query.has_image === '1' && imageBase64;
 
+  const legacyScope = route.query.market_mode
+    ? null
+    : (route.query.scope ? String(route.query.scope) : null);
+
   const response = await api.search(
     q || 'find this product',
     mapFilters(activeFilters.value),
     locale.value,
     hasImage ? imageBase64 : null,
-    activeScope.value,
+    activeMarket.value,
     page,
-    perPage
+    perPage,
+    legacyScope
   );
 
   if (append) {
@@ -834,10 +844,8 @@ async function runSearch() {
     lastQueryKey = queryKey;
   }
 
-  if (route.query.scope) {
-    activeScope.value = String(route.query.scope);
-    api.setLocationScope(activeScope.value);
-  }
+  activeMarket.value = api.parseMarketFromQuery(route.query);
+  api.setMarketSelection(activeMarket.value);
 
   uploadedPreview.value = hasImage ? `data:image/jpeg;base64,${imageBase64}` : null;
   loading.value = true;
@@ -892,7 +900,10 @@ function refineSearch() {
   debounceTimer = setTimeout(runSearch, 400);
 }
 
-watch(() => [route.query.q, route.query.scope], runSearch);
+watch(
+  () => [route.query.q, route.query.scope, route.query.market_mode, route.query.market_code],
+  runSearch
+);
 
 watch(locale, (newLocale) => {
   if (route.name !== 'search') return;

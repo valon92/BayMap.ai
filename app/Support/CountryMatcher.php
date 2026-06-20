@@ -27,6 +27,13 @@ class CountryMatcher
             return false;
         }
 
+        if ($productCountryCode !== null && $productCountryCode !== '') {
+            $code = strtoupper($productCountryCode);
+            if ($needle === strtolower($code) || self::needleMatchesCountryCode($needle, $code)) {
+                return true;
+            }
+        }
+
         $loc = mb_strtolower($location);
         if (str_contains($loc, $needle)) {
             return true;
@@ -57,6 +64,10 @@ class CountryMatcher
         }
 
         if (str_contains($needle, 'germany') || str_contains($needle, 'deutschland') || str_contains($needle, 'gjermani') || $needle === 'de') {
+            if ($productCountryCode !== null && strtoupper($productCountryCode) !== 'DE') {
+                return false;
+            }
+
             if ($productCountryCode !== null && strtoupper($productCountryCode) === 'DE') {
                 return true;
             }
@@ -80,7 +91,36 @@ class CountryMatcher
             return (bool) preg_match('/albania|shqip|tirana|tiranë|durrës|durres/u', $loc);
         }
 
+        if (str_contains($needle, 'italy') || str_contains($needle, 'itali') || str_contains($needle, 'italia') || $needle === 'it') {
+            if ($productCountryCode !== null && strtoupper($productCountryCode) === 'IT') {
+                return true;
+            }
+
+            return (bool) preg_match('/italy|italia|milano|milan|roma|rome|torino|turin|napoli|naples|bologna|firenze|florence/u', $loc);
+        }
+
+        if (str_contains($needle, 'france') || str_contains($needle, 'franc') || str_contains($needle, 'frankreich') || $needle === 'fr') {
+            if ($productCountryCode !== null && strtoupper($productCountryCode) === 'FR') {
+                return true;
+            }
+
+            return (bool) preg_match('/france|frankreich|paris|lyon|marseille|toulouse|bordeaux|strasbourg|lille/u', $loc);
+        }
+
         return false;
+    }
+
+    private static function needleMatchesCountryCode(string $needle, string $code): bool
+    {
+        return match ($code) {
+            'DE' => str_contains($needle, 'germany') || str_contains($needle, 'deutschland') || str_contains($needle, 'gjermani'),
+            'CH' => str_contains($needle, 'switzerland') || str_contains($needle, 'schweiz') || str_contains($needle, 'svizzera') || str_contains($needle, 'zvic'),
+            'IT' => str_contains($needle, 'italy') || str_contains($needle, 'itali') || str_contains($needle, 'italia'),
+            'FR' => str_contains($needle, 'france') || str_contains($needle, 'franc') || str_contains($needle, 'frankreich'),
+            'NL' => str_contains($needle, 'netherlands') || str_contains($needle, 'holland'),
+            'XK' => self::isKosovoNeedle($needle),
+            default => false,
+        };
     }
 
     public static function isKosovoNeedle(string $needle): bool

@@ -23,6 +23,15 @@ return [
 
     'timeout_seconds' => (int) env('LIVE_PLATFORM_TIMEOUT', 60),
 
+    /** Shorter timeout for catalog listing pages (avoids 125s PHP limit on multi-worker searches). */
+    'listing_timeout_seconds' => (int) env('LIVE_PLATFORM_LISTING_TIMEOUT', 18),
+
+    /** Product detail gallery enrichment — keep bounded for mobile/LAN dev server. */
+    'gallery_enrich_enabled' => (bool) env('LIVE_GALLERY_ENRICH', true),
+    'gallery_enrich_max_products' => (int) env('LIVE_GALLERY_ENRICH_MAX', 6),
+    'gallery_enrich_timeout_seconds' => (int) env('LIVE_GALLERY_ENRICH_TIMEOUT', 8),
+    'gallery_enrich_time_budget_seconds' => (int) env('LIVE_GALLERY_ENRICH_BUDGET', 15),
+
     'max_workers_cap' => (int) env('LIVE_PLATFORM_MAX_WORKERS', 24),
 
     /**

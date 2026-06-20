@@ -33,7 +33,37 @@ class AutomotiveModelResolver
         $store = strtolower(trim($storeKey));
 
         return str_contains($store, 'autoscout24')
-            || $store === 'kleinanzeigen';
+            || $store === 'kleinanzeigen'
+            || str_contains($store, 'autolina')
+            || str_contains($store, 'autogrid')
+            || str_contains($store, 'mobile')
+            || str_contains($store, 'subito')
+            || str_contains($store, 'leboncoin')
+            || str_contains($store, 'lacentrale')
+            || str_contains($store, 'heycar')
+            || str_contains($store, 'merrjep')
+            || str_contains($store, 'veturaneshitje')
+            || str_contains($store, 'car_trade')
+            || str_contains($store, 'carindex');
+    }
+
+    /**
+     * Fix common cross-brand SUV naming (e.g. Audi X5 → Audi Q5).
+     */
+    public static function normalizeModelForBrand(string $brand, string $model): string
+    {
+        $brandLower = mb_strtolower(trim($brand));
+        $modelUpper = strtoupper(trim($model));
+
+        if ($modelUpper === '') {
+            return $model;
+        }
+
+        return match (true) {
+            $brandLower === 'audi' && $modelUpper === 'X5' => 'Q5',
+            $brandLower === 'bmw' && $modelUpper === 'Q5' => 'X5',
+            default => $model,
+        };
     }
 
     /**
@@ -41,6 +71,7 @@ class AutomotiveModelResolver
      */
     public static function catalogSlug(string $brand, string $model): string
     {
+        $model = self::normalizeModelForBrand($brand, $model);
         $brandSlug = self::BRAND_SLUGS[mb_strtolower(trim($brand))] ?? mb_strtolower(trim($brand));
         $brandSlug = str_replace(' ', '-', $brandSlug);
         $baseModel = self::baseModelName($model);
@@ -56,6 +87,7 @@ class AutomotiveModelResolver
      */
     public static function makeModelSlugs(string $brand, string $model): array
     {
+        $model = self::normalizeModelForBrand($brand, $model);
         $make = self::BRAND_SLUGS[mb_strtolower(trim($brand))] ?? mb_strtolower(trim($brand));
         $make = str_replace(' ', '-', $make);
         $baseModel = self::baseModelName($model);

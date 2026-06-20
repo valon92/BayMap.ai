@@ -15,12 +15,19 @@ class ProductGalleryEnricher
      * @param  array<int, array<string, mixed>>  $products
      * @return array<int, array<string, mixed>>
      */
-    public function enrichFromDetailPages(array $products, ?string $locale = null, int $limit = 48): array
+    public function enrichFromDetailPages(array $products, ?string $locale = null, ?int $limit = null): array
     {
+        if (! config('live_platforms.gallery_enrich_enabled', true)) {
+            return $products;
+        }
+
+        $limit ??= (int) config('live_platforms.gallery_enrich_max_products', 10);
+        $budgetSeconds = (int) config('live_platforms.gallery_enrich_time_budget_seconds', 25);
+        $deadline = microtime(true) + max(5, $budgetSeconds);
         $enriched = 0;
 
         foreach ($products as &$product) {
-            if ($enriched >= $limit) {
+            if ($enriched >= $limit || microtime(true) >= $deadline) {
                 break;
             }
 
@@ -53,7 +60,8 @@ class ProductGalleryEnricher
      */
     private function imagesFromDetailPage(string $url, ?string $locale): array
     {
-        $html = $this->http->get($url, $locale);
+        $timeout = (int) config('live_platforms.gallery_enrich_timeout_seconds', 12);
+        $html = $this->http->get($url, $locale, null, null, $timeout);
         if ($html === '') {
             return [];
         }

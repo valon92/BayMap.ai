@@ -5,6 +5,10 @@ use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
 
+// Federated search runs multiple HTTP workers — default PHP 30s kills artisan serve mid-request.
+ini_set('max_execution_time', (string) (getenv('SEARCH_MAX_EXECUTION_SECONDS') ?: 300));
+ini_set('default_socket_timeout', '25');
+
 // Prevent PHP notices/deprecations from corrupting JSON API responses
 ini_set('display_errors', '0');
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);

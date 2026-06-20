@@ -28,6 +28,7 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
         $storeKey = (string) ($platform['_key'] ?? 'woocommerce');
         $all = [];
         $seen = [];
+        $listingTimeout = (int) config('live_platforms.listing_timeout_seconds', 25);
 
         foreach ($this->urlsToScrape($platform, $parsedQuery) as $baseUrl) {
             $maxPages = $this->maxPages($parsedQuery);
@@ -37,7 +38,7 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
                     ? $baseUrl
                     : rtrim(explode('?', $baseUrl, 2)[0], '/').'/page/'.$page.'/'.(str_contains($baseUrl, '?') ? '?'.explode('?', $baseUrl, 2)[1] : '');
 
-                $html = $this->http->get($url, $platform['locale'] ?? null);
+                $html = $this->http->get($url, $platform['locale'] ?? null, null, null, $listingTimeout);
                 if ($html === '') {
                     break;
                 }
@@ -104,14 +105,14 @@ class WooCommerceScraperAdapter implements ScraperAdapterInterface
         $footwear = KosovoFashionIntent::isFootwearType((string) ($parsedQuery['product_type'] ?? ''));
 
         if ($footwear && (! empty($parsedQuery['size']) || ! empty($parsedQuery['brand']))) {
-            return 5;
+            return 2;
         }
 
         if (! empty($parsedQuery['size']) || ! empty($parsedQuery['max_price'])) {
-            return 3;
+            return 2;
         }
 
-        return 8;
+        return 4;
     }
 
     /**
