@@ -758,12 +758,12 @@ function submitEditedQuery() {
 }
 
 function onMarketChange(selection) {
-  activeMarket.value = selection;
-  api.setMarketSelection(selection);
+  activeMarket.value = api.normalizeMarketSelection(selection);
+  api.setMarketSelection(activeMarket.value);
   router.replace({
     query: {
       ...route.query,
-      ...api.marketQueryParams(selection),
+      ...api.marketQueryParams(activeMarket.value),
     },
   });
 }
@@ -786,6 +786,8 @@ async function fetchPage(page, append = false) {
   const legacyScope = route.query.market_mode
     ? null
     : (route.query.scope ? String(route.query.scope) : null);
+
+  activeMarket.value = api.resolveMarketSelection(activeMarket.value, api.parseMarketFromQuery(route.query));
 
   const response = await api.search(
     q || 'find this product',
@@ -844,8 +846,17 @@ async function runSearch() {
     lastQueryKey = queryKey;
   }
 
-  activeMarket.value = api.parseMarketFromQuery(route.query);
+  activeMarket.value = api.resolveMarketSelection(
+    api.parseMarketFromQuery(route.query),
+    api.getMarketSelection(),
+  );
   api.setMarketSelection(activeMarket.value);
+  router.replace({
+    query: {
+      ...route.query,
+      ...api.marketQueryParams(activeMarket.value),
+    },
+  });
 
   uploadedPreview.value = hasImage ? `data:image/jpeg;base64,${imageBase64}` : null;
   loading.value = true;

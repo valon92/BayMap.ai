@@ -8,6 +8,7 @@ use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
+use App\Support\HomeFurnitureIntentParser;
 use App\Support\PriceIntentParser;
 use App\Support\ProductCategoryResolver;
 use App\Support\SearchCountryResolver;
@@ -83,6 +84,7 @@ class QueryIntentEnricher
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
         $parsed = self::mergeRealEstateIntent($parsed, $rawQuery);
+        $parsed = HomeFurnitureIntentParser::merge($parsed, $rawQuery);
         $parsed = TravelIntentParser::fromQuery($rawQuery, $parsed);
         $parsed = WebServicesIntentParser::fromQuery($rawQuery, $parsed);
 

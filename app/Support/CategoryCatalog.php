@@ -221,7 +221,7 @@ class CategoryCatalog
             'grocery' => ['grocery', 'food', 'organic', 'supermarket', 'ushqim', 'produkt ushqimor', 'gluten', 'dairy', 'snacks'],
             'beauty' => ['makeup', 'skincare', 'perfume', 'shampoo', 'cosmetic', 'kozmetikë', 'kozmetike', 'bukuri', 'serum', 'lipstick'],
             'automotive' => ['audi', 'bmw', 'mercedes', 'volkswagen', 'toyota', 'honda', 'ford', 'km', 'mileage', 'sedan', 'suv', 'diesel', 'vetur', 'veture', 'makina', 'car'],
-            'home_furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room', 'mobilje', 'dollap', 'karrige'],
+            'home_furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room', 'mobilje', 'dollap', 'karrige', 'kuzhina', 'kuzhinë', 'kitchen', 'küche', 'furniture'],
             'health_wellness' => ['supplement', 'vitamin', 'fitness', 'yoga', 'wellness', 'protein', 'shëndet', 'shendet', 'gym', 'massage'],
             'gaming_entertainment' => ['ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming', 'game', 'console', 'lojë', 'loje', 'piano', 'pianino', 'lodër', 'loder', 'lodra', 'instrument', 'gitar', 'toy', 'lego', 'makina femije', 'veture femije', 'automjet femije'],
             'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm', 'domain', 'domen', 'domenë', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar', 'website', 'faqe internet'],

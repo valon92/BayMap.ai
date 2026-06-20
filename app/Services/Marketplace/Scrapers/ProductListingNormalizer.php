@@ -11,6 +11,7 @@ use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
+use App\Support\HomeFurnitureIntentParser;
 use App\Support\KosovoToyIntent;
 use App\Support\ListingEnricher;
 
@@ -43,6 +44,12 @@ class ProductListingNormalizer
      */
     public static function detectProductType(string $title, ?string $category = null): string
     {
+        $category = CategoryCatalog::normalize($category ?? '');
+
+        if ($category === 'home_furniture') {
+            return HomeFurnitureIntentParser::productTypeFromTitle($title) ?? 'furniture';
+        }
+
         $lower = mb_strtolower($title);
 
         if (CategoryCatalog::isElectronics($category ?? '')) {
@@ -101,7 +108,7 @@ class ProductListingNormalizer
             'images' => is_array($item['images'] ?? null) ? $item['images'] : [],
             'price' => (float) ($item['price'] ?? 0),
             'currency' => (string) ($platform['currency'] ?? 'EUR'),
-            'location' => (string) ($item['location'] ?? $platform['location'] ?? ''),
+            'location' => (string) ($item['location'] ?? $platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
             'country_code' => (string) ($platform['country'] ?? ''),
             'condition' => (string) ($item['condition'] ?? 'new'),
             'url' => $item['url'] ?? ($platform['base_url'] ?? '#'),
@@ -271,10 +278,16 @@ class ProductListingNormalizer
         $isToy = KosovoToyIntent::isToySearch($parsed);
         $isElectronics = CategoryCatalog::isElectronics($parsed['category'] ?? '') && ! $isToy;
         $isFashion = in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true);
+        $isHomeFurniture = CategoryCatalog::normalize($parsed['category'] ?? '') === 'home_furniture';
         $productType = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
         $maxPrice = isset($parsed['max_price']) ? (float) $parsed['max_price'] : null;
 
-        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isElectronics, $isFashion, $isToy, $productType, $maxPrice) {
+        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isElectronics, $isFashion, $isHomeFurniture, $isToy, $productType, $maxPrice) {
+            if ($isHomeFurniture
+                && ! HomeFurnitureIntentParser::matchesListing((string) ($item['title'] ?? ''), $parsed)) {
+                return false;
+            }
+
             if ($isToy
                 && ! KosovoToyIntent::titleMatchesIntent((string) ($item['title'] ?? ''), $parsed)) {
                 return false;

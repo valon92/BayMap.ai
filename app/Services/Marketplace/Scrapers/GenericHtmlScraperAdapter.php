@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace\Scrapers;
 
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
+use App\Support\AutomotiveDisplayNormalizer;
 use App\Support\CategoryCatalog;
 use App\Support\ListingEnricher;
 use App\Support\PlatformCatalogUrlBuilder;
@@ -136,7 +137,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
                 'price' => $price,
                 'image' => $image !== '' ? $image : null,
                 'brand' => mb_strtolower((string) ($node['brandName'] ?? '')),
-                'location' => (string) ($platform['location'] ?? 'Switzerland'),
+                'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
             ]);
         }
 
@@ -258,7 +259,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
             'images' => $images,
             'brand' => $brand,
             'category' => (string) ($platform['category'] ?? CategoryCatalog::categoryFromPlatform($platform)),
-            'location' => (string) ($platform['location'] ?? 'Switzerland'),
+            'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
         ]);
     }
 
@@ -412,7 +413,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
                     'price' => 0.0,
                     'image' => is_string($value['imageURL'] ?? null) ? $value['imageURL'] : null,
                     'brand' => 'apple',
-                    'location' => (string) ($platform['location'] ?? 'Switzerland'),
+                    'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
                 ]);
             }
         }
@@ -485,7 +486,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
                 'currency' => (string) ($variant['price']['currencyCode'] ?? $platform['currency'] ?? 'CHF'),
                 'image' => $image !== '' ? $image : null,
                 'brand' => $vendor !== '' ? mb_strtolower($vendor) : null,
-                'location' => (string) ($platform['location'] ?? 'Switzerland'),
+                'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
             ]);
         }
 
@@ -541,7 +542,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
                 'price' => $price,
                 'currency' => (string) ($platform['currency'] ?? 'CHF'),
                 'brand' => $brand !== '' ? mb_strtolower($brand) : null,
-                'location' => (string) ($platform['location'] ?? 'Switzerland'),
+                'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
             ]);
         }
 
@@ -626,7 +627,7 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
                     'title' => $title,
                     'url' => $url,
                     'price' => $price,
-                    'location' => (string) ($platform['location'] ?? 'Switzerland'),
+                    'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
                 ]);
 
                 if (count($products) >= self::MAX_LISTINGS) {

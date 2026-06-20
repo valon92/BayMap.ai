@@ -51,7 +51,7 @@ return [
     'local_search' => [
         'exclude_global' => ['amazon', 'etsy', 'facebook_marketplace'],
         'allow_ebay_categories' => ['DE:automotive'],
-        'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor'],
+        'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor', 'DE:home_furniture', '*:home_furniture'],
         'by_country' => [
             'CH' => [
                 'exclude_global' => ['amazon', 'etsy'],

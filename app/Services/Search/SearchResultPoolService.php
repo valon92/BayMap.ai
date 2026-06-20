@@ -46,6 +46,7 @@ class SearchResultPoolService
 
         return match ($category) {
             'automotive' => 200,
+            'home_furniture' => 120,
             'luxury_collectibles' => 72,
             default => 48,
         };

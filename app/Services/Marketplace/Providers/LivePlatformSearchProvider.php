@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Providers;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\LivePlatformScraperService;
 use App\Support\CategoryCatalog;
+use App\Support\HomeFurnitureIntentParser;
 use App\Support\KosovoFashionPlatforms;
 use App\Support\KosovoToyIntent;
 use App\Support\KosovoToyPlatforms;
@@ -72,6 +73,10 @@ class LivePlatformSearchProvider implements FederatedSearchProviderInterface
 
         if (KosovoToyPlatforms::isPlatform($this->platformKey)
             && ! KosovoToyIntent::isToySearch($parsedQuery)) {
+            return [];
+        }
+
+        if (HomeFurnitureIntentParser::skipPlatform($this->platformKey, $parsedQuery)) {
             return [];
         }
 

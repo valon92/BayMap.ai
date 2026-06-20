@@ -83,6 +83,21 @@ function normalizeMarketSelection(raw) {
   };
 }
 
+export function resolveMarketSelection(primary, fallback = null) {
+  const primaryNorm = normalizeMarketSelection(primary);
+  const fallbackNorm = normalizeMarketSelection(fallback || DEFAULT_MARKET);
+
+  if (primaryNorm.countryCodes.length > 0) {
+    return primaryNorm;
+  }
+
+  if (fallbackNorm.countryCodes.length > 0 || fallbackNorm.mode === 'global' || fallbackNorm.mode === 'continent') {
+    return fallbackNorm;
+  }
+
+  return primaryNorm;
+}
+
 function migrateLegacyScope() {
   const legacy = localStorage.getItem(SCOPE_STORAGE_KEY);
   if (legacy === 'world' || legacy === 'global' || legacy === 'universal') {
@@ -126,7 +141,10 @@ export const api = {
     perPage = 12,
     locationScopeOverride = null
   ) => {
-    const market = normalizeMarketSelection(marketSelection || api.getMarketSelection());
+    const market = resolveMarketSelection(
+      marketSelection,
+      api.getMarketSelection(),
+    );
 
     return request('/search', {
       method: 'POST',
@@ -224,6 +242,10 @@ export const api = {
   loadSearchImage: () => sessionStorage.getItem(IMAGE_STORAGE_KEY),
 
   clearSearchImage: () => sessionStorage.removeItem(IMAGE_STORAGE_KEY),
+
+  normalizeMarketSelection,
+
+  resolveMarketSelection,
 };
 
 export default api;

@@ -33,6 +33,15 @@ class MarketIntentService
             return $parsed;
         }
 
+        if (in_array($mode, ['country', 'countries'], true) && $code === '') {
+            if (! empty($parsed['search_country_code'])) {
+                $parsed['search_target'] = true;
+                $parsed['search_scope'] = 'targeted';
+            }
+
+            return $parsed;
+        }
+
         if (in_array($mode, ['country', 'countries'], true) && $code !== '') {
             $codes = $this->parseCountryCodes($code);
             if ($codes === []) {

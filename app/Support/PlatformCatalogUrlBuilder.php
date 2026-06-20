@@ -77,6 +77,10 @@ class PlatformCatalogUrlBuilder
             return (string) ($platform['default_query'] ?? 'schweiz');
         }
 
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'home_furniture') {
+            return HomeFurnitureIntentParser::searchTerm($parsed, $platform);
+        }
+
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'sports_outdoor') {
             $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
             if ($type === 'scooter' || preg_match('/\b(skuter|scooter)\b/ui', (string) ($parsed['raw_query'] ?? ''))) {

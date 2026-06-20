@@ -19,6 +19,7 @@ use App\Support\CategoryCatalog;
 use App\Support\CountryMatcher;
 use App\Support\ElectronicsIntentParser;
 use App\Support\FashionIntentParser;
+use App\Support\HomeFurnitureIntentParser;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
@@ -109,6 +110,8 @@ class SearchOrchestratorService
         }
         $parsed = $this->intentEnricher->enrich($parsed, $query);
         $parsed = $this->marketIntent->apply($parsed, $marketMode, $marketCode, $locale);
+        $parsed = HomeFurnitureIntentParser::merge($parsed, $query);
+        $parsed = $this->resolveSearchMarket($parsed, $marketMode, $marketCode, $locale);
         $parsed['category'] = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
         $searchGeo = $this->intentEnricher->searchGeo($geo, $parsed);
         if (empty($parsed['search_target'])) {
@@ -953,6 +956,41 @@ class SearchOrchestratorService
             'price_desc' => 'Sorted by price: highest to lowest',
             default => 'Ranked by exact intent match and AI relevance',
         };
+    }
+
+    /**
+     * Ensure targeted country is set — kitchen/furniture searches fail silently without a market.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @return array<string, mixed>
+     */
+    private function resolveSearchMarket(array $parsed, ?string $marketMode, ?string $marketCode, ?string $locale): array
+    {
+        if (! empty($parsed['search_country_code'])) {
+            return $parsed;
+        }
+
+        $code = strtoupper(trim((string) $marketCode));
+        $mode = strtolower(trim((string) $marketMode));
+
+        if (in_array($mode, ['country', 'countries'], true) && $code !== '') {
+            return $this->marketIntent->apply($parsed, $marketMode, $marketCode, $locale);
+        }
+
+        if (HomeFurnitureIntentParser::isKitchenSearch($parsed)
+            || CategoryCatalog::normalize($parsed['category'] ?? '') === 'home_furniture') {
+            if (in_array($mode, ['country', 'countries'], true)) {
+                return $parsed;
+            }
+
+            $parsed['search_country_code'] = 'DE';
+            $parsed['search_country'] = SearchCountryResolver::countryNameForCode('DE') ?? 'Germany';
+            $parsed['search_target'] = true;
+            $parsed['search_scope'] = 'targeted';
+            $parsed['location_source'] = 'furniture_default_market';
+        }
+
+        return $parsed;
     }
 
     private function normalizeLocationScope(?string $scope): string
