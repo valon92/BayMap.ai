@@ -59,23 +59,32 @@ npm run dev
 
 `php artisan serve` (default port 8000) listens only on **127.0.0.1** — your phone **cannot** open `localhost`, `127.0.0.1`, or your **public internet IP** from another device.
 
-Use the Mac’s **Wi‑Fi LAN IP** (e.g. `192.168.1.114` — System Settings → Network → Wi‑Fi → Details).
+Use the Mac’s **Wi‑Fi LAN IP** (e.g. `192.168.0.111` — System Settings → Network → Wi‑Fi → Details).
+
+**Option A — production build (simplest, no hot reload):**
 
 ```bash
 npm run lan
+# or: npm run iphone
 ```
-
-If you see **“Address already in use”**, the server may already be running — run `npm run lan` again (it prints the iPhone URL) or open the URL below.
 
 On your phone (**same Wi‑Fi**, not mobile data), open in **Safari**:
 
-**http://192.168.1.114:8766**
+**http://192.168.0.111:8000**
 
-(Replace the IP with your Mac’s LAN address from **System Settings → Network → Wi‑Fi**. Do **not** use your public internet IP or `localhost`.)
+(Replace the IP with your Mac’s LAN address. Do **not** use `localhost` or your public internet IP.)
 
-Stop LAN server: `npm run lan:stop`
+**Option B — hot reload on phone + Mac:**
 
-**Important:** Do not run `npm run dev` (Vite) at the same time as `npm run lan`. Vite makes Laravel serve `localhost:5173` assets — on iPhone that points to the phone, so the page stays blank. ipko works because it only uses `public/build/`.
+```bash
+npm run dev:lan
+```
+
+Then open **http://192.168.0.111:8000** on the iPhone.
+
+Stop LAN servers: `npm run lan:stop`
+
+**Important:** Do not run plain `php artisan serve` + `npm run dev` for iPhone testing. Vite serves assets from `localhost:5173`, which on the phone points to the iPhone itself — blank page. Use `npm run lan` or `npm run dev:lan` instead.
 
 If the page never loads: router **AP isolation** / guest Wi‑Fi often blocks phone→Mac. Try Mac **Personal Hotspot** and connect the iPhone to it, then use the hotspot IP.
 

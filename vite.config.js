@@ -8,12 +8,16 @@ export default defineConfig({
         host: '0.0.0.0',
         port: 5173,
         strictPort: true,
+        origin: process.env.VITE_HMR_HOST
+            ? `http://${process.env.VITE_HMR_HOST}:5173`
+            : undefined,
         hmr: {
             host: process.env.VITE_HMR_HOST || 'localhost',
+            port: 5173,
         },
         proxy: {
             '/api': {
-                target: process.env.VITE_DEV_SERVER_TARGET || 'http://127.0.0.1:8765',
+                target: process.env.VITE_DEV_SERVER_TARGET || 'http://127.0.0.1:8000',
                 changeOrigin: true,
             },
         },

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PORT="${LAN_PORT:-8766}"
+PORT="${LAN_PORT:-8000}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+LAN_IP="$(bash "$ROOT/scripts/detect-lan-ip.sh" 2>/dev/null || true)"
 
 print_iphone_url() {
   if [[ -n "${LAN_IP}" ]]; then
