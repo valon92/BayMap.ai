@@ -43,6 +43,23 @@ class UniversalMarketplaceBridge
         'AL' => 'al',
         'MK' => 'mk',
         'RS' => 'rs',
+        'HU' => 'hu',
+        'GR' => 'gr',
+        'HR' => 'hr',
+        'SI' => 'si',
+        'SK' => 'sk',
+        'CZ' => 'cz',
+        'RO' => 'ro',
+        'BG' => 'bg',
+        'IE' => 'ie',
+        'PT' => 'pt',
+        'UA' => 'ua',
+        'LU' => 'lu',
+        'LT' => 'lt',
+        'LV' => 'lv',
+        'EE' => 'ee',
+        'BA' => 'ba',
+        'ME' => 'me',
     ];
 
     /** @var array<string, string> */
@@ -62,6 +79,22 @@ class UniversalMarketplaceBridge
         'KR' => 'ko',
         'XK' => 'sq',
         'AL' => 'sq',
+        'MK' => 'mk',
+        'RS' => 'sr',
+        'HU' => 'hu',
+        'GR' => 'el',
+        'HR' => 'hr',
+        'SI' => 'sl',
+        'SK' => 'sk',
+        'CZ' => 'cs',
+        'RO' => 'ro',
+        'BG' => 'bg',
+        'IE' => 'en',
+        'PT' => 'pt',
+        'UA' => 'uk',
+        'LT' => 'lt',
+        'LV' => 'lv',
+        'EE' => 'et',
     ];
 
     /** @var array<string, string> */
@@ -146,9 +179,45 @@ class UniversalMarketplaceBridge
 
         return match ($sourceKey) {
             'google_flights' => $category === 'travel',
-            'ebay', 'google_shopping' => $category !== 'travel',
+            'google_shopping' => $category !== 'travel' && ! CategoryCatalog::isAutomotiveParts($category),
+            'ebay' => $category !== 'travel',
             default => true,
         };
+    }
+
+    /**
+     * Google Shopping as last resort when live auto-parts scrapers return nothing.
+     */
+    public static function allowsGoogleShoppingFallback(string $countryCode, string $category): bool
+    {
+        if (! self::enabled() || ! in_array('google_shopping', self::providerKeys(), true)) {
+            return false;
+        }
+
+        $category = CategoryCatalog::normalize($category);
+        if (! CategoryCatalog::isAutomotiveParts($category)) {
+            return false;
+        }
+
+        $countryCode = strtoupper($countryCode);
+        $rules = (array) config('live_platforms.local_search.google_shopping_fallback_categories', []);
+
+        foreach ($rules as $rule) {
+            if (! is_string($rule) || ! str_contains($rule, ':')) {
+                continue;
+            }
+
+            [$ruleCountry, $ruleCategory] = explode(':', $rule, 2);
+            $countryMatch = $ruleCountry === '*' || strtoupper($ruleCountry) === $countryCode;
+            $categoryMatch = $ruleCategory === '*'
+                || CategoryCatalog::normalize($ruleCategory) === $category;
+
+            if ($countryMatch && $categoryMatch) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

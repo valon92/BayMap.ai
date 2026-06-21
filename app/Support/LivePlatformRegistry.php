@@ -71,6 +71,20 @@ class LivePlatformRegistry
             $keys[] = $key;
         }
 
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            foreach (self::all() as $key => $meta) {
+                $platformCountry = strtoupper((string) ($meta['country'] ?? ''));
+                $isGlobal = in_array($platformCountry, ['WW', 'GLOBAL', '*'], true) || ! empty($meta['global']);
+                if (! $isGlobal) {
+                    continue;
+                }
+                $cats = (array) ($meta['categories'] ?? []);
+                if (in_array($category, $cats, true)) {
+                    $keys[] = $key;
+                }
+            }
+        }
+
         $keys = array_values(array_unique(array_merge($keys, PlatformCatalogBridge::keysFor($countryCode, $category))));
 
         if ($countryCode === 'CH' && in_array($category, ['fashion', 'sports_outdoor'], true)) {

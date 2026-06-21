@@ -50,8 +50,10 @@ return [
      */
     'local_search' => [
         'exclude_global' => ['amazon', 'etsy', 'facebook_marketplace'],
-        'allow_ebay_categories' => ['DE:automotive'],
+        'allow_ebay_categories' => ['DE:automotive', 'DE:automotive_parts', '*:automotive_parts'],
         'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor', 'DE:home_furniture', '*:home_furniture'],
+        /** Google Shopping only when every live parts scraper returned 0 (eBay still allowed via allow_ebay_categories). */
+        'google_shopping_fallback_categories' => ['*:automotive_parts'],
         'by_country' => [
             'CH' => [
                 'exclude_global' => ['amazon', 'etsy'],

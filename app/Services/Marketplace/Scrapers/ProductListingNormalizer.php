@@ -4,6 +4,7 @@ namespace App\Services\Marketplace\Scrapers;
 
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveDisplayNormalizer;
+use App\Support\AutomotivePartsIntentParser;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveModelResolver;
 use App\Support\AutoScout24ListingParser;
@@ -45,6 +46,10 @@ class ProductListingNormalizer
     public static function detectProductType(string $title, ?string $category = null): string
     {
         $category = CategoryCatalog::normalize($category ?? '');
+
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            return 'auto_part';
+        }
 
         if ($category === 'home_furniture') {
             return HomeFurnitureIntentParser::productTypeFromTitle($title) ?? 'furniture';
@@ -100,6 +105,15 @@ class ProductListingNormalizer
 
         $brand = $item['brand'] ?? $titleHints['brand'] ?? self::detectBrand($title);
 
+        $productType = $item['product_type'] ?? $titleHints['product_type'] ?? null;
+        if ($productType === null || $productType === '') {
+            if (CategoryCatalog::isAutomotiveParts($category)) {
+                $productType = (string) ($parsedQuery['product_type'] ?? 'auto_part');
+            } else {
+                $productType = self::detectProductType($title, $category);
+            }
+        }
+
         $listing = [
             'id' => $storeKey.'-'.($item['product_id'] ?? md5($title)),
             'store' => $storeKey,
@@ -121,9 +135,10 @@ class ProductListingNormalizer
             'chip' => $item['chip'] ?? $titleHints['chip'] ?? null,
             'display_size' => $item['display_size'] ?? $titleHints['display_size'] ?? null,
             'year' => $item['year'] ?? $titleHints['year'] ?? null,
-            'product_type' => $item['product_type'] ?? $titleHints['product_type'] ?? self::detectProductType($title, $category),
+            'product_type' => $productType,
             'sizes' => $item['sizes'] ?? [],
             'category' => $category,
+            'item' => $item['item'] ?? ($parsedQuery['item'] ?? null),
             'tags' => array_values(array_filter([
                 $category,
                 $storeKey,
@@ -279,12 +294,18 @@ class ProductListingNormalizer
         $isElectronics = CategoryCatalog::isElectronics($parsed['category'] ?? '') && ! $isToy;
         $isFashion = in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true);
         $isHomeFurniture = CategoryCatalog::normalize($parsed['category'] ?? '') === 'home_furniture';
+        $isAutomotiveParts = CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '');
         $productType = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
         $maxPrice = isset($parsed['max_price']) ? (float) $parsed['max_price'] : null;
 
-        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isElectronics, $isFashion, $isHomeFurniture, $isToy, $productType, $maxPrice) {
+        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isAutomotiveParts, $isElectronics, $isFashion, $isHomeFurniture, $isToy, $productType, $maxPrice) {
             if ($isHomeFurniture
                 && ! HomeFurnitureIntentParser::matchesListing((string) ($item['title'] ?? ''), $parsed)) {
+                return false;
+            }
+
+            if ($isAutomotiveParts
+                && ! AutomotivePartsIntentParser::matchesListing((string) ($item['title'] ?? ''), $parsed)) {
                 return false;
             }
 
@@ -316,7 +337,7 @@ class ProductListingNormalizer
                     return false;
                 }
             }
-            if ($brand !== '') {
+            if ($brand !== '' && ! $isAutomotiveParts) {
                 $title = mb_strtolower($item['title'] ?? '');
                 $itemBrand = mb_strtolower((string) ($item['brand'] ?? ''));
                 $brandAliases = [$brand];
@@ -340,13 +361,14 @@ class ProductListingNormalizer
                 }
             }
 
-            if ($model !== '') {
+            if ($model !== '' && ! $isAutomotiveParts) {
                 if ($isAutomotive) {
                     $store = strtolower((string) ($item['store'] ?? ''));
-                    if (AutomotiveModelResolver::shouldTrustPlatformScope($store, $parsed)) {
+                    if ($isAutomotive && AutomotiveModelResolver::shouldTrustPlatformScope($store, $parsed)) {
                         // AutoScout24 / Kleinanzeigen URLs are already scoped to make/model.
                     } else {
-                    $allowUnknownYear = str_contains($store, 'merrjep')
+                    $allowUnknownYear = $isAutomotiveParts
+                        || str_contains($store, 'merrjep')
                         || str_contains($store, 'veturaneshitje')
                         || str_contains($store, 'autolina')
                         || str_contains($store, 'autogrid')

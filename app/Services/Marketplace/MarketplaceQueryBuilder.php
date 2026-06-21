@@ -2,16 +2,8 @@
 
 namespace App\Services\Marketplace;
 
-/**
- * Builds a single search query string from AI-parsed attributes.
- */
 class MarketplaceQueryBuilder
 {
-    /**
-     * @param  array<string, mixed>  $parsedQuery
-     * @param  array<string, mixed>  $geo
-     * @param  string|null  $locationSuffix  City/country suffix for local-first search
-     */
     public function build(array $parsedQuery, array $geo = [], ?string $locationSuffix = null): string
     {
         if (($parsedQuery['category'] ?? '') === 'real_estate') {
@@ -56,10 +48,6 @@ class MarketplaceQueryBuilder
         return $base;
     }
 
-    /**
-     * @param  array<string, mixed>  $parsedQuery
-     * @param  array<string, mixed>  $geo
-     */
     private function buildRealEstateQuery(array $parsedQuery, array $geo, ?string $locationSuffix): string
     {
         if (! empty($parsedQuery['search_query'])) {

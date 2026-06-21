@@ -14,6 +14,7 @@ use App\Services\Orchestration\SearchIntentFactory;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
 use App\Support\AutomotiveIntentParser;
+use App\Support\AutomotivePartsIntentParser;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\CountryMatcher;
@@ -112,6 +113,9 @@ class SearchOrchestratorService
         $parsed = $this->marketIntent->apply($parsed, $marketMode, $marketCode, $locale);
         $parsed = HomeFurnitureIntentParser::merge($parsed, $query);
         $parsed = $this->resolveSearchMarket($parsed, $marketMode, $marketCode, $locale);
+        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            $parsed = AutomotivePartsIntentParser::merge($parsed, $query);
+        }
         $parsed['category'] = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
         $searchGeo = $this->intentEnricher->searchGeo($geo, $parsed);
         if (empty($parsed['search_target'])) {
@@ -171,6 +175,7 @@ class SearchOrchestratorService
 
         // Step 4: Product aggregation — normalize, unify attributes, dedupe
         $products = $this->aggregation->aggregate($products);
+        $products = $this->preferDirectPlatformResults($products, $parsed);
 
         $pipeline[] = [
             'step' => 'aggregate',
@@ -461,7 +466,8 @@ class SearchOrchestratorService
                     return false;
                 }
             }
-            if (isset($filters['brand']) && $filters['brand'] !== '') {
+            if (isset($filters['brand']) && $filters['brand'] !== ''
+                && ! CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
                 if (! $this->productMatchesBrand($product, (string) $filters['brand'])) {
                     return false;
                 }
@@ -782,6 +788,28 @@ class SearchOrchestratorService
      * @param  array<string, mixed>  $parsed
      * @return array<int, array<string, mixed>>
      */
+    /**
+     * Auto parts: keep listings scraped from registered stores; drop Google Shopping when any exist.
+     *
+     * @param  array<int, array<string, mixed>>  $products
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, array<string, mixed>>
+     */
+    private function preferDirectPlatformResults(array $products, array $parsed): array
+    {
+        if (! CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            return $products;
+        }
+
+        $direct = array_values(array_filter(
+            $products,
+            fn (array $product): bool => ($product['source_key'] ?? '') !== 'google_shopping'
+                && ! in_array('google_shopping', (array) ($product['tags'] ?? []), true),
+        ));
+
+        return $direct !== [] ? $direct : $products;
+    }
+
     private function interleaveMarketplaceSources(array $products, array $parsed): array
     {
         $category = CategoryCatalog::normalize($parsed['category'] ?? '');

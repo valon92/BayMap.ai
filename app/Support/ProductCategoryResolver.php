@@ -42,6 +42,13 @@ class ProductCategoryResolver
     'makina' => 'automotive',
     'car' => 'automotive',
     'auto' => 'automotive',
+    'autopjese' => 'automotive_parts',
+    'autopjesë' => 'automotive_parts',
+    'pjesë' => 'automotive_parts',
+    'pjese' => 'automotive_parts',
+    'spare part' => 'automotive_parts',
+    'ersatzteil' => 'automotive_parts',
+    'ricambi' => 'automotive_parts',
     'atlete' => 'fashion',
     'këpuc' => 'fashion',
     'kepuc' => 'fashion',
@@ -80,6 +87,11 @@ class ProductCategoryResolver
       return 'gaming_entertainment';
     }
 
+    if (AutomotivePartsIntentParser::isPartsSearch([], $query)
+      && ! AutomotivePartsIntentParser::isVehiclePurchaseQuery([], $query)) {
+      return 'automotive_parts';
+    }
+
     foreach (self::KEYWORDS as $keyword => $category) {
       if (preg_match('/\b'.preg_quote($keyword, '/').'\b/u', $lower)) {
         return $category;
@@ -107,6 +119,7 @@ class ProductCategoryResolver
 
     $current = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
     $shouldOverride = $current === 'marketplace'
+      || ($detected === 'automotive_parts' && $current !== 'travel')
       || ($detected === 'automotive' && $current === 'real_estate')
       || ($detected === 'electronics_tech' && in_array($current, ['marketplace', 'real_estate'], true))
       || ($detected === 'sports_outdoor' && $current === 'marketplace')

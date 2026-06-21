@@ -90,6 +90,16 @@ class ListingEnricher
             ], fn ($v) => $v !== null && $v !== ''));
         }
 
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            $part = trim((string) ($item['item'] ?? ''));
+            if ($part !== '') {
+                self::addChip($chips, 'part', str_replace('_', ' ', $part));
+            }
+            self::addChip($chips, 'condition', $item['condition'] ?? null);
+
+            return $chips;
+        }
+
         if ($category === 'real_estate') {
             self::addChip($chips, 'rooms', $item['rooms'] ?? $item['bedrooms'] ?? null, fn ($v) => $v.' '.($v == 1 ? 'room' : 'rooms'));
             self::addChip($chips, 'area', $item['area_sqm'] ?? $item['living_space'] ?? null, fn ($v) => is_numeric($v) ? number_format((float) $v, 0, ',', '.').' m²' : (string) $v);

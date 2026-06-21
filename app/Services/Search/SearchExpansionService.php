@@ -167,6 +167,7 @@ class SearchExpansionService
 
         return match ($category) {
             'automotive' => ['ebay', 'mobile.de', 'autoscout24', 'facebook_marketplace'],
+            'automotive_parts' => ['ebay'],
             'online_education' => GlobalBookMarketplaces::keys(),
             'luxury_collectibles' => ['etsy', 'ebay', 'facebook_marketplace', 'google_shopping'],
             'fashion', 'sports_outdoor' => ['driloni', 'ebay', 'etsy', 'facebook_marketplace', 'google_shopping'],
