@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\MarketplaceSearchInterface;
+use App\Support\AutomotivePartsIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\HomeFurnitureIntentParser;
 use App\Support\LivePlatformRegistry;
@@ -61,7 +62,11 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
             $geo = UniversalMarketplaceBridge::serpGeo($parsedQuery, $expandedFilters);
             $category = CategoryCatalog::normalize($parsedQuery['category'] ?? '');
             $configuredLimit = (int) config('serpapi.limit', 40);
-            $limit = $category === 'home_furniture' ? max($configuredLimit, 120) : $configuredLimit;
+            $limit = match ($category) {
+                'home_furniture' => max($configuredLimit, 120),
+                'automotive_parts' => max($configuredLimit, 80),
+                default => $configuredLimit,
+            };
             $expandImmersive = $this->shouldExpandImmersive($parsedQuery);
             $queries = $this->resolveQueries($parsedQuery, $expandedFilters);
             $merged = [];
@@ -125,6 +130,10 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
                 ));
             }
 
+            if ($merged === [] && CategoryCatalog::isAutomotiveParts($category)) {
+                $merged = $this->fetchWithPartsGeoFallback($queries, $geo, $limit, $expandImmersive, $immersiveProductBudget);
+            }
+
             return $merged;
         } catch (\Throwable $e) {
             Log::warning('SerpAPI exception', ['error' => $e->getMessage()]);
@@ -159,6 +168,10 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
             }
         }
 
+        if (CategoryCatalog::isAutomotiveParts($parsedQuery['category'] ?? '')) {
+            return AutomotivePartsIntentParser::serpSearchQueries($parsedQuery);
+        }
+
         $query = $this->queryBuilder->build(
             $parsedQuery,
             [],
@@ -166,6 +179,124 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
         );
 
         return $query !== '' ? [$query] : [];
+    }
+
+    /**
+     * When local SerpAPI catalog is thin, retry with regional mega-catalogs (DE/US/GB).
+     *
+     * @param  array<int, string>  $queries
+     * @param  array{gl: string, hl: string, country_code: string}  $geo
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchWithPartsGeoFallback(
+        array $queries,
+        array $geo,
+        int $limit,
+        bool $expandImmersive,
+        int $immersiveProductBudget,
+    ): array {
+        foreach ($this->partsGeoFallbackChain($geo['country_code']) as $fallbackGeo) {
+            if ($fallbackGeo['country_code'] === $geo['country_code']) {
+                continue;
+            }
+
+            $merged = $this->fetchPartsFromGeo($queries, $fallbackGeo, $limit, $expandImmersive, $immersiveProductBudget);
+            if ($merged !== []) {
+                return $merged;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<int, array{gl: string, hl: string, country_code: string}>
+     */
+    private function partsGeoFallbackChain(string $countryCode): array
+    {
+        $countryCode = strtoupper($countryCode);
+        $chain = [];
+
+        $regional = match ($countryCode) {
+            'XK', 'AL', 'MK', 'RS', 'BA', 'ME', 'HR', 'SI', 'BG', 'RO' => ['gl' => 'de', 'hl' => 'de', 'country_code' => 'DE'],
+            'IE' => ['gl' => 'uk', 'hl' => 'en', 'country_code' => 'GB'],
+            'AU', 'NZ' => ['gl' => 'au', 'hl' => 'en', 'country_code' => 'AU'],
+            'CA' => ['gl' => 'ca', 'hl' => 'en', 'country_code' => 'CA'],
+            'IN' => ['gl' => 'in', 'hl' => 'en', 'country_code' => 'IN'],
+            'BR' => ['gl' => 'br', 'hl' => 'pt', 'country_code' => 'BR'],
+            'MX' => ['gl' => 'mx', 'hl' => 'es', 'country_code' => 'MX'],
+            'JP' => ['gl' => 'jp', 'hl' => 'ja', 'country_code' => 'JP'],
+            'ZA' => ['gl' => 'za', 'hl' => 'en', 'country_code' => 'ZA'],
+            default => ['gl' => 'de', 'hl' => 'de', 'country_code' => 'DE'],
+        };
+        $chain[] = $regional;
+
+        if ($regional['country_code'] !== 'US') {
+            $chain[] = ['gl' => 'us', 'hl' => 'en', 'country_code' => 'US'];
+        }
+
+        return $chain;
+    }
+
+    /**
+     * @param  array<int, string>  $queries
+     * @param  array{gl: string, hl: string, country_code: string}  $geo
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchPartsFromGeo(
+        array $queries,
+        array $geo,
+        int $limit,
+        bool $expandImmersive,
+        int $immersiveProductBudget,
+    ): array {
+        $merged = [];
+        $seen = [];
+        $immersiveProductsUsed = 0;
+
+        foreach ($queries as $query) {
+            if (count($merged) >= $limit) {
+                break;
+            }
+
+            foreach ($this->fetchResults($query, $geo, $limit) as $item) {
+                if ($expandImmersive
+                    && $immersiveProductsUsed < $immersiveProductBudget
+                    && ! empty($item['serpapi_immersive_product_api'])) {
+                    $immersiveProductsUsed++;
+                    foreach ($this->fetchImmersiveStoreOffers($item, $geo['country_code']) as $listing) {
+                        $key = (string) ($listing['id'] ?? md5(json_encode($listing)));
+                        if (isset($seen[$key])) {
+                            continue;
+                        }
+                        $seen[$key] = true;
+                        $listing['country_code'] = $geo['country_code'];
+                        $merged[] = $listing;
+                        if (count($merged) >= $limit) {
+                            break 2;
+                        }
+                    }
+
+                    continue;
+                }
+
+                $key = (string) ($item['product_id'] ?? md5((string) ($item['title'] ?? '')));
+                if (isset($seen[$key])) {
+                    continue;
+                }
+
+                $seen[$key] = true;
+                $normalized = $this->normalize($item, $geo['country_code']);
+                $normalized['country_code'] = $geo['country_code'];
+                $merged[] = $normalized;
+
+                if (count($merged) >= $limit) {
+                    break 2;
+                }
+            }
+        }
+
+        return $merged;
     }
 
     /**

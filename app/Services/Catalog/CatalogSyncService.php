@@ -27,8 +27,10 @@ class CatalogSyncService
         $live = (array) config('live_platforms.platforms', []);
         $globalPath = database_path('data/global_platforms_a_z.php');
         $global = is_file($globalPath) ? (array) require $globalPath : [];
+        $partsPath = database_path('data/global_automotive_parts_platforms.php');
+        $parts = is_file($partsPath) ? (array) require $partsPath : [];
 
-        return array_merge($live, $global);
+        return array_merge($live, $global, $parts);
     }
 
     /**

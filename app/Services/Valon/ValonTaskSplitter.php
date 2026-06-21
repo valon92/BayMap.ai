@@ -34,12 +34,20 @@ class ValonTaskSplitter
 
         $multiCountryCount = (int) ($expanded['_multi_country_count'] ?? 0);
         if (($expanded['_multi_country_search'] ?? false) && $multiCountryCount > 1) {
-            $perCountryCap = max(3, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
+            if (CategoryCatalog::isAutomotiveParts($category)) {
+                $perCountryCap = max(5, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
+            } else {
+                $perCountryCap = max(3, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
+            }
             $max = min($max, $perCountryCap);
         }
         $prefix = $this->workerPrefix($category);
         $providers = $activation['providers'] ?? [];
         $agents = $activation['agents'] ?? [];
+
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            [$agents, $providers] = $this->prioritizeLivePlatformsForParts($agents, $providers);
+        }
 
         if (($expanded['_multi_country_search'] ?? false) && CategoryCatalog::isAutomotive($category)) {
             [$agents, $providers] = $this->prioritizeLocalAutomotiveWorkers($agents, $providers, $countryCode);
@@ -312,5 +320,33 @@ class ValonTaskSplitter
         }
 
         return false;
+    }
+
+    /**
+     * Auto parts: scrape registered stores first (Autodoc, Pro4matic, …), bridge last.
+     *
+     * @param  array<int, array<string, mixed>>  $agents
+     * @param  array<int, FederatedSearchProviderInterface>  $providers
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, FederatedSearchProviderInterface>}
+     */
+    private function prioritizeLivePlatformsForParts(array $agents, array $providers): array
+    {
+        usort($agents, function (array $a, array $b): int {
+            $rank = fn (array $agent): int => (($agent['id'] ?? '') === 'UniversalBridgeAgent') ? 99 : 0;
+
+            return $rank($a) <=> $rank($b);
+        });
+
+        usort($providers, function (FederatedSearchProviderInterface $a, FederatedSearchProviderInterface $b): int {
+            $rank = fn (FederatedSearchProviderInterface $provider): int => match ($provider->sourceKey()) {
+                'google_shopping' => 99,
+                'ebay', 'ebay_motors_ww' => 50,
+                default => 0,
+            };
+
+            return $rank($a) <=> $rank($b);
+        });
+
+        return [$agents, $providers];
     }
 }

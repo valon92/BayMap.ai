@@ -27,6 +27,7 @@ class CategoryCatalog
         'grocery',
         'beauty',
         'automotive',
+        'automotive_parts',
         'home_furniture',
         'health_wellness',
         'gaming_entertainment',
@@ -103,6 +104,11 @@ class CategoryCatalog
         return self::is($category, 'automotive');
     }
 
+    public static function isAutomotiveParts(string $category): bool
+    {
+        return self::is($category, 'automotive_parts');
+    }
+
     public static function isLocalFashion(string $category): bool
     {
         return in_array(self::normalize($category), ['fashion', 'sports_outdoor', 'luxury_collectibles'], true);
@@ -167,6 +173,8 @@ class CategoryCatalog
         switch (self::normalize($category)) {
             case 'automotive':
                 return 'car';
+            case 'automotive_parts':
+                return 'marketplace';
             case 'online_education':
                 return 'book';
             case 'home_furniture':
@@ -221,6 +229,11 @@ class CategoryCatalog
             'grocery' => ['grocery', 'food', 'organic', 'supermarket', 'ushqim', 'produkt ushqimor', 'gluten', 'dairy', 'snacks'],
             'beauty' => ['makeup', 'skincare', 'perfume', 'shampoo', 'cosmetic', 'kozmetikë', 'kozmetike', 'bukuri', 'serum', 'lipstick'],
             'automotive' => ['audi', 'bmw', 'mercedes', 'volkswagen', 'toyota', 'honda', 'ford', 'km', 'mileage', 'sedan', 'suv', 'diesel', 'vetur', 'veture', 'makina', 'car'],
+            'automotive_parts' => [
+                'autopjese', 'autopjesë', 'pjesë', 'pjese', 'spare part', 'ersatzteil', 'ricambi',
+                'turbina', 'turbolader', 'turbo', 'turbocharger', 'filter', 'filtër', 'brake', 'fren',
+                'alternator', 'clutch', 'radiator', 'machinery', 'makineri',
+            ],
             'home_furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room', 'mobilje', 'dollap', 'karrige', 'kuzhina', 'kuzhinë', 'kitchen', 'küche', 'furniture'],
             'health_wellness' => ['supplement', 'vitamin', 'fitness', 'yoga', 'wellness', 'protein', 'shëndet', 'shendet', 'gym', 'massage'],
             'gaming_entertainment' => ['ps5', 'playstation', 'xbox', 'nintendo', 'switch', 'gaming', 'game', 'console', 'lojë', 'loje', 'piano', 'pianino', 'lodër', 'loder', 'lodra', 'instrument', 'gitar', 'toy', 'lego', 'makina femije', 'veture femije', 'automjet femije'],
@@ -318,6 +331,12 @@ class CategoryCatalog
                 self::priceFilter($parsed, $sq, 5, 300),
             ),
             'automotive' => self::automotiveFilters($parsed, $sq),
+            'automotive_parts' => array_merge(
+                self::select('product_type', $sq ? 'Lloji' : 'Type', ['auto_part', 'machinery', 'tire', 'accessory'], $parsed['product_type'] ?? null),
+                self::select('brand', $sq ? 'Marka' : 'Brand', ['bmw', 'audi', 'mercedes', 'volkswagen', 'toyota', 'ford'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
+                self::conditionFilter($parsed, $sq, ['new', 'used', 'refurbished']),
+                self::priceFilter($parsed, $sq, 5, 5000),
+            ),
             'home_furniture' => array_merge(
                 self::select('item', $sq ? 'Artikulli' : 'Item', ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe'], $parsed['item'] ?? null),
                 self::select('room', $sq ? 'Dhoma' : 'Room', ['living room', 'bedroom', 'office', 'dining', 'kitchen'], $parsed['room'] ?? null),

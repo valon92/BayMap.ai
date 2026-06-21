@@ -468,7 +468,7 @@ const productSpecs = computed(() => {
   const p = props.product;
   const category = productCategory.value;
 
-  if (category === 'automotive' || p.mileage != null) {
+  if (category === 'automotive' || category === 'automotive_parts' || p.mileage != null) {
     if (p.year) chips.push({ label: 'year', value: String(p.year) });
     if (p.mileage != null) chips.push({ label: 'mileage', value: formatMileage(p.mileage) });
     if (p.fuel) chips.push({ label: 'fuel', value: p.fuel });

@@ -81,6 +81,13 @@ class PlatformCatalogUrlBuilder
             return HomeFurnitureIntentParser::searchTerm($parsed, $platform);
         }
 
+        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            return AutomotivePartsIntentParser::searchTerm(
+                $parsed,
+                (string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? ''),
+            );
+        }
+
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'sports_outdoor') {
             $type = mb_strtolower((string) ($parsed['product_type'] ?? ''));
             if ($type === 'scooter' || preg_match('/\b(skuter|scooter)\b/ui', (string) ($parsed['raw_query'] ?? ''))) {
@@ -236,6 +243,10 @@ class PlatformCatalogUrlBuilder
     {
         $scraper = (string) ($platform['scraper'] ?? $platform['_key'] ?? '');
 
+        if (str_contains($scraper, 'pro4matic') || str_contains((string) ($platform['_key'] ?? ''), 'pro4matic')) {
+            return self::pro4maticUrl($platform, $parsed);
+        }
+
         if (str_contains($scraper, 'apple')) {
             return self::appleStoreUrl($platform, $parsed);
         }
@@ -251,6 +262,48 @@ class PlatformCatalogUrlBuilder
         $url = str_replace('{zip}', $zip, $url);
 
         return $base.$url;
+    }
+
+    /**
+     * Pro4matic — brand/model category page when possible, otherwise site search.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function pro4maticUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://pro4matic.com/de'), '/');
+        $brand = mb_strtolower(trim((string) ($parsed['brand'] ?? '')));
+        $model = mb_strtoupper(trim((string) ($parsed['model'] ?? '')));
+
+        $makeSlug = match (true) {
+            str_contains($brand, 'mercedes') => 'mercedes-benz',
+            str_contains($brand, 'bmw') => 'bmw',
+            str_contains($brand, 'audi') => 'audi',
+            str_contains($brand, 'volkswagen') || $brand === 'vw' => 'volkswagen',
+            str_contains($brand, 'porsche') => 'porsche',
+            str_contains($brand, 'land rover') || str_contains($brand, 'land-rover') => 'land-rover',
+            $brand !== '' => str_replace(' ', '-', $brand),
+            default => '',
+        };
+
+        if ($makeSlug !== '' && $model !== '') {
+            $modelSlug = match ($model) {
+                'GLE' => 'classe-gle-w167',
+                'GLC' => 'classe-glc-x253',
+                'GLA' => 'classe-gla-x156',
+                'GLS' => 'classe-gls-x167',
+                default => null,
+            };
+            if ($modelSlug !== null) {
+                return $base.'/kategorie-produkt/autos/'.$makeSlug.'/'.$modelSlug.'/';
+            }
+        }
+
+        $template = (string) ($platform['search_template'] ?? '/pesquisa.php?search={query}');
+        $query = rawurlencode(self::searchTerm($platform, $parsed));
+
+        return $base.str_replace('{query}', $query, $template);
     }
 
     /**

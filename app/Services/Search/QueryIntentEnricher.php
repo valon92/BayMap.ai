@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Support\AutomotiveIntentParser;
+use App\Support\AutomotivePartsIntentParser;
 use App\Support\AutomotiveModelResolver;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
@@ -82,6 +83,7 @@ class QueryIntentEnricher
 
         $parsed = self::mergeFashionIntent($parsed, $rawQuery);
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
+        $parsed = AutomotivePartsIntentParser::merge($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
         $parsed = self::mergeRealEstateIntent($parsed, $rawQuery);
         $parsed = HomeFurnitureIntentParser::merge($parsed, $rawQuery);
@@ -119,6 +121,10 @@ class QueryIntentEnricher
             $parsed = WebServicesIntentParser::finalize($parsed);
         }
 
+        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            unset($parsed['year'], $parsed['year_min'], $parsed['year_max'], $parsed['max_km'], $parsed['mileage']);
+        }
+
         if (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
             $parsed = AutomotiveIntentParser::normalizeYearFields($parsed);
             if (! empty($parsed['brand']) && ! empty($parsed['model'])) {
@@ -147,6 +153,10 @@ class QueryIntentEnricher
             }
         } elseif (! empty($parsed['fuel'])) {
             $parsed['fuel'] = AutomotiveIntentParser::normalizeFuel((string) $parsed['fuel']);
+        }
+
+        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            $parsed = AutomotivePartsIntentParser::merge($parsed, $rawQuery);
         }
 
         return array_filter($parsed, fn ($v) => $v !== null && $v !== '' && $v !== []);
@@ -187,6 +197,10 @@ class QueryIntentEnricher
      */
     private static function mergeAutomotiveIntent(array $parsed, string $rawQuery): array
     {
+        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            return $parsed;
+        }
+
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'travel') {
             return $parsed;
         }
@@ -516,7 +530,12 @@ class QueryIntentEnricher
             $defaults['price_max'] = (float) $parsed['max_price'];
         }
 
+        $skipVehicleAttrs = CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '');
+
         foreach (['brand', 'size', 'product_type', 'color', 'colors', 'fuel', 'engine_liters', 'year_min', 'year_max', 'model'] as $key) {
+            if ($skipVehicleAttrs && in_array($key, ['brand', 'model'], true)) {
+                continue;
+            }
             if (! empty($parsed[$key]) && ! isset($clientFilters[$key])) {
                 $value = $parsed[$key];
                 if ($key === 'product_type' && in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {

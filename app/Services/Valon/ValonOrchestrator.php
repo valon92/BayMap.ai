@@ -121,6 +121,22 @@ class ValonOrchestrator
             }
         }
 
+        if ($results === []
+            && CategoryCatalog::isAutomotiveParts($category)
+            && UniversalMarketplaceBridge::allowsGoogleShoppingFallback($countryCode, $category)) {
+            $shoppingFallback = $this->runGoogleShoppingPartsFallback(
+                $parsedQuery,
+                $expandedFilters,
+                $geo,
+                count($workerMeta),
+            );
+            if ($shoppingFallback['results'] !== []) {
+                $results = $shoppingFallback['results'];
+                $workerReports = array_merge($workerReports, $shoppingFallback['report']);
+                $workerMeta = array_merge($workerMeta, $shoppingFallback['workers']);
+            }
+        }
+
         if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)
             && ! WebServicesIntentParser::isActive($parsedQuery)
             && ! KosovoToyIntent::shouldSkipDemoFallback($parsedQuery)
@@ -433,6 +449,79 @@ class ValonOrchestrator
             'results' => $results,
             'report' => $report,
             'workers' => $workers,
+        ];
+    }
+
+    /**
+     * SerpAPI Google Shopping when registered CH/DE/… parts stores scrape 0 listings.
+     *
+     * @return array{
+     *   results: array<int, array<string, mixed>>,
+     *   report: array<int, array<string, mixed>>,
+     *   workers: array<int, array<string, mixed>>
+     * }
+     */
+    private function runGoogleShoppingPartsFallback(
+        array $parsedQuery,
+        array $expandedFilters,
+        array $geo,
+        int $workerOffset = 0,
+    ): array {
+        $provider = null;
+        foreach ($this->registry->all() as $candidate) {
+            if ($candidate->sourceKey() === 'google_shopping' && $candidate->isAvailable()) {
+                $provider = $candidate;
+                break;
+            }
+        }
+
+        if (! $provider instanceof FederatedSearchProviderInterface) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $started = microtime(true);
+
+        try {
+            $items = $provider->search($parsedQuery, $expandedFilters);
+        } catch (\Throwable) {
+            $items = [];
+        }
+
+        $count = is_array($items) ? count($items) : 0;
+        if ($count === 0) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $maxResults = (int) config('marketplaces.google_shopping_parts_fallback_max', 48);
+        $items = array_slice($items, 0, max(12, $maxResults));
+
+        $latencyMs = (int) round((microtime(true) - $started) * 1000);
+        $prefix = $this->workerPrefixForCategory(CategoryCatalog::normalize($parsedQuery['category'] ?? ''));
+        $workerId = "{$prefix}-".($workerOffset + 1);
+
+        return [
+            'results' => $items,
+            'report' => [[
+                'worker_id' => $workerId,
+                'platform' => 'google_shopping',
+                'platform_label' => $provider->label(),
+                'role' => 'Google Shopping fallback',
+                'mode' => 'live',
+                'count' => count($items),
+                'status' => 'ok',
+                'location_tier' => $geo['city'] ?? '',
+                'latency_ms' => $latencyMs,
+                'error' => null,
+            ]],
+            'workers' => [[
+                'id' => $workerId,
+                'role' => 'Google Shopping fallback',
+                'platform' => 'google_shopping',
+                'platform_label' => $provider->label(),
+                'status' => 'ok',
+                'results' => count($items),
+                'latency_ms' => $latencyMs,
+            ]],
         ];
     }
 

@@ -53,6 +53,10 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
             $items = $this->parseHeuristic($html, $storeKey, $platform);
         }
 
+        if ($items === [] && $this->isPro4maticPlatform($platform)) {
+            $items = $this->scrapePro4maticFallbacks($platform, $parsedQuery, $storeKey);
+        }
+
         return ProductListingNormalizer::filterForIntent($items, $parsedQuery);
     }
 
@@ -65,6 +69,8 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         $scraper = (string) ($platform['scraper'] ?? '');
 
         foreach ([
+            fn () => $this->parseAutodocListings($html, $storeKey, $platform),
+            fn () => $this->parsePro4maticProducts($html, $storeKey, $platform),
             fn () => $this->parseShopifySearchAnalytics($html, $storeKey, $platform),
             fn () => $this->parseShopifyDataProductCards($html, $storeKey, $platform),
             fn () => $this->parseManorNextData($html, $storeKey, $platform),
@@ -637,5 +643,163 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         }
 
         return $products;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     */
+    private function isPro4maticPlatform(array $platform): bool
+    {
+        $key = (string) ($platform['_key'] ?? '');
+        $scraper = (string) ($platform['scraper'] ?? '');
+
+        return str_contains($key, 'pro4matic') || str_contains($scraper, 'pro4matic');
+    }
+
+    /**
+     * Pro4matic category/search pages often load listings via JS — retry search + homepage SSR cards.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function scrapePro4maticFallbacks(array $platform, array $parsedQuery, string $storeKey): array
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://pro4matic.com/de'), '/');
+        $term = rawurlencode(PlatformCatalogUrlBuilder::searchTerm($platform, $parsedQuery));
+        $referer = $base.'/';
+
+        foreach ([
+            $base.'/pesquisa.php?search='.$term,
+            $base.'/',
+        ] as $url) {
+            $html = $this->http->get($url, $platform['locale'] ?? 'de-DE', $referer, $storeKey);
+            if ($html === '') {
+                continue;
+            }
+
+            $items = $this->parsePro4maticProducts($html, $storeKey, $platform);
+            if ($items !== []) {
+                return $items;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Autodoc / autodoc.* listing cards (direct store HTML, not Google Shopping).
+     *
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseAutodocListings(string $html, string $storeKey, array $platform): array
+    {
+        if (! str_contains($html, 'listing-item__name')
+            && ! str_contains($storeKey, 'autodoc')) {
+            return [];
+        }
+
+        if (! preg_match_all(
+            '/<div class="listing-item"[^>]*data-article-id="(\d+)"[^>]*data-generic-name="([^"]*)"[^>]*data-price="([0-9.]+)"[\s\S]*?<a href="([^"]+)" class="listing-item__name"[^>]*>([\s\S]*?)<\/a>/i',
+            $html,
+            $matches,
+            PREG_SET_ORDER,
+        )) {
+            return [];
+        }
+
+        $items = [];
+        $seen = [];
+
+        foreach ($matches as $match) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $title = trim(html_entity_decode(strip_tags($match[5]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $title = preg_replace('/\s+/', ' ', $title) ?? $title;
+            if ($title === '' || isset($seen[$title])) {
+                continue;
+            }
+
+            $price = (float) $match[3];
+            if ($price <= 0) {
+                continue;
+            }
+
+            $url = html_entity_decode($match[4], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (! str_starts_with($url, 'http')) {
+                $url = rtrim((string) ($platform['base_url'] ?? ''), '/').$url;
+            }
+
+            $seen[$title] = true;
+            $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                'product_id' => $match[1],
+                'title' => $title,
+                'url' => $url,
+                'price' => $price,
+                'currency' => (string) ($platform['currency'] ?? 'EUR'),
+                'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * Pro4matic (pro4matic.com) — Luftfederung specialist catalog cards.
+     *
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function parsePro4maticProducts(string $html, string $storeKey, array $platform): array
+    {
+        $scraper = (string) ($platform['scraper'] ?? $storeKey);
+        if (! str_contains($scraper, 'pro4matic') && ! str_contains($html, 'produtos_divs')) {
+            return [];
+        }
+
+        if (! preg_match_all(
+            '/<div class="produtos_divs[^"]*"[^>]*data-id="(\d+)"[\s\S]*?<a href="([^"]+)">[\s\S]*?<h2 class="list_subtit[^"]*">([\s\S]*?)<\/h2>[\s\S]*?preco text-center"><strong><small>[^<]*<\/small>([0-9.,]+)<\/strong>/i',
+            $html,
+            $matches,
+            PREG_SET_ORDER,
+        )) {
+            return [];
+        }
+
+        $items = [];
+        $seen = [];
+
+        foreach ($matches as $match) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $title = trim(html_entity_decode(strip_tags($match[3]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $title = preg_replace('/\s+/', ' ', $title) ?? $title;
+            if ($title === '' || isset($seen[$title])) {
+                continue;
+            }
+
+            $price = $this->parseGermanPrice($match[4]);
+            if ($price <= 0) {
+                continue;
+            }
+
+            $url = html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $seen[$title] = true;
+            $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                'product_id' => $match[1],
+                'title' => $title,
+                'url' => $url,
+                'price' => $price,
+                'currency' => (string) ($platform['currency'] ?? 'EUR'),
+                'location' => (string) ($platform['location'] ?? 'Germany'),
+            ]);
+        }
+
+        return $items;
     }
 }

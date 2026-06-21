@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Providers;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\SerpApiShoppingService;
 use App\Services\Marketplace\Scrapers\ProductListingNormalizer;
+use App\Support\AutomotivePartsIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\HomeFurnitureIntentParser;
 
@@ -57,23 +58,37 @@ class SerpApiSearchProvider implements FederatedSearchProviderInterface
         $items = $this->serpApi->search($parsedQuery, $expandedFilters);
         $items = ProductListingNormalizer::filterForIntent($items, $parsedQuery);
 
-        if (CategoryCatalog::normalize($parsedQuery['category'] ?? '') !== 'home_furniture') {
-            return $items;
+        if (CategoryCatalog::normalize($parsedQuery['category'] ?? '') === 'home_furniture') {
+            $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? ''));
+
+            return array_map(function (array $item) use ($parsedQuery, $countryCode): array {
+                $title = (string) ($item['title'] ?? '');
+                $item['category'] = 'home_furniture';
+                $item['product_type'] = HomeFurnitureIntentParser::isKitchenSearch($parsedQuery)
+                    ? 'kitchen'
+                    : (HomeFurnitureIntentParser::productTypeFromTitle($title) ?? 'furniture');
+                if ($countryCode !== '' && empty($item['country_code'])) {
+                    $item['country_code'] = $countryCode;
+                }
+
+                return $item;
+            }, $items);
         }
 
-        $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? ''));
+        if (CategoryCatalog::isAutomotiveParts($parsedQuery['category'] ?? '')) {
+            $countryCode = strtoupper((string) ($parsedQuery['search_country_code'] ?? ''));
 
-        return array_map(function (array $item) use ($parsedQuery, $countryCode): array {
-            $title = (string) ($item['title'] ?? '');
-            $item['category'] = 'home_furniture';
-            $item['product_type'] = HomeFurnitureIntentParser::isKitchenSearch($parsedQuery)
-                ? 'kitchen'
-                : (HomeFurnitureIntentParser::productTypeFromTitle($title) ?? 'furniture');
-            if ($countryCode !== '' && empty($item['country_code'])) {
-                $item['country_code'] = $countryCode;
-            }
+            return array_map(function (array $item) use ($parsedQuery, $countryCode): array {
+                $item['category'] = 'automotive_parts';
+                $item['product_type'] = (string) ($parsedQuery['product_type'] ?? 'auto_part');
+                if ($countryCode !== '' && empty($item['country_code'])) {
+                    $item['country_code'] = $countryCode;
+                }
 
-            return $item;
-        }, $items);
+                return $item;
+            }, $items);
+        }
+
+        return $items;
     }
 }
