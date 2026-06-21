@@ -195,29 +195,8 @@ class UniversalMarketplaceBridge
         }
 
         $category = CategoryCatalog::normalize($category);
-        if (! CategoryCatalog::isAutomotiveParts($category)) {
-            return false;
-        }
 
-        $countryCode = strtoupper($countryCode);
-        $rules = (array) config('live_platforms.local_search.google_shopping_fallback_categories', []);
-
-        foreach ($rules as $rule) {
-            if (! is_string($rule) || ! str_contains($rule, ':')) {
-                continue;
-            }
-
-            [$ruleCountry, $ruleCategory] = explode(':', $rule, 2);
-            $countryMatch = $ruleCountry === '*' || strtoupper($ruleCountry) === $countryCode;
-            $categoryMatch = $ruleCategory === '*'
-                || CategoryCatalog::normalize($ruleCategory) === $category;
-
-            if ($countryMatch && $categoryMatch) {
-                return true;
-            }
-        }
-
-        return false;
+        return CategoryCatalog::isAutomotiveParts($category);
     }
 
     /**

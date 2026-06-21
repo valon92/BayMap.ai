@@ -61,6 +61,9 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
         try {
             $geo = UniversalMarketplaceBridge::serpGeo($parsedQuery, $expandedFilters);
             $category = CategoryCatalog::normalize($parsedQuery['category'] ?? '');
+            $labelCountryCode = UniversalMarketplaceBridge::resolveCountryCode($parsedQuery, $expandedFilters);
+            $labelForUserMarket = CategoryCatalog::isAutomotiveParts($category);
+            $resultCountryCode = $labelForUserMarket ? $labelCountryCode : $geo['country_code'];
             $configuredLimit = (int) config('serpapi.limit', 40);
             $limit = match ($category) {
                 'home_furniture' => max($configuredLimit, 120),
@@ -84,7 +87,7 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
                         && $immersiveProductsUsed < $immersiveProductBudget
                         && ! empty($item['serpapi_immersive_product_api'])) {
                         $immersiveProductsUsed++;
-                        $storeListings = $this->fetchImmersiveStoreOffers($item, $geo['country_code']);
+                        $storeListings = $this->fetchImmersiveStoreOffers($item, $resultCountryCode);
 
                         if ($storeListings !== []) {
                             foreach ($storeListings as $listing) {
@@ -115,7 +118,7 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
                     }
 
                     $seen[$key] = true;
-                    $merged[] = $this->normalize($item, $geo['country_code']);
+                    $merged[] = $this->normalize($item, $resultCountryCode);
 
                     if (count($merged) >= $limit) {
                         break 2;
@@ -131,7 +134,14 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
             }
 
             if ($merged === [] && CategoryCatalog::isAutomotiveParts($category)) {
-                $merged = $this->fetchWithPartsGeoFallback($queries, $geo, $limit, $expandImmersive, $immersiveProductBudget);
+                $merged = $this->fetchWithPartsGeoFallback(
+                    $queries,
+                    $geo,
+                    $limit,
+                    $expandImmersive,
+                    $immersiveProductBudget,
+                    $labelCountryCode,
+                );
             }
 
             return $merged;
@@ -194,13 +204,21 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
         int $limit,
         bool $expandImmersive,
         int $immersiveProductBudget,
+        string $labelCountryCode,
     ): array {
         foreach ($this->partsGeoFallbackChain($geo['country_code']) as $fallbackGeo) {
             if ($fallbackGeo['country_code'] === $geo['country_code']) {
                 continue;
             }
 
-            $merged = $this->fetchPartsFromGeo($queries, $fallbackGeo, $limit, $expandImmersive, $immersiveProductBudget);
+            $merged = $this->fetchPartsFromGeo(
+                $queries,
+                $fallbackGeo,
+                $limit,
+                $expandImmersive,
+                $immersiveProductBudget,
+                $labelCountryCode,
+            );
             if ($merged !== []) {
                 return $merged;
             }
@@ -249,7 +267,9 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
         int $limit,
         bool $expandImmersive,
         int $immersiveProductBudget,
+        string $labelCountryCode,
     ): array {
+        $labelCountryCode = strtoupper($labelCountryCode);
         $merged = [];
         $seen = [];
         $immersiveProductsUsed = 0;
@@ -264,13 +284,13 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
                     && $immersiveProductsUsed < $immersiveProductBudget
                     && ! empty($item['serpapi_immersive_product_api'])) {
                     $immersiveProductsUsed++;
-                    foreach ($this->fetchImmersiveStoreOffers($item, $geo['country_code']) as $listing) {
+                    foreach ($this->fetchImmersiveStoreOffers($item, $labelCountryCode) as $listing) {
                         $key = (string) ($listing['id'] ?? md5(json_encode($listing)));
                         if (isset($seen[$key])) {
                             continue;
                         }
                         $seen[$key] = true;
-                        $listing['country_code'] = $geo['country_code'];
+                        $listing['country_code'] = $labelCountryCode;
                         $merged[] = $listing;
                         if (count($merged) >= $limit) {
                             break 2;
@@ -286,8 +306,8 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
                 }
 
                 $seen[$key] = true;
-                $normalized = $this->normalize($item, $geo['country_code']);
-                $normalized['country_code'] = $geo['country_code'];
+                $normalized = $this->normalize($item, $labelCountryCode);
+                $normalized['country_code'] = $labelCountryCode;
                 $merged[] = $normalized;
 
                 if (count($merged) >= $limit) {

@@ -412,6 +412,11 @@ class SearchOrchestratorService
                         $product['country_code'] ?? null,
                     );
                 }
+                if (! $countryMatch
+                    && CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')
+                    && in_array('google_shopping', (array) ($product['tags'] ?? []), true)) {
+                    $countryMatch = true;
+                }
                 if (! $countryMatch && ! empty($parsed['search_countries']) && is_array($parsed['search_countries'])) {
                     foreach ($parsed['search_countries'] as $country) {
                         if (CountryMatcher::locationMatchesFilter(
