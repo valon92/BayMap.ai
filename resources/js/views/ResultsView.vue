@@ -733,6 +733,16 @@ function formatTagValue(val, key) {
     const gl = t(gk);
     if (gl !== gk) return gl;
   }
+  if (key === 'product_type') {
+    const pk = `product_type_values.${val}`;
+    const pl = t(pk);
+    if (pl !== pk) return pl;
+  }
+  if (key === 'item') {
+    const ck = `part_component_values.${val}`;
+    const cl = t(ck);
+    if (cl !== ck) return cl;
+  }
   return String(val);
 }
 

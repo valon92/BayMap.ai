@@ -39,10 +39,11 @@ class AutomotivePartsComponentRegistry
         return [
             'query_patterns' => [],
             'title_regex' => '/\b('.$pattern.')\b/iu',
-            'search' => [
-                'DE' => $de, 'AT' => $de, 'CH' => $de,
-                'FR' => $en, 'IT' => $en, 'default' => $en,
-            ],
+            'search' => AutomotivePartsLocale::searchMap(
+                $de,
+                $en,
+                (array) ($entry['locales'] ?? []),
+            ),
             'serp_extra' => (array) ($entry['serp'] ?? []),
         ];
     }
@@ -179,7 +180,20 @@ class AutomotivePartsComponentRegistry
             'light_sensor' => ['de' => 'Lichtsensor', 'en' => 'light sensor'],
             'temperature_sensor' => ['de' => 'Temperatursensor', 'en' => 'temperature sensor', 'serp' => ['coolant temp sensor']],
             'tpms_sensor' => ['de' => 'Reifendrucksensor', 'en' => 'TPMS sensor', 'serp' => ['tire pressure sensor']],
-            'catalytic_converter' => ['de' => 'Katalysator', 'en' => 'catalytic converter'],
+            'catalytic_converter' => [
+                'de' => 'Katalysator',
+                'en' => 'catalytic converter',
+                'alt' => 'katalysator|katalizator|catalytic\s*converter|kat(?:\.|\s|$)',
+                'serp' => ['Katalysator', 'catalytic converter', 'Abgasreinigung'],
+                'locales' => [
+                    'FR' => 'catalyseur',
+                    'IT' => 'catalizzatore',
+                    'ES' => 'catalizador',
+                    'PT' => 'catalisador',
+                    'PL' => 'katalizator',
+                    'NL' => 'katalysator',
+                ],
+            ],
             'dpf_filter' => ['de' => 'Rußpartikelfilter', 'en' => 'DPF filter', 'serp' => ['diesel particulate filter']],
             'exhaust_pipe' => ['de' => 'Abgasrohr', 'en' => 'exhaust pipe'],
             'muffler' => ['de' => 'Schalldämpfer', 'en' => 'muffler', 'serp' => ['silencer']],

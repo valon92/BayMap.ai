@@ -21,6 +21,7 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
     public function __construct(
         private ScraperHttpClient $http,
         private BrowseAiScrapeService $browseAi,
+        private ProductGalleryEnricher $galleryEnricher,
     ) {}
 
     public function adapterKey(): string
@@ -93,7 +94,26 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             $raw[0]['_marketplace_result_total'] = $platformTotal;
         }
 
+        if ($this->shouldEnrichAutomotiveGallery($scraper) && $raw !== []) {
+            $limit = min(
+                count($raw),
+                (int) config('live_platforms.automotive_gallery_enrich_max', 20),
+            );
+            $raw = $this->galleryEnricher->enrichFromDetailPages(
+                $raw,
+                isset($platform['locale']) ? (string) $platform['locale'] : null,
+                $limit,
+                (int) config('live_platforms.automotive_gallery_enrich_budget_seconds', 30),
+            );
+        }
+
         return $raw;
+    }
+
+    private function shouldEnrichAutomotiveGallery(string $scraper): bool
+    {
+        return str_contains($scraper, 'merrjep')
+            || str_contains($scraper, 'veturaneshitje');
     }
 
     /**
@@ -127,6 +147,7 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             str_contains($scraper, 'heycar') => $this->parseHeycar($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'merrjep') => $this->parseMerrjepAuto($html, $storeKey, $platform, $parsedQuery),
             str_contains($scraper, 'veturaneshitje') => $this->parseVeturaneshitje($html, $storeKey, $platform, $parsedQuery),
+            str_contains($scraper, 'carvago') => $this->parseCarvago($html, $storeKey, $platform, $parsedQuery),
             default => $this->parseGenericAutomotive($html, $storeKey, $platform, $parsedQuery),
         };
 
@@ -1423,6 +1444,10 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 
             $title = $this->titleFromVeturaneshitjeSlug($slug);
 
+            if ($this->isVeturaneshitjeNoiseListing($title, $slug)) {
+                continue;
+            }
+
             $price = 0.0;
             if (preg_match('/<div class="lead text-orange price">.*?<strong>\s*([\d.,]+)\s*EUR\s*<\/strong>/is', $chunk, $priceMatch)) {
                 $price = (float) str_replace(',', '', trim($priceMatch[1]));
@@ -1464,6 +1489,75 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
         return $items;
     }
 
+    /**
+     * Carvago.com — embedded JSON listings on SSR search pages.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseCarvago(string $html, string $storeKey, array $platform, array $parsedQuery): array
+    {
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://carvago.com'), '/');
+
+        $blocks = preg_split('/(?="id":"\d+")/', $html) ?: [];
+        $items = [];
+        $seen = [];
+
+        foreach ($blocks as $block) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            if (! preg_match('/^"id":"(\d+)".*?"slug":"([^"]+)".*?"title":"([^"]+)".*?"registration_date":"(\d{4})-\d{2}-\d{2}"/s', $block, $match)) {
+                continue;
+            }
+
+            $id = $match[1];
+            if (isset($seen[$id])) {
+                continue;
+            }
+
+            $price = 0.0;
+            if (preg_match('/"price_data":\{"price":(\d+)/', $block, $priceMatch)) {
+                $price = (float) $priceMatch[1];
+            }
+
+            $mileage = null;
+            if (preg_match('/"mileage":(\d+)/', $block, $mileageMatch)) {
+                $mileage = (int) $mileageMatch[1];
+            }
+
+            $location = 'Europe';
+            if (preg_match('/"location_city":"([^"]*)".*?"location_country":\{[^}]*"name":"([^"]+)"/s', $block, $locMatch)) {
+                $city = html_entity_decode($locMatch[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $country = html_entity_decode($locMatch[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $location = trim($city) !== '' ? trim($city.', '.$country) : $country;
+            }
+
+            $slug = html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $title = html_entity_decode($match[3], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $year = (int) $match[4];
+
+            $seen[$id] = true;
+            $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, [
+                'product_id' => $id,
+                'title' => $title,
+                'price' => $price,
+                'url' => $baseUrl.'/cars/'.$slug,
+                'location' => $location,
+                'brand' => $this->brandFromTitle($title),
+                'model' => $this->modelFromTitle($title),
+                'year' => $year,
+                'mileage' => $mileage,
+                'color' => AutomotiveColorResolver::extractFromText($title),
+                'condition' => 'used',
+            ]);
+        }
+
+        return $items;
+    }
+
     private function titleFromVeturaneshitjeSlug(string $slug): string
     {
         $slug = preg_replace('/^id-\d+-[^-]+-/', '', $slug) ?? $slug;
@@ -1479,6 +1573,23 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             'blejm te gjitha', 'blejme te gjitha', 'auto:tregu', 'tregu/blejm', 'blejm vetura',
             '24/7 kesh', 'invalid shitet', 'shes pjes', 'pjes per audi', 'motorri defekt',
             'aksidentua', 'pa dogane aksident',
+        ];
+
+        foreach ($noise as $hint) {
+            if (str_contains($lower, $hint)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isVeturaneshitjeNoiseListing(string $title, string $slug): bool
+    {
+        $lower = mb_strtolower($title.' '.$slug);
+        $noise = [
+            'abortion', 'cytotec', 'counterfeit', 'fake money', 'buy-counterfeit',
+            'whatsapp', 'telegram', 'pills', 'drug', 'casino', 'escort',
         ];
 
         foreach ($noise as $hint) {

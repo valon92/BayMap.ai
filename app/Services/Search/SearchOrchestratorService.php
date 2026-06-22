@@ -13,7 +13,7 @@ use App\Services\Marketplace\SerpApiShoppingService;
 use App\Services\Orchestration\SearchIntentFactory;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
-use App\Support\AutomotiveIntentParser;
+use App\Support\AutomotiveModelResolver;
 use App\Support\AutomotivePartsIntentParser;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
@@ -308,18 +308,26 @@ class SearchOrchestratorService
             if (isset($filters['price_max']) && ($product['price'] ?? PHP_INT_MAX) > (float) $filters['price_max']) {
                 return false;
             }
-            if (isset($filters['year_min']) && $filters['year_min'] !== '') {
-                $minYear = (int) $filters['year_min'];
-                $productYear = isset($product['year']) ? (int) $product['year'] : null;
-                if ($productYear !== null && $productYear < $minYear) {
-                    return false;
-                }
-            }
-            if (isset($filters['year_max']) && $filters['year_max'] !== '') {
-                $maxYear = (int) $filters['year_max'];
-                $productYear = isset($product['year']) ? (int) $product['year'] : null;
-                if ($productYear !== null && $productYear > $maxYear) {
-                    return false;
+            if (isset($filters['year_min']) && $filters['year_min'] !== ''
+                || isset($filters['year_max']) && $filters['year_max'] !== '') {
+                $yearBounds = AutomotiveModelResolver::clientYearBounds($parsed, $filters);
+                if ($yearBounds !== null) {
+                    [$minYear, $maxYear] = $yearBounds;
+                    $productYear = isset($product['year']) ? (int) $product['year'] : null;
+                    $title = (string) ($product['title'] ?? '');
+
+                    if ($productYear !== null) {
+                        if ($productYear < $minYear || $productYear > $maxYear) {
+                            return false;
+                        }
+                    } elseif (CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
+                        if (! AutomotiveModelResolver::matchesYearRange($productYear, $title, [
+                            'year_min' => $minYear,
+                            'year_max' => $maxYear,
+                        ], true)) {
+                            return false;
+                        }
+                    }
                 }
             }
             if (isset($filters['year']) && $filters['year'] !== '' && ! isset($filters['year_min']) && ! isset($filters['year_max'])) {
@@ -761,7 +769,8 @@ class SearchOrchestratorService
     private function isKosovoAutomotiveLiveStore(string $store): bool
     {
         return str_contains($store, 'merrjep')
-            || str_contains($store, 'veturaneshitje');
+            || str_contains($store, 'veturaneshitje')
+            || str_contains($store, 'carvago');
     }
 
     /**
@@ -812,7 +821,39 @@ class SearchOrchestratorService
                 && ! in_array('google_shopping', (array) ($product['tags'] ?? []), true),
         ));
 
-        return $direct !== [] ? $direct : $products;
+        $shopping = array_values(array_filter(
+            $products,
+            fn (array $product): bool => ($product['source_key'] ?? '') === 'google_shopping'
+                || in_array('google_shopping', (array) ($product['tags'] ?? []), true),
+        ));
+
+        if ($direct === []) {
+            return $products;
+        }
+
+        if ($shopping === []) {
+            return $direct;
+        }
+
+        $rawQuery = (string) ($parsed['raw_query'] ?? '');
+        $component = AutomotivePartsIntentParser::extractComponent($parsed, $rawQuery);
+        if ($component === '') {
+            return $direct;
+        }
+
+        $matchingDirect = array_values(array_filter(
+            $direct,
+            static fn (array $product): bool => AutomotivePartsIntentParser::matchesListing(
+                (string) ($product['title'] ?? ''),
+                $parsed,
+            ),
+        ));
+
+        if (count($matchingDirect) < 3) {
+            return $this->dedupeListings(array_merge($matchingDirect, $shopping));
+        }
+
+        return $matchingDirect;
     }
 
     private function interleaveMarketplaceSources(array $products, array $parsed): array

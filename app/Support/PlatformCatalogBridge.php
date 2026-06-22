@@ -6,14 +6,6 @@ use App\Services\Marketplace\EbayOAuthService;
 
 /**
  * Bridges legacy per-country marketplace catalogs into the universal live fan-out registry.
- *
- * Unified model (same for every country + category):
- * 1. Register platforms in config/live_platforms.php (country + categories)
- * 2. PlatformDiscoveryService / LivePlatformRegistry discover keys from parsed intent
- * 3. LocalMarketplaceResolver filters providers and excludes global connectors
- * 4. One Valon Worker per platform runs in parallel
- *
- * Legacy *Marketplaces.php classes remain as label/mock fallbacks until fully migrated to live_platforms.
  */
 class PlatformCatalogBridge
 {
@@ -25,51 +17,47 @@ class PlatformCatalogBridge
         $countryCode = strtoupper($countryCode);
         $category = CategoryCatalog::normalize($category);
 
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            return AutomotivePartsMarketplaces::keysFor($countryCode);
+        }
+
+        if (CategoryCatalog::isAutomotive($category)) {
+            return self::automotiveVehicleKeys($countryCode);
+        }
+
         return match ($countryCode) {
             'CH' => match (true) {
-                CategoryCatalog::isAutomotiveParts($category) => AutomotivePartsMarketplaces::keysFor('CH'),
-                CategoryCatalog::isAutomotive($category) => SwissCarMarketplaces::keys(),
                 CategoryCatalog::isElectronics($category) => SwissElectronicsMarketplaces::keys(),
                 $category === 'real_estate' => SwissRealEstateMarketplaces::keys(),
                 in_array($category, ['fashion', 'sports_outdoor'], true) => SwissFashionMarketplaces::keys(),
                 default => [],
             },
-            'NL' => match (true) {
-                CategoryCatalog::isAutomotiveParts($category) => AutomotivePartsMarketplaces::keysFor('NL'),
-                CategoryCatalog::isAutomotive($category) => DutchCarMarketplaces::keys(),
-                default => [],
-            },
-            'DE' => match (true) {
-                CategoryCatalog::isAutomotiveParts($category) => AutomotivePartsMarketplaces::keysFor('DE'),
-                CategoryCatalog::isAutomotive($category) => self::germanAutomotiveKeys(),
-                CategoryCatalog::isElectronics($category) => GermanElectronicsMarketplaces::keys(),
-                default => [],
-            },
-            'GB' => match (true) {
-                CategoryCatalog::isAutomotiveParts($category) => AutomotivePartsMarketplaces::keysFor('GB'),
-                $category === 'real_estate' => UKRealEstateMarketplaces::keys(),
-                default => [],
-            },
-            'XK' => CategoryCatalog::isAutomotiveParts($category)
-                ? AutomotivePartsMarketplaces::keysFor('XK')
-                : (CategoryCatalog::isAutomotive($category) ? KosovoCarMarketplaces::keys() : []),
-            'FR' => CategoryCatalog::isAutomotiveParts($category) ? AutomotivePartsMarketplaces::keysFor('FR') : [],
-            'IT' => CategoryCatalog::isAutomotiveParts($category) ? AutomotivePartsMarketplaces::keysFor('IT') : [],
-            'ES' => CategoryCatalog::isAutomotiveParts($category) ? AutomotivePartsMarketplaces::keysFor('ES') : [],
-            'AT' => CategoryCatalog::isAutomotiveParts($category) ? AutomotivePartsMarketplaces::keysFor('AT') : [],
-            'US' => CategoryCatalog::isAutomotiveParts($category) ? AutomotivePartsMarketplaces::keysFor('US') : [],
-            'PL' => CategoryCatalog::isAutomotiveParts($category) ? AutomotivePartsMarketplaces::keysFor('PL') : [],
-            default => CategoryCatalog::isAutomotiveParts($category)
-                ? AutomotivePartsMarketplaces::keysFor($countryCode)
-                : [],
+            'DE' => CategoryCatalog::isElectronics($category) ? GermanElectronicsMarketplaces::keys() : [],
+            'GB' => $category === 'real_estate' ? UKRealEstateMarketplaces::keys() : [],
+            default => [],
         };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function automotiveVehicleKeys(string $countryCode): array
+    {
+        $keys = AutomotiveVehiclesMarketplaces::keysFor($countryCode);
+
+        if ($countryCode === 'DE' && app(EbayOAuthService::class)->isConfigured()) {
+            $keys[] = 'ebay';
+        }
+
+        return array_values(array_unique($keys));
     }
 
     public static function label(string $key): string
     {
         $key = strtolower(trim($key));
 
-        return KosovoCarMarketplaces::label($key)
+        return AutomotiveVehiclesMarketplaces::label($key)
+            ?: KosovoCarMarketplaces::label($key)
             ?: SwissFashionMarketplaces::label($key)
             ?: SwissCarMarketplaces::label($key)
             ?: UKRealEstateMarketplaces::label($key)
@@ -85,19 +73,5 @@ class PlatformCatalogBridge
     public static function hasPlatforms(string $countryCode, string $category): bool
     {
         return self::keysFor($countryCode, $category) !== [];
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private static function germanAutomotiveKeys(): array
-    {
-        $keys = GermanCarMarketplaces::keys();
-
-        if (app(EbayOAuthService::class)->isConfigured()) {
-            $keys[] = 'ebay';
-        }
-
-        return array_values(array_unique($keys));
     }
 }

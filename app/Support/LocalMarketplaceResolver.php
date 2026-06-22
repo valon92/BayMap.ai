@@ -50,7 +50,7 @@ class LocalMarketplaceResolver
      */
     public static function hasLocalPlatforms(array $parsed): bool
     {
-        return self::keysFromParsed($parsed) !== [];
+        return LivePlatformRegistry::countrySpecificKeysFromParsed($parsed) !== [];
     }
 
     /**

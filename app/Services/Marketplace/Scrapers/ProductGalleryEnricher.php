@@ -15,14 +15,14 @@ class ProductGalleryEnricher
      * @param  array<int, array<string, mixed>>  $products
      * @return array<int, array<string, mixed>>
      */
-    public function enrichFromDetailPages(array $products, ?string $locale = null, ?int $limit = null): array
+    public function enrichFromDetailPages(array $products, ?string $locale = null, ?int $limit = null, ?int $budgetSeconds = null): array
     {
         if (! config('live_platforms.gallery_enrich_enabled', true)) {
             return $products;
         }
 
         $limit ??= (int) config('live_platforms.gallery_enrich_max_products', 10);
-        $budgetSeconds = (int) config('live_platforms.gallery_enrich_time_budget_seconds', 25);
+        $budgetSeconds ??= (int) config('live_platforms.gallery_enrich_time_budget_seconds', 25);
         $deadline = microtime(true) + max(5, $budgetSeconds);
         $enriched = 0;
 
@@ -66,6 +66,22 @@ class ProductGalleryEnricher
             return [];
         }
 
+        $host = mb_strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        if (str_contains($host, 'merrjep.com')) {
+            $images = $this->imagesFromMerrjepDetailPage($html);
+            if (count($images) > 1) {
+                return $this->filterProductImages($images);
+            }
+        }
+
+        if (str_contains($host, 'veturaneshitje.com')) {
+            $images = $this->imagesFromVeturaneshitjeDetailPage($html, $url);
+            if (count($images) > 1) {
+                return $images;
+            }
+        }
+
         $images = $this->imagesFromJsonLdBlocks($html);
         if (count($images) > 1) {
             return $this->filterProductImages($images);
@@ -84,6 +100,59 @@ class ProductGalleryEnricher
         }
 
         return $this->filterProductImages($images);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function imagesFromMerrjepDetailPage(string $html): array
+    {
+        if (! preg_match_all('/carousel-item custom-photo-gallery[^>]*>.*?data-src="([^"]+)"/is', $html, $matches)) {
+            return [];
+        }
+
+        $images = [];
+
+        foreach ($matches[1] as $url) {
+            $url = html_entity_decode(trim($url), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($url === '' || str_contains($url, 'skeleton')) {
+                continue;
+            }
+
+            $images[] = preg_replace('#/0/0/#', '/1280/1024/', $url) ?? $url;
+        }
+
+        return array_values(array_unique($images));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function imagesFromVeturaneshitjeDetailPage(string $html, string $pageUrl): array
+    {
+        if (! preg_match('/carousel-inner(.*?)<\/div>\s*<a class="left carousel-control"/is', $html, $carousel)) {
+            return [];
+        }
+
+        if (! preg_match_all('/src="(\/CarImages\/[^"]+)"/i', $carousel[1], $matches)) {
+            return [];
+        }
+
+        $scheme = parse_url($pageUrl, PHP_URL_SCHEME) ?: 'https';
+        $host = parse_url($pageUrl, PHP_URL_HOST) ?: 'www.veturaneshitje.com';
+        $base = $scheme.'://'.$host;
+        $images = [];
+
+        foreach ($matches[1] as $path) {
+            $path = html_entity_decode(trim($path), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($path === '') {
+                continue;
+            }
+
+            $images[] = $base.$path;
+        }
+
+        return array_values(array_unique($images));
     }
 
     /**

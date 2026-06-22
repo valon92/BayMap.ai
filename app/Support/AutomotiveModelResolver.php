@@ -41,8 +41,6 @@ class AutomotiveModelResolver
             || str_contains($store, 'leboncoin')
             || str_contains($store, 'lacentrale')
             || str_contains($store, 'heycar')
-            || str_contains($store, 'merrjep')
-            || str_contains($store, 'veturaneshitje')
             || str_contains($store, 'car_trade')
             || str_contains($store, 'carindex');
     }
@@ -235,8 +233,14 @@ class AutomotiveModelResolver
         $patterns = [
             '/\bmk\s*'.$generation.'\b(?!\.\d)/i',
             '/\bgolf\s*(?:mk\s*)?'.$generation.'\b(?!\.\d)/i',
+            '/\bgolf\s*'.$generation.'\.5\b/i',
             '/\b'.$generation.'\.?\s+golf\b/i',
         ];
+
+        if ($generation === 7) {
+            $patterns[] = '/\bgolf\s*vii\+?\b/i';
+            $patterns[] = '/\bvii\+?\s+golf\b/i';
+        }
 
         if (strlen($roman) > 1) {
             $patterns[] = '/\bgolf\s*'.$roman.'\b/i';
@@ -264,6 +268,51 @@ class AutomotiveModelResolver
         }
 
         return false;
+    }
+
+    /**
+     * Client-side year bounds — for Golf 7 2018 use MK7 range (2012–2019), not only 2018.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $filters
+     * @return array{0: int, 1: int}|null
+     */
+    public static function clientYearBounds(array $parsed, array $filters): ?array
+    {
+        $min = isset($filters['year_min']) && $filters['year_min'] !== ''
+            ? (int) $filters['year_min']
+            : null;
+        $max = isset($filters['year_max']) && $filters['year_max'] !== ''
+            ? (int) $filters['year_max']
+            : null;
+
+        if ($min === null && $max === null) {
+            if (isset($filters['year']) && $filters['year'] !== '') {
+                $min = $max = (int) $filters['year'];
+            } else {
+                return null;
+            }
+        }
+
+        $min ??= $max;
+        $max ??= $min;
+
+        if (! CategoryCatalog::isAutomotive($parsed['category'] ?? '')) {
+            return [$min, $max];
+        }
+
+        $model = (string) ($parsed['model'] ?? '');
+        $generation = self::generationFromModel($model);
+        $base = self::baseModelName($model);
+
+        if ($generation !== null) {
+            $range = self::generationYearRange($base, $generation);
+            if ($range !== null) {
+                return $range;
+            }
+        }
+
+        return [$min, $max];
     }
 
     /**

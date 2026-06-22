@@ -48,7 +48,7 @@ class MarketplaceAggregator
 
             $expanded = $expandedFilters;
             $expanded['search_country_code'] = $country['search_country_code'];
-            $expanded['marketplaces'] = \App\Support\LivePlatformRegistry::keysFromParsed($perCountry);
+            $expanded['marketplaces'] = \App\Support\LivePlatformRegistry::countrySpecificKeysFromParsed($perCountry);
             $expanded['_multi_country_search'] = true;
             $expanded['_multi_country_count'] = $countryCount;
 

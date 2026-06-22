@@ -17,6 +17,10 @@ class KosovoCarMarketplaces
             'label' => 'Veturaneshitje.com',
             'url' => 'https://www.veturaneshitje.com/vetura',
         ],
+        'carvago_xk' => [
+            'label' => 'Carvago.com',
+            'url' => 'https://carvago.com/cars',
+        ],
         'auto24' => [
             'label' => 'Auto24 Kosovo',
             'url' => 'https://auto24-ks.com',

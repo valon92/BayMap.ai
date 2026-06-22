@@ -32,6 +32,10 @@ return [
     'gallery_enrich_timeout_seconds' => (int) env('LIVE_GALLERY_ENRICH_TIMEOUT', 8),
     'gallery_enrich_time_budget_seconds' => (int) env('LIVE_GALLERY_ENRICH_BUDGET', 15),
 
+    /** Kosovo automotive detail galleries (MerrJep, Veturaneshitje). */
+    'automotive_gallery_enrich_max' => (int) env('AUTOMOTIVE_GALLERY_ENRICH_MAX', 20),
+    'automotive_gallery_enrich_budget_seconds' => (int) env('AUTOMOTIVE_GALLERY_ENRICH_BUDGET', 30),
+
     'max_workers_cap' => (int) env('LIVE_PLATFORM_MAX_WORKERS', 24),
 
     /**
@@ -50,10 +54,10 @@ return [
      */
     'local_search' => [
         'exclude_global' => ['amazon', 'etsy', 'facebook_marketplace'],
-        'allow_ebay_categories' => ['DE:automotive', 'DE:automotive_parts', '*:automotive_parts'],
+        'allow_ebay_categories' => ['DE:automotive', 'DE:automotive_parts', '*:automotive_parts', '*:automotive'],
         'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor', 'DE:home_furniture', '*:home_furniture'],
-        /** Google Shopping only when every live parts scraper returned 0 (eBay still allowed via allow_ebay_categories). */
-        'google_shopping_fallback_categories' => ['*:automotive_parts'],
+        /** Google Shopping when live scrapers return 0 (eBay still allowed via allow_ebay_categories). */
+        'google_shopping_fallback_categories' => ['*:automotive_parts', '*:automotive'],
         'by_country' => [
             'CH' => [
                 'exclude_global' => ['amazon', 'etsy'],
@@ -290,19 +294,34 @@ return [
             'search_template' => '/vetura?make={make_id}',
             'make_ids' => [
                 'audi' => 10,
-                'bmw' => 11,
-                'mercedes' => 12,
-                'mercedes-benz' => 12,
-                'volkswagen' => 13,
-                'vw' => 13,
-                'ford' => 14,
-                'opel' => 15,
-                'toyota' => 16,
-                'honda' => 17,
-                'porsche' => 18,
-                'skoda' => 19,
-                'seat' => 20,
+                'bmw' => 14,
+                'mercedes' => 64,
+                'mercedes-benz' => 64,
+                'volkswagen' => 101,
+                'vw' => 101,
+                'ford' => 35,
+                'opel' => 73,
+                'toyota' => 97,
+                'honda' => 39,
+                'porsche' => 79,
+                'skoda' => 88,
+                'seat' => 87,
             ],
+        ],
+
+        'carvago_xk' => [
+            'adapter' => 'automotive',
+            'scraper' => 'carvago',
+            'label' => 'Carvago.com',
+            'country' => 'XK',
+            'categories' => ['automotive'],
+            'automotive_live' => true,
+            'base_url' => 'https://carvago.com',
+            'location' => 'Europe',
+            'currency' => 'EUR',
+            'locale' => 'en',
+            'priority' => 3,
+            'search_template' => '/cars/{make}/{model}',
         ],
 
         // ── Germany · Fashion ────────────────────────────────────────────

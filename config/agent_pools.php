@@ -79,7 +79,7 @@ return [
 
         'automotive' => [
             'agents' => [
-                ['id' => 'KosovoAutomotivePlatformAgent', 'sources' => ['merrjep_auto', 'veturaneshitje'], 'countries' => ['XK'], 'trust' => 90, 'speed' => 92],
+                ['id' => 'KosovoAutomotivePlatformAgent', 'sources' => ['merrjep_auto', 'veturaneshitje', 'carvago_xk'], 'countries' => ['XK'], 'trust' => 90, 'speed' => 92],
                 ['id' => 'MobileDeAgent', 'sources' => ['mobile.de', 'mobile_de'], 'countries' => ['DE'], 'trust' => 92, 'speed' => 85],
                 ['id' => 'AutoScout24Agent', 'sources' => ['autoscout24', 'autoscout24_de', 'autoscout24_nl', 'autoscout24_ch'], 'countries' => ['DE', 'CH', 'NL', 'AT'], 'trust' => 91, 'speed' => 83],
                 ['id' => 'CarGurusAgent', 'sources' => ['google_shopping', 'ebay'], 'countries' => ['US', 'DE', 'GB'], 'trust' => 80, 'speed' => 72],

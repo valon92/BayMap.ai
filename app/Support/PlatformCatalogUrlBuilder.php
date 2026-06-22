@@ -406,6 +406,14 @@ class PlatformCatalogUrlBuilder
             return self::veturaneshitjeUrl($platform, $parsed);
         }
 
+        if (str_contains($scraper, 'carvago')) {
+            return self::carvagoUrl($platform, $parsed, $page);
+        }
+
+        if (str_contains($scraper, 'carsales')) {
+            return self::carsalesAuUrl($platform, $parsed);
+        }
+
         if (str_contains($scraper, 'autogrid')) {
             return self::autogridUrl($platform, $parsed);
         }
@@ -541,16 +549,26 @@ class PlatformCatalogUrlBuilder
     private static function merrjepAutoUrl(array $platform, array $parsed): string
     {
         $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
-        $make = mb_strtolower(trim((string) ($parsed['brand'] ?? '')));
-        $model = mb_strtolower(trim((string) ($parsed['model'] ?? '')));
-        $model = str_replace(' ', '-', $model);
+        [$make, $model] = AutomotiveModelResolver::makeModelSlugs(
+            (string) ($parsed['brand'] ?? ''),
+            (string) ($parsed['model'] ?? ''),
+        );
 
-        if ($make !== '' && $model !== '') {
+        if ($make === 'vw' || $make === 'volkswagen') {
+            $make = 'vw-volkswagen';
+        }
+
+        if ($make !== '' && $make !== 'all' && $model !== '' && $model !== 'all') {
             return $base.'/shpallje/makina/vetura/'.$make.'/'.$model.'?Private=False';
         }
 
-        if ($make !== '') {
-            return $base.'/shpallje/makina/vetura/'.$make.'?Private=False';
+        if ($make !== '' && $make !== 'all') {
+            return $base.'/shpallje/makina/vetura/'.$make.'/ne-shitje?Private=False';
+        }
+
+        $model = trim((string) ($parsed['model'] ?? ''));
+        if ($model !== '') {
+            return $base.'/shpallje/makina/vetura?Private=False&Search='.rawurlencode($model);
         }
 
         return $base.'/shpallje/makina/vetura?Private=False';
@@ -566,14 +584,97 @@ class PlatformCatalogUrlBuilder
     {
         $base = rtrim((string) ($platform['base_url'] ?? ''), '/');
         $makeIds = (array) ($platform['make_ids'] ?? []);
-        $brand = mb_strtolower(str_replace([' ', '-'], '', (string) ($parsed['brand'] ?? '')));
-        $makeId = $makeIds[$brand] ?? null;
-
-        if ($makeId !== null) {
-            return $base.'/vetura?make='.$makeId;
+        $brand = mb_strtolower(trim(str_replace([' ', '-'], '', (string) ($parsed['brand'] ?? ''))));
+        if ($brand === 'vw') {
+            $brand = 'volkswagen';
         }
 
-        return $base.'/vetura';
+        $params = [];
+        $makeId = $makeIds[$brand] ?? null;
+        if ($makeId !== null) {
+            $params['make'] = $makeId;
+        }
+
+        $model = trim((string) ($parsed['model'] ?? ''));
+        if ($model !== '') {
+            $generation = AutomotiveModelResolver::generationFromModel($model);
+            $baseModel = AutomotiveModelResolver::baseModelName($model);
+            $params['search'] = trim($generation !== null ? $baseModel.' '.$generation : $model);
+        }
+
+        if ($params === []) {
+            return $base.'/vetura';
+        }
+
+        return $base.'/vetura?'.http_build_query($params);
+    }
+
+    /**
+     * Carvago.com — pan-European autos with Kosovo delivery.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function carvagoUrl(array $platform, array $parsed, int $page = 1): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://carvago.com'), '/');
+        [$make, $model] = AutomotiveModelResolver::makeModelSlugs(
+            (string) ($parsed['brand'] ?? ''),
+            (string) ($parsed['model'] ?? ''),
+        );
+
+        $path = match (true) {
+            $make !== '' && $make !== 'all' && $model !== '' && $model !== 'all' => '/cars/'.$make.'/'.$model,
+            $make !== '' && $make !== 'all' => '/cars/'.$make,
+            default => '/cars',
+        };
+
+        $params = [];
+        if (! empty($parsed['year_min']) || ! empty($parsed['year_max'])) {
+            $generation = AutomotiveModelResolver::generationFromModel((string) ($parsed['model'] ?? ''));
+            $baseModel = AutomotiveModelResolver::baseModelName((string) ($parsed['model'] ?? ''));
+            if ($generation !== null && $baseModel === 'golf') {
+                $params['registrationFrom'] = 2012;
+                $params['registrationTo'] = 2019;
+            } else {
+                if (! empty($parsed['year_min'])) {
+                    $params['registrationFrom'] = (int) $parsed['year_min'];
+                }
+                if (! empty($parsed['year_max'])) {
+                    $params['registrationTo'] = (int) $parsed['year_max'];
+                }
+            }
+        }
+        if ($page > 1) {
+            $params['page'] = $page;
+        }
+
+        $url = $base.$path;
+
+        return $params !== [] ? $url.'?'.http_build_query($params) : $url;
+    }
+
+    /**
+     * Carsales.com.au — make/model aware search.
+     *
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsed
+     */
+    private static function carsalesAuUrl(array $platform, array $parsed): string
+    {
+        $base = rtrim((string) ($platform['base_url'] ?? 'https://www.carsales.com.au'), '/');
+        $parts = array_filter([
+            $parsed['brand'] ?? null,
+            $parsed['model'] ?? null,
+        ]);
+
+        if ($parts !== []) {
+            return $base.'/cars/?q='.rawurlencode(implode(' ', $parts));
+        }
+
+        $query = trim((string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? ''));
+
+        return $base.'/cars/?q='.rawurlencode($query !== '' ? $query : 'car');
     }
 
     /**

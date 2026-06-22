@@ -61,6 +61,20 @@ class AutomotivePartsIntentParser
             ],
             'serp_extra' => ['turbocharger', 'Turbolader'],
         ],
+        'engine' => [
+            'query_patterns' => [
+                '/\bmotor(?:i|ë|in|et)?\s+(?:per|për|for)\b/ui',
+                '/\bmotor\s+(?:per|për|for)\b/ui',
+                '/\b(?:gebraucht(?:s)?motor|komplettmotor)\b/ui',
+            ],
+            'title_regex' => '/\b(gebrauchtmotor|komplett(?:er\s+)?motor|motor(?:block|satz)?|complete\s+engine|used\s+engine)\b/ui',
+            'search' => [
+                'DE' => 'Motor', 'AT' => 'Motor', 'CH' => 'Motor',
+                'FR' => 'moteur', 'IT' => 'motore', 'ES' => 'motor', 'PT' => 'motor',
+                'NL' => 'motor', 'PL' => 'silnik', 'default' => 'engine',
+            ],
+            'serp_extra' => ['Gebrauchtmotor', 'Komplettmotor', 'used engine'],
+        ],
         'filter' => [
             'query_patterns' => [
                 '/\bfilter\s+per\s+vetur/i',
@@ -320,11 +334,47 @@ class AutomotivePartsIntentParser
 
     public static function productType(string $rawQuery): string
     {
-        if (self::extractComponent([], $rawQuery) === 'machinery') {
+        $component = self::extractComponent([], $rawQuery);
+
+        if ($component === 'machinery') {
             return 'machinery';
         }
 
+        if (in_array($component, ['engine', 'engine_block', 'cylinder_head'], true)) {
+            return 'engine';
+        }
+
         return 'auto_part';
+    }
+
+    /**
+     * Live scrapers often return 1–2 irrelevant listings; supplement with Google Shopping when matches are thin.
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     * @param  array<string, mixed>  $parsed
+     */
+    public static function needsShoppingSupplement(array $results, array $parsed): bool
+    {
+        if (! CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+            return $results === [];
+        }
+
+        $component = self::extractComponent($parsed, (string) ($parsed['raw_query'] ?? ''));
+        if ($component === '') {
+            return $results === [];
+        }
+
+        $matching = 0;
+        foreach ($results as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            if (self::matchesListing((string) ($row['title'] ?? ''), $parsed)) {
+                $matching++;
+            }
+        }
+
+        return $matching < 3;
     }
 
     /**
@@ -517,7 +567,7 @@ class AutomotivePartsIntentParser
         $def = self::componentDef($component);
         $search = (array) ($def['search'] ?? []);
 
-        return (string) ($search[$countryCode] ?? $search['default'] ?? $component);
+        return AutomotivePartsLocale::resolve($countryCode, $search) ?: $component;
     }
 
     /**
@@ -537,6 +587,16 @@ class AutomotivePartsIntentParser
 
         if ($merged === null) {
             $merged = array_merge(AutomotivePartsComponentRegistry::definitions(), self::COMPONENTS);
+            if (isset($merged['engine'])) {
+                $merged['engine']['search'] = AutomotivePartsLocale::searchMap('Motor', 'engine', [
+                    'FR' => 'moteur',
+                    'IT' => 'motore',
+                    'ES' => 'motor',
+                    'PT' => 'motor',
+                    'NL' => 'motor',
+                    'PL' => 'silnik',
+                ]);
+            }
         }
 
         return $merged;
@@ -544,16 +604,7 @@ class AutomotivePartsIntentParser
 
     private static function genericPartsTerm(string $countryCode): string
     {
-        return match ($countryCode) {
-            'DE', 'AT', 'CH' => 'autoteile',
-            'FR' => 'pièces auto',
-            'IT' => 'ricambi auto',
-            'ES', 'PT' => 'recambios coche',
-            'NL' => 'auto onderdelen',
-            'PL' => 'części samochodowe',
-            'XK', 'AL' => 'autopjesë',
-            default => 'car parts',
-        };
+        return AutomotivePartsLocale::genericPartsTerm($countryCode);
     }
 
     private static function looksLikeGenericPart(string $lowerTitle): bool
@@ -615,6 +666,11 @@ class AutomotivePartsIntentParser
             'steering_wheel' => [
                 'paraurti', 'pare-chocs', 'stoßstange', 'stossstange', 'bumper',
                 'auspuff', 'sportauspuff', 'schalldämpfer', 'exhaust', 'muffler',
+            ],
+            'engine', 'engine_block' => [
+                'tachometer', 'drehzahlmesser', 'drehzahl', 'speedometer', 'kilometerteller',
+                'instrumentencluster', 'instrument cluster', 'kombiinstrument', 'cockpit',
+                'wischermotor', 'scheibenwischer', 'anlasser', 'startermotor', 'fensterheber',
             ],
             default => [],
         };

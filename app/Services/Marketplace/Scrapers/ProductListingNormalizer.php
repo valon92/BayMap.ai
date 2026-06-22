@@ -172,13 +172,20 @@ class ProductListingNormalizer
             $images = [(string) $item['image']];
         }
 
+        $price = (float) ($item['price'] ?? 0);
+        $priceOnRequest = (bool) ($item['price_on_request'] ?? false);
+        if (! $priceOnRequest && $price <= 0) {
+            $priceOnRequest = true;
+        }
+
         $listing = [
             'id' => $storeKey.'-'.($item['product_id'] ?? md5($title)),
             'store' => $storeKey,
             'title' => $title,
             'image' => $images[0] ?? ($item['image'] ?? null),
             'images' => $images,
-            'price' => (float) ($item['price'] ?? 0),
+            'price' => $price,
+            'price_on_request' => $priceOnRequest,
             'currency' => (string) ($platform['currency'] ?? 'EUR'),
             'location' => (string) ($item['location'] ?? $countryLabel),
             'country_code' => $countryCode,
@@ -370,6 +377,7 @@ class ProductListingNormalizer
                     $allowUnknownYear = $isAutomotiveParts
                         || str_contains($store, 'merrjep')
                         || str_contains($store, 'veturaneshitje')
+                        || str_contains($store, 'carvago')
                         || str_contains($store, 'autolina')
                         || str_contains($store, 'autogrid')
                         || str_contains($store, 'autoscout24');

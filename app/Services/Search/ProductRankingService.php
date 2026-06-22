@@ -263,7 +263,8 @@ class ProductRankingService
             if (str_contains(str_replace(' ', '', $title), str_replace(' ', '', $wanted)) || in_array($wanted, $tags, true)) {
                 $reasons[] = "matches model {$parsed['model']}";
             } else {
-                $reasons[] = "similar {$parsed['brand']} listing (check model)";
+                $brandLabel = ! empty($parsed['brand']) ? (string) $parsed['brand'] : 'vehicle';
+                $reasons[] = "similar {$brandLabel} listing (check model)";
             }
         }
 

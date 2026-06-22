@@ -145,8 +145,11 @@
       </div>
 
       <div class="flex items-center gap-1.5 flex-wrap mt-auto">
-        <p class="text-[13px] font-semibold text-blue-600 tabular-nums leading-none">
-          {{ formatPrice(product.price, product.currency) }}
+        <p
+          class="text-[13px] font-semibold leading-none"
+          :class="displayPriceOnRequest ? 'text-slate-600' : 'text-blue-600 tabular-nums'"
+        >
+          {{ displayPriceLabel }}
         </p>
       </div>
 
@@ -438,6 +441,23 @@ watch(lightboxOpen, (open) => {
 onUnmounted(() => {
   document.body.style.overflow = '';
   window.removeEventListener('keydown', onLightboxKeydown);
+});
+
+const displayPriceOnRequest = computed(() => {
+  const p = props.product;
+  if (p.price_on_request) {
+    return true;
+  }
+
+  return Number(p.price) <= 0 && (p.product_type === 'car' || p.category === 'automotive');
+});
+
+const displayPriceLabel = computed(() => {
+  if (displayPriceOnRequest.value) {
+    return t('price_on_request');
+  }
+
+  return formatPrice(props.product.price, props.product.currency);
 });
 
 const productCategory = computed(() => {

@@ -31,6 +31,8 @@ class UniversalMarketplaceBridge
         'MX' => 'mx',
         'CA' => 'ca',
         'AU' => 'au',
+        'FJ' => 'fj',
+        'NZ' => 'nz',
         'JP' => 'jp',
         'KR' => 'kr',
         'SG' => 'sg',
@@ -108,6 +110,7 @@ class UniversalMarketplaceBridge
         'BR' => 'BRL',
         'JP' => 'JPY',
         'AU' => 'AUD',
+        'FJ' => 'FJD',
         'CA' => 'CAD',
     ];
 
@@ -186,7 +189,7 @@ class UniversalMarketplaceBridge
     }
 
     /**
-     * Google Shopping as last resort when live auto-parts scrapers return nothing.
+     * Google Shopping as last resort when live scrapers return nothing.
      */
     public static function allowsGoogleShoppingFallback(string $countryCode, string $category): bool
     {
@@ -195,8 +198,27 @@ class UniversalMarketplaceBridge
         }
 
         $category = CategoryCatalog::normalize($category);
+        $rules = (array) config('live_platforms.local_search.google_shopping_fallback_categories', ['*:automotive_parts']);
 
-        return CategoryCatalog::isAutomotiveParts($category);
+        foreach ($rules as $rule) {
+            if (! is_string($rule) || ! str_contains($rule, ':')) {
+                continue;
+            }
+            [$ruleCountry, $ruleCategory] = explode(':', $rule, 2);
+            $countryMatch = $ruleCountry === '*' || strtoupper($ruleCountry) === strtoupper($countryCode);
+            $categoryMatch = $ruleCategory === '*' || CategoryCatalog::normalize($ruleCategory) === $category;
+            if ($countryMatch && $categoryMatch) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @deprecated Use allowsGoogleShoppingFallback() */
+    public static function allowsGoogleShoppingPartsFallback(string $countryCode, string $category): bool
+    {
+        return self::allowsGoogleShoppingFallback($countryCode, $category);
     }
 
     /**

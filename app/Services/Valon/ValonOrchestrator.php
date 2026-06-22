@@ -9,6 +9,7 @@ use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Orchestration\ProviderDiscoveryEngine;
 use App\Services\Orchestration\SearchIntentFactory;
 use App\Services\Search\LocationExpansionEngine;
+use App\Support\AutomotivePartsIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\GermanCarMarketplaces;
 use App\Support\KosovoAutomotiveIntent;
@@ -121,17 +122,21 @@ class ValonOrchestrator
             }
         }
 
-        if ($results === []
-            && CategoryCatalog::isAutomotiveParts($category)
+        if (($results === []
+                || (CategoryCatalog::isAutomotiveParts($category)
+                    && AutomotivePartsIntentParser::needsShoppingSupplement($results, $parsedQuery)))
             && UniversalMarketplaceBridge::allowsGoogleShoppingFallback($countryCode, $category)) {
-            $shoppingFallback = $this->runGoogleShoppingPartsFallback(
+            $shoppingFallback = $this->runGoogleShoppingFallback(
                 $parsedQuery,
                 $expandedFilters,
                 $geo,
                 count($workerMeta),
+                $category,
             );
             if ($shoppingFallback['results'] !== []) {
-                $results = $shoppingFallback['results'];
+                $results = $results === []
+                    ? $shoppingFallback['results']
+                    : array_merge($results, $shoppingFallback['results']);
                 $workerReports = array_merge($workerReports, $shoppingFallback['report']);
                 $workerMeta = array_merge($workerMeta, $shoppingFallback['workers']);
             }
@@ -461,11 +466,12 @@ class ValonOrchestrator
      *   workers: array<int, array<string, mixed>>
      * }
      */
-    private function runGoogleShoppingPartsFallback(
+    private function runGoogleShoppingFallback(
         array $parsedQuery,
         array $expandedFilters,
         array $geo,
         int $workerOffset = 0,
+        string $category = 'marketplace',
     ): array {
         $provider = null;
         foreach ($this->registry->all() as $candidate) {
@@ -496,8 +502,9 @@ class ValonOrchestrator
         $items = array_slice($items, 0, max(12, $maxResults));
 
         $latencyMs = (int) round((microtime(true) - $started) * 1000);
-        $prefix = $this->workerPrefixForCategory(CategoryCatalog::normalize($parsedQuery['category'] ?? ''));
+        $prefix = $this->workerPrefixForCategory(CategoryCatalog::normalize($category));
         $workerId = "{$prefix}-".($workerOffset + 1);
+        $role = CategoryCatalog::isAutomotive($category) ? 'Google Shopping cars' : 'Google Shopping fallback';
 
         return [
             'results' => $items,
@@ -505,7 +512,7 @@ class ValonOrchestrator
                 'worker_id' => $workerId,
                 'platform' => 'google_shopping',
                 'platform_label' => $provider->label(),
-                'role' => 'Google Shopping fallback',
+                'role' => $role,
                 'mode' => 'live',
                 'count' => count($items),
                 'status' => 'ok',
@@ -515,7 +522,7 @@ class ValonOrchestrator
             ]],
             'workers' => [[
                 'id' => $workerId,
-                'role' => 'Google Shopping fallback',
+                'role' => $role,
                 'platform' => 'google_shopping',
                 'platform_label' => $provider->label(),
                 'status' => 'ok',

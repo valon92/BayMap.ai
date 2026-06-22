@@ -142,12 +142,48 @@ class LivePlatformRegistry
         return app(PlatformDiscoveryService::class)->keys($parsed);
     }
 
+    public static function isGlobalOnlyPlatform(string $key): bool
+    {
+        $meta = self::platform($key);
+        if ($meta === null) {
+            return false;
+        }
+
+        $country = strtoupper((string) ($meta['country'] ?? ''));
+
+        return ! empty($meta['global'])
+            || in_array($country, ['WW', 'GLOBAL', '*'], true);
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     * @return array<int, string>
+     */
+    public static function countrySpecificKeys(array $keys): array
+    {
+        return array_values(array_filter($keys, fn (string $key) => ! self::isGlobalOnlyPlatform($key)));
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, string>
+     */
+    public static function countrySpecificKeysFromParsed(array $parsed): array
+    {
+        return self::countrySpecificKeys(self::keysFromParsed($parsed));
+    }
+
+    public static function hasCountrySpecificPlatformsFor(string $countryCode, string $category): bool
+    {
+        return self::countrySpecificKeys(self::keysFor($countryCode, $category)) !== [];
+    }
+
     /**
      * @param  array<string, mixed>  $parsed
      */
     public static function shouldFanOut(array $parsed, string $countryCode): bool
     {
-        return self::keysFromParsed($parsed) !== [];
+        return self::countrySpecificKeysFromParsed($parsed) !== [];
     }
 
     /**
@@ -155,7 +191,7 @@ class LivePlatformRegistry
      */
     public static function maxWorkersFor(array $parsed): int
     {
-        $count = count(self::keysFromParsed($parsed));
+        $count = count(self::countrySpecificKeysFromParsed($parsed));
         $cap = (int) config('live_platforms.max_workers_cap', 24);
 
         return $count > 0 ? min($count, $cap) : $cap;

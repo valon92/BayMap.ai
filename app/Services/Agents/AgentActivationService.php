@@ -42,20 +42,20 @@ class AgentActivationService
         }
 
         if (LocalMarketplaceResolver::isTargeted($parsed)) {
-            $keys = LivePlatformRegistry::keysFromParsed($parsedForFanOut);
-            $live = $keys !== []
-                ? $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category)
+            $localKeys = LivePlatformRegistry::countrySpecificKeysFromParsed($parsedForFanOut);
+            $live = $localKeys !== []
+                ? $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category, $localKeys)
                 : ['agents' => [], 'source_keys' => [], 'providers' => []];
 
             if (UniversalMarketplaceBridge::enabled()
-                && ($keys === [] ? UniversalMarketplaceBridge::useWhenNoLocalPlatforms() : UniversalMarketplaceBridge::shouldAugmentLocalSearch())
-                && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category)) {
+                && ($localKeys === [] ? UniversalMarketplaceBridge::useWhenNoLocalPlatforms() : UniversalMarketplaceBridge::shouldAugmentLocalSearch())
+                && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category, $parsedForFanOut)) {
                 $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
 
                 return $this->mergeActivation($live, $bridge);
             }
 
-            return $keys !== [] ? $live : [
+            return $localKeys !== [] ? $live : [
                 'agents' => [],
                 'source_keys' => [],
                 'providers' => [],
@@ -63,9 +63,10 @@ class AgentActivationService
         }
 
         if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {
-            $live = $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category);
+            $localKeys = LivePlatformRegistry::countrySpecificKeysFromParsed($parsedForFanOut);
+            $live = $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category, $localKeys);
             if (UniversalMarketplaceBridge::shouldAugmentLocalSearch()
-                && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category)) {
+                && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category, $parsedForFanOut)) {
                 $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
 
                 return $this->mergeActivation($live, $bridge);
@@ -160,10 +161,16 @@ class AgentActivationService
      *   providers: array<int, FederatedSearchProviderInterface>
      * }
      */
-    private function activateLivePlatforms(array $parsed, array $expanded, array $geo, string $countryCode, string $category): array
-    {
+    private function activateLivePlatforms(
+        array $parsed,
+        array $expanded,
+        array $geo,
+        string $countryCode,
+        string $category,
+        ?array $wantedKeys = null,
+    ): array {
         $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
-        $wanted = LivePlatformRegistry::keysFromParsed($parsed);
+        $wanted = $wantedKeys ?? LivePlatformRegistry::countrySpecificKeysFromParsed($parsed);
         $byKey = [];
 
         foreach ($allProviders as $provider) {
@@ -470,13 +477,17 @@ class AgentActivationService
 
     /**
      * @param  array<string, mixed>  $expanded
+     * @param  array<string, mixed>  $parsed
      */
-    private function shouldSkipBridgeForMultiCountry(array $expanded, string $category): bool
+    private function shouldSkipBridgeForMultiCountry(array $expanded, string $category, array $parsed): bool
     {
-        if (! ($expanded['_multi_country_search'] ?? false)) {
+        if (! ($expanded['_multi_country_search'] ?? false) || ! CategoryCatalog::isAutomotive($category)) {
             return false;
         }
 
-        return CategoryCatalog::isAutomotive($category);
+        $countryCode = strtoupper((string) ($parsed['search_country_code'] ?? ''));
+
+        return $countryCode !== ''
+            && LivePlatformRegistry::hasCountrySpecificPlatformsFor($countryCode, $category);
     }
 }

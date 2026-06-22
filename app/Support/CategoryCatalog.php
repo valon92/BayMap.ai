@@ -332,7 +332,7 @@ class CategoryCatalog
             ),
             'automotive' => self::automotiveFilters($parsed, $sq),
             'automotive_parts' => array_merge(
-                self::select('product_type', $sq ? 'Lloji' : 'Type', ['auto_part', 'machinery', 'tire', 'accessory'], $parsed['product_type'] ?? null),
+                self::select('product_type', $sq ? 'Lloji' : 'Type', ['engine', 'auto_part', 'machinery', 'tire', 'accessory'], $parsed['product_type'] ?? null),
                 self::select('brand', $sq ? 'Marka' : 'Brand', ['bmw', 'audi', 'mercedes', 'volkswagen', 'toyota', 'ford'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
                 self::conditionFilter($parsed, $sq, ['new', 'used', 'refurbished']),
                 self::priceFilter($parsed, $sq, 5, 5000),

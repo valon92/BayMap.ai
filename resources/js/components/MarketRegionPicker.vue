@@ -189,7 +189,7 @@
                 class="market-country-chip"
                 :class="{ 'market-country-chip--active': isCountrySelected(country.code) }"
                 :disabled="disabled"
-                @click="selectCountry(country.code, country.name, activeContinentMeta.code)"
+                @click="toggleCountry(country.code, country.name, activeContinentMeta.code)"
               >
                 {{ country.name }}
               </button>

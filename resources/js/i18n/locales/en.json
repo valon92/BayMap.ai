@@ -179,6 +179,7 @@
   "match": "match",
   "buy": "View listing",
   "offers": "offers",
+  "price_on_request": "Price on request",
   "compare_prices": "Compare prices on other platforms",
   "hide_offers": "Hide offers",
   "gallery_prev": "Previous photo",
@@ -367,6 +368,21 @@
     "language": "Language",
     "colors": "Colors",
     "size": "Size (EU)"
+  },
+  "product_type_values": {
+    "engine": "Engine",
+    "auto_part": "Auto part",
+    "machinery": "Machinery",
+    "tire": "Tire",
+    "accessory": "Accessory"
+  },
+  "part_component_values": {
+    "engine": "Engine",
+    "engine_block": "Engine block",
+    "catalytic_converter": "Catalytic converter",
+    "brake_disc": "Brake disc",
+    "brake_pad": "Brake pads",
+    "turbo": "Turbo"
   },
   "gender_values": {
     "men": "Men",

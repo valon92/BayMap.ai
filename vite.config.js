@@ -3,16 +3,18 @@ import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath, URL } from 'node:url';
 
+const lanHost = process.env.VITE_HMR_HOST;
+
 export default defineConfig({
     server: {
         host: '0.0.0.0',
         port: 5173,
         strictPort: true,
-        origin: process.env.VITE_HMR_HOST
-            ? `http://${process.env.VITE_HMR_HOST}:5173`
-            : undefined,
+        // Reflect the Laravel page origin (127.0.0.1, LAN IP, 0.0.0.0, …) — not just :5173.
+        cors: true,
+        origin: lanHost ? `http://${lanHost}:5173` : undefined,
         hmr: {
-            host: process.env.VITE_HMR_HOST || 'localhost',
+            host: lanHost || 'localhost',
             port: 5173,
         },
         proxy: {
