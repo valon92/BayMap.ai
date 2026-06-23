@@ -303,8 +303,8 @@ class CategoryCatalog
             ),
             'fashion' => array_merge(
                 self::sizeFilter($parsed, $sq),
-                self::select('brand', $sq ? 'Marka' : 'Brand', ['boss', 'hugo boss', 'adidas', 'nike', 'puma', 'zara', 'h&m', 'gucci'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
-                self::select('product_type', $sq ? 'Lloji' : 'Type', ['sneakers', 'shoes', 'dress', 'jacket', 'shirt', 'jeans'], $parsed['product_type'] ?? null),
+                self::select('brand', $sq ? 'Marka' : 'Brand', FashionFilterCatalog::BRANDS, isset($parsed['brand']) ? FashionFilterCatalog::slugify((string) $parsed['brand']) : null),
+                self::select('product_type', $sq ? 'Lloji' : 'Type', FashionFilterCatalog::PRODUCT_TYPES, isset($parsed['product_type']) ? FashionIntentParser::normalizeType((string) $parsed['product_type']) : null),
                 self::select('gender', $sq ? 'Gjinia' : 'Gender', self::genderOptions($sq), self::normalizeGender($parsed['gender'] ?? null)),
                 self::colorFilter($parsed, $sq),
                 self::conditionFilter($parsed, $sq, ['new', 'used']),

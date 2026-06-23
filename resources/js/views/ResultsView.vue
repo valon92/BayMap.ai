@@ -150,9 +150,12 @@
           v-if="data?.filters?.length"
           :key="String(route.query.q || '')"
           :filters="data.filters"
-          v-model="activeFilters"
+          v-model="draftFilters"
+          :applied-filters="appliedFilters"
+          :applying="loading"
           class="results-filters order-1 lg:order-none mb-0"
-          @change="refineSearch"
+          @apply="applyFilters"
+          @clear="clearDraftFilters"
         />
 
         <div class="results-products order-2 lg:order-none min-w-0">
@@ -341,10 +344,42 @@ const loading = ref(true);
 const loadingMore = ref(false);
 const currentPage = ref(1);
 const visibleResults = ref([]);
-const activeFilters = ref({});
+const draftFilters = ref({});
+const appliedFilters = ref({});
 const perPage = 48;
-let debounceTimer = null;
 let lastQueryKey = '';
+let shouldRefineFilters = false;
+
+const FILTER_QUERY_KEYS = ['product_type', 'brand', 'gender', 'color', 'size', 'condition', 'sort', 'price_max'];
+
+function filtersFromQuery(query) {
+  const out = {};
+  for (const key of FILTER_QUERY_KEYS) {
+    const val = query?.[key];
+    if (val != null && val !== '') {
+      out[key] = String(val);
+    }
+  }
+  return out;
+}
+
+function filtersToQuery(filters) {
+  const out = {};
+  for (const key of FILTER_QUERY_KEYS) {
+    if (filters[key] != null && filters[key] !== '') {
+      out[key] = String(filters[key]);
+    }
+  }
+  return out;
+}
+
+function stripFilterQuery(query) {
+  const next = { ...query };
+  for (const key of FILTER_QUERY_KEYS) {
+    delete next[key];
+  }
+  return next;
+}
 
 const platformCapabilities = computed(() => data.value?.platform?.positioning ?? []);
 
@@ -698,7 +733,7 @@ const parsedTags = computed(() => {
   const skip = [
     'raw_query', 'category', 'keywords', 'country', 'language_hint', 'description', 'vision',
     'search_query', 'nearby_streets', 'neighborhoods', 'landmark', 'landmark_label', 'area_summary',
-    'near_landmark', 'city', 'location_source', 'search_target',
+    'near_landmark', 'city', 'location_source', 'search_target', 'filter_refined',
   ];
   return Object.fromEntries(
     Object.entries(data.value.parsed).filter(([k, v]) => !skip.includes(k) && v != null && v !== '')
@@ -737,6 +772,16 @@ function formatTagValue(val, key) {
     const pk = `product_type_values.${val}`;
     const pl = t(pk);
     if (pl !== pk) return pl;
+  }
+  if (key === 'brand') {
+    const bk = `brand_values.${val}`;
+    const bl = t(bk);
+    if (bl !== bk) return bl;
+  }
+  if (key === 'color') {
+    const ck = `color_values.${val}`;
+    const cl = t(ck);
+    if (cl !== ck) return cl;
   }
   if (key === 'item') {
     const ck = `part_component_values.${val}`;
@@ -801,13 +846,14 @@ async function fetchPage(page, append = false) {
 
   const response = await api.search(
     q || 'find this product',
-    mapFilters(activeFilters.value),
+    mapFilters(appliedFilters.value),
     locale.value,
     hasImage ? imageBase64 : null,
     activeMarket.value,
     page,
     perPage,
-    legacyScope
+    legacyScope,
+    shouldRefineFilters,
   );
 
   if (append) {
@@ -816,8 +862,12 @@ async function fetchPage(page, append = false) {
   } else {
     data.value = response;
     visibleResults.value = response.results || [];
-    activeFilters.value = filtersFromResponse(response);
+    const synced = filtersFromResponse(response);
+    appliedFilters.value = synced;
+    draftFilters.value = { ...synced };
   }
+
+  shouldRefineFilters = false;
 
   currentPage.value = page;
   if (!append) {
@@ -852,8 +902,14 @@ async function runSearch() {
   }
 
   if (queryKey !== lastQueryKey) {
-    activeFilters.value = {};
     lastQueryKey = queryKey;
+    const urlFilters = filtersFromQuery(route.query);
+    appliedFilters.value = urlFilters;
+    draftFilters.value = { ...urlFilters };
+    shouldRefineFilters = Object.keys(urlFilters).length > 0;
+    if (Object.keys(urlFilters).length === 0) {
+      router.replace({ query: stripFilterQuery(route.query) });
+    }
   }
 
   activeMarket.value = api.resolveMarketSelection(
@@ -916,9 +972,36 @@ function mapFilters(filters) {
   return mapped;
 }
 
-function refineSearch() {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(runSearch, 400);
+function clearDraftFilters() {
+  draftFilters.value = {};
+}
+
+async function applyFilters(nextFilters) {
+  appliedFilters.value = { ...nextFilters };
+  draftFilters.value = { ...nextFilters };
+  shouldRefineFilters = true;
+
+  router.replace({
+    query: {
+      ...stripFilterQuery(route.query),
+      ...filtersToQuery(appliedFilters.value),
+    },
+  });
+
+  loading.value = true;
+  data.value = null;
+  visibleResults.value = [];
+  currentPage.value = 1;
+
+  try {
+    await fetchPage(1, false);
+  } catch (e) {
+    console.error(e);
+    data.value = { results: [], filters: [], pipeline: [], meta: { total: 0, has_more: false } };
+    visibleResults.value = [];
+  } finally {
+    loading.value = false;
+  }
 }
 
 watch(
@@ -946,6 +1029,13 @@ onMounted(() => {
   if (route.query.locale) {
     setLocale(String(route.query.locale));
   }
+  const urlFilters = filtersFromQuery(route.query);
+  appliedFilters.value = urlFilters;
+  draftFilters.value = { ...urlFilters };
+  shouldRefineFilters = Object.keys(urlFilters).length > 0;
+  const q = String(route.query.q || '');
+  const hasImage = route.query.has_image === '1';
+  lastQueryKey = `${q}|${hasImage ? 'img' : ''}`;
   runSearch();
 });
 </script>

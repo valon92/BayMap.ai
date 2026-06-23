@@ -20,6 +20,7 @@ return [
         'web_services_bridge' => 94,
         'ebay' => 92,
         'google_shopping' => 88,
+        'channel3' => 90,
         'amazon' => 85,
         'mobile.de' => 90,
         'autoscout24' => 90,

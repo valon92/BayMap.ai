@@ -42,7 +42,7 @@ class AgentActivationService
         }
 
         if (LocalMarketplaceResolver::isTargeted($parsed)) {
-            $localKeys = LivePlatformRegistry::countrySpecificKeysFromParsed($parsedForFanOut);
+            $localKeys = $this->livePlatformKeys($parsedForFanOut, $countryCode, $category);
             $live = $localKeys !== []
                 ? $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category, $localKeys)
                 : ['agents' => [], 'source_keys' => [], 'providers' => []];
@@ -63,7 +63,7 @@ class AgentActivationService
         }
 
         if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {
-            $localKeys = LivePlatformRegistry::countrySpecificKeysFromParsed($parsedForFanOut);
+            $localKeys = $this->livePlatformKeys($parsedForFanOut, $countryCode, $category);
             $live = $this->activateLivePlatforms($parsedForFanOut, $expanded, $geo, $countryCode, $category, $localKeys);
             if (UniversalMarketplaceBridge::shouldAugmentLocalSearch()
                 && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category, $parsedForFanOut)) {
@@ -193,9 +193,11 @@ class AgentActivationService
         foreach ($ordered as $provider) {
             $key = $provider->sourceKey();
             $sourceKeys[] = $key;
-            $agentId = $countryCode === 'CH' && in_array($category, ['fashion', 'sports_outdoor'], true)
-                ? 'SwissFashionPlatformAgent'
-                : 'LivePlatformAgent';
+            $agentId = match (true) {
+                $countryCode === 'CH' && in_array($category, ['fashion', 'sports_outdoor'], true) => 'SwissFashionPlatformAgent',
+                $countryCode === 'US' && in_array($category, ['fashion', 'sports_outdoor'], true) => 'USFashionPlatformAgent',
+                default => 'LivePlatformAgent',
+            };
             $agents[] = [
                 'id' => $agentId,
                 'score' => 100.0,
@@ -489,5 +491,17 @@ class AgentActivationService
 
         return $countryCode !== ''
             && LivePlatformRegistry::hasCountrySpecificPlatformsFor($countryCode, $category);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function livePlatformKeys(array $parsed, string $countryCode, string $category): array
+    {
+        if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return LivePlatformRegistry::keysFor($countryCode, $category);
+        }
+
+        return LivePlatformRegistry::countrySpecificKeysFromParsed($parsed);
     }
 }

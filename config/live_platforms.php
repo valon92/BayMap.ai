@@ -43,7 +43,7 @@ return [
      */
     'universal_bridge' => [
         'enabled' => (bool) env('UNIVERSAL_BRIDGE_ENABLED', true),
-        'providers' => ['google_shopping', 'google_flights', 'ebay'],
+        'providers' => ['channel3', 'google_shopping', 'google_flights', 'ebay'],
         'always_with_local' => true,
         'when_no_local' => true,
     ],
@@ -57,7 +57,7 @@ return [
         'allow_ebay_categories' => ['DE:automotive', 'DE:automotive_parts', '*:automotive_parts', '*:automotive'],
         'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor', 'DE:home_furniture', '*:home_furniture'],
         /** Google Shopping when live scrapers return 0 (eBay still allowed via allow_ebay_categories). */
-        'google_shopping_fallback_categories' => ['*:automotive_parts', '*:automotive'],
+        'google_shopping_fallback_categories' => ['*:automotive_parts', '*:automotive', '*:fashion', '*:sports_outdoor'],
         'by_country' => [
             'CH' => [
                 'exclude_global' => ['amazon', 'etsy'],

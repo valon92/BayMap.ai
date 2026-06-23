@@ -139,7 +139,8 @@ export const api = {
     marketSelection = null,
     page = 1,
     perPage = 12,
-    locationScopeOverride = null
+    locationScopeOverride = null,
+    refineFilters = false,
   ) => {
     const market = resolveMarketSelection(
       marketSelection,
@@ -158,6 +159,7 @@ export const api = {
         market_code: marketCodeFromSelection(market),
         page,
         per_page: perPage,
+        refine_filters: refineFilters,
       }),
     });
   },

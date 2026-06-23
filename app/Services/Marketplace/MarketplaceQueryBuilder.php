@@ -11,7 +11,7 @@ class MarketplaceQueryBuilder
         }
 
         if (! empty($parsedQuery['search_query'])) {
-            $base = $parsedQuery['search_query'];
+            $base = (string) $parsedQuery['search_query'];
         } else {
             $parts = array_filter([
                 $parsedQuery['brand'] ?? null,
@@ -27,11 +27,7 @@ class MarketplaceQueryBuilder
                 $parts[] = $parsedQuery['raw_query'];
             }
 
-            if (! empty($parsedQuery['description'])) {
-                $parts[] = $parsedQuery['description'];
-            }
-
-            $base = trim(implode(' ', array_unique($parts)));
+            $base = trim($this->uniqueTerms($parts));
 
             if ($base === '') {
                 $keywords = $parsedQuery['keywords'] ?? [];
@@ -77,5 +73,31 @@ class MarketplaceQueryBuilder
         }
 
         return $base !== '' ? $base : 'apartment Ferizaj';
+    }
+
+    /**
+     * @param  array<int, string|null>  $terms
+     */
+    private function uniqueTerms(array $terms): string
+    {
+        $seen = [];
+        $out = [];
+
+        foreach ($terms as $term) {
+            $term = trim((string) $term);
+            if ($term === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($term);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $out[] = $term;
+        }
+
+        return implode(' ', $out);
     }
 }

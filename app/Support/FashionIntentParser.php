@@ -68,6 +68,14 @@ class FashionIntentParser
         'kapele' => 'cap',
         'hat' => 'cap',
         'beanie' => 'cap',
+        'blouse' => 'blouse',
+        'bluz' => 'blouse',
+        'bluze' => 'blouse',
+        'bluzë' => 'blouse',
+        'jeans' => 'jeans',
+        'xhinse' => 'jeans',
+        'xhins' => 'jeans',
+        'denim' => 'jeans',
     ];
 
     /**
@@ -106,6 +114,10 @@ class FashionIntentParser
             }
         }
 
+        if (preg_match('/ngjyr[aëë].*t[eë]\s+ndryshme|multi\s?-?\s?color|multicolor|multi\s?colour|shumë\s+ngjyra|shume\s+ngjyra|different\s+colou?rs/u', $lower)) {
+            $result['color'] = 'multicolor';
+        }
+
         $size = ShoeSize::extractFromText($query);
         if ($size !== null) {
             $result['size'] = $size;
@@ -121,7 +133,65 @@ class FashionIntentParser
             $result['gender'] = 'men';
         }
 
+        $apparelSize = self::extractApparelSize($query);
+        if ($apparelSize !== null) {
+            $result['size'] = $apparelSize;
+        }
+
         return $result;
+    }
+
+    public static function extractApparelSize(string $text): ?string
+    {
+        if (preg_match('/\b(?:size|madh[eë]sia|nr|numri)\s*[:#]?\s*(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)\b/ui', $text, $m)) {
+            return strtoupper($m[1]);
+        }
+
+        if (preg_match('/\b(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)\b/u', $text, $m)) {
+            return strtoupper($m[1]);
+        }
+
+        return null;
+    }
+
+    /**
+     * English marketplace query for international fashion searches.
+     *
+     * @param  array<string, mixed>  $parsed
+     */
+    public static function marketplaceQuery(array $parsed): string
+    {
+        $parts = [];
+        $gender = CategoryCatalog::normalizeGender((string) ($parsed['gender'] ?? ''));
+
+        if (in_array($gender, ['men', 'male'], true)) {
+            $parts[] = 'men';
+        } elseif (in_array($gender, ['women', 'female'], true)) {
+            $parts[] = 'women';
+        }
+
+        $type = self::normalizeType((string) ($parsed['product_type'] ?? ''));
+        if ($type !== '') {
+            $parts[] = self::marketplaceSearchTerm($type, $gender);
+        }
+
+        if (! empty($parsed['brand'])) {
+            $parts[] = str_replace('_', ' ', FashionFilterCatalog::slugify((string) $parsed['brand']));
+        }
+
+        $color = mb_strtolower((string) ($parsed['color'] ?? ''));
+        if ($color !== '' && $color !== 'multicolor') {
+            $parts[] = $color;
+        } elseif ($color === 'multicolor') {
+            $parts[] = 'multicolor';
+        }
+
+        $size = strtoupper(trim((string) ($parsed['size'] ?? '')));
+        if ($size !== '' && preg_match('/^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$/u', $size)) {
+            $parts[] = 'size '.$size;
+        }
+
+        return trim(implode(' ', array_filter($parts)));
     }
 
     public static function normalizeType(string $type): string
@@ -152,6 +222,33 @@ class FashionIntentParser
         }
 
         return $type;
+    }
+
+    /**
+     * Explicit fashion keywords from the buyer query (overrides AI when present).
+     *
+     * @return array<string, mixed>
+     */
+    public static function explicitFromQuery(string $query): array
+    {
+        return self::fromQuery($query);
+    }
+
+    /**
+     * Marketplace search term for a normalized product type + gender context.
+     */
+    public static function marketplaceSearchTerm(string $type, ?string $gender = null): string
+    {
+        $type = self::normalizeType($type);
+        $gender = CategoryCatalog::normalizeGender($gender ?? '');
+
+        if ($type === 'blouse' && in_array($gender, ['men', 'male'], true)) {
+            return 'dress shirt';
+        }
+
+        $needles = FashionFilterCatalog::typeNeedles($type);
+
+        return $needles[0] ?? str_replace('_', ' ', $type);
     }
 
     public static function isFashionQuery(string $query): bool
@@ -189,8 +286,9 @@ class FashionIntentParser
             'dress' => ['dress', 'fustan', 'robe'],
             'pants' => ['pant', 'trener', 'track', 'jogger'],
             'shirt' => ['shirt', 'tee', 'bluz', 't-shirt', 'polo'],
+            'blouse' => ['blouse', 'bluz', 'bluze', 'bluse', 'top', 'camiseta', 'camisa', 'blusa'],
             'cap', 'hat', 'beanie', 'kapa', 'kapela', 'kapelë', 'kapele' => ['cap', 'kapel', 'kapele', 'kapela', 'hat', 'beanie', 'snapback', 'club cap', 'df club', 'fitted', 'trucker', 'mütze', 'mutze', 'kappe', 'badekappe', 'baseballmütze', 'baseballmutze'],
-            default => [$type],
+            default => FashionFilterCatalog::typeNeedles($type),
         };
 
         $exclude = match ($type) {
@@ -261,15 +359,50 @@ class FashionIntentParser
         }
 
         $title = mb_strtolower((string) ($product['title'] ?? ''));
+        $url = mb_strtolower((string) ($product['url'] ?? ''));
+        $store = mb_strtolower((string) ($product['store'] ?? $product['source'] ?? ''));
+        $itemGender = CategoryCatalog::normalizeGender((string) ($product['gender'] ?? ''));
+
+        if ($itemGender === 'women' && in_array($gender, ['men', 'male'], true)) {
+            return false;
+        }
+        if ($itemGender === 'men' && in_array($gender, ['women', 'female'], true)) {
+            return false;
+        }
+        if ($itemGender === 'men' && in_array($gender, ['men', 'male'], true)) {
+            return true;
+        }
+        if ($itemGender === 'women' && in_array($gender, ['women', 'female'], true)) {
+            return true;
+        }
+        if ($itemGender === 'unisex') {
+            return true;
+        }
+
         $isKids = (bool) preg_match('/\b(jr\.?|junior|kids|kid|children|child|fëmij|femij|vogël|vogel|infant|toddler)\b/u', $title);
-        $isWomen = (bool) preg_match('/\b(women|woman|female|femra|dama|for her|wmns|w\s|ladies)\b/u', $title);
-        $isMen = (bool) preg_match('/\b(men|man|male|meshkuj|for him|homme)\b/u', $title);
+        $isWomen = (bool) preg_match('/\b(women|woman|womens|women\'s|female|femra|dama|for her|wmns|ladies|lady\'s|maternity|bride|femme)\b/u', $title.' '.$url.' '.$store);
+        $isMen = (bool) preg_match('/\b(men|man|mens|men\'s|male|meshkuj|for him|homme|masculine)\b/u', $title.' '.$url);
 
         return match ($gender) {
-            'male', 'men' => ! $isKids && ! $isWomen,
-            'female', 'women' => ! $isKids && ! $isMen,
+            'male', 'men' => ! $isKids && ! $isWomen && ($isMen || self::isLikelyMensListing($product)),
+            'female', 'women' => ! $isKids && ! $isMen && ($isWomen || ! self::isLikelyMensListing($product)),
             default => true,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private static function isLikelyMensListing(array $product): bool
+    {
+        $title = mb_strtolower((string) ($product['title'] ?? ''));
+        $type = self::normalizeType((string) ($product['product_type'] ?? ''));
+
+        if ($type === 'blouse' && ! preg_match('/\b(dress shirt|button.?down|oxford|formal shirt)\b/u', $title)) {
+            return false;
+        }
+
+        return preg_match('/\b(dress shirt|button.?down|oxford|formal shirt|mens|men\'s)\b/u', $title) === 1;
     }
 
     private static function titleContainsNeedle(string $title, string $needle): bool

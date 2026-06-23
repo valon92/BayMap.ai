@@ -85,10 +85,30 @@ class LivePlatformRegistry
             }
         }
 
+        if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            foreach (self::all() as $key => $meta) {
+                $platformCountry = strtoupper((string) ($meta['country'] ?? ''));
+                $isGlobal = in_array($platformCountry, ['WW', 'GLOBAL', '*'], true) || ! empty($meta['global']);
+                if (! $isGlobal) {
+                    continue;
+                }
+                $cats = (array) ($meta['categories'] ?? []);
+                if (in_array($category, $cats, true)) {
+                    $keys[] = $key;
+                }
+            }
+        }
+
         $keys = array_values(array_unique(array_merge($keys, PlatformCatalogBridge::keysFor($countryCode, $category))));
 
         if ($countryCode === 'CH' && in_array($category, ['fashion', 'sports_outdoor'], true)) {
             return SwissFashionMarketplaces::ORDERED_KEYS;
+        }
+
+        if ($countryCode === 'US' && in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            $usKeys = USFashionMarketplaces::keys();
+
+            return $usKeys !== [] ? $usKeys : $keys;
         }
 
         usort($keys, fn ($a, $b) => self::priorityFor($a) <=> self::priorityFor($b));
@@ -183,6 +203,11 @@ class LivePlatformRegistry
      */
     public static function shouldFanOut(array $parsed, string $countryCode): bool
     {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+        if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return self::keysFor($countryCode, $category) !== [];
+        }
+
         return self::countrySpecificKeysFromParsed($parsed) !== [];
     }
 

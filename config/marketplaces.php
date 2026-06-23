@@ -51,6 +51,13 @@ return [
             'priority' => 20,
             'categories' => ['*'],
         ],
+        'channel3' => [
+            'adapter' => 'channel3',
+            'label' => 'Channel3',
+            'mode' => 'live',
+            'priority' => 12,
+            'categories' => ['fashion', 'sports_outdoor', 'electronics_tech', 'home_appliances', 'home_furniture', 'beauty', 'grocery', 'marketplace', 'luxury_collectibles'],
+        ],
         'amazon' => [
             'adapter' => 'mock',
             'label' => 'Amazon',

@@ -152,6 +152,7 @@ class UniversalMarketplaceBridge
         ]);
 
         return array_values(array_filter($keys, fn (string $key) => match ($key) {
+            'channel3' => config('channel3.enabled') && ! empty(config('channel3.api_key')),
             'google_shopping' => config('serpapi.enabled') && ! empty(config('serpapi.api_key')),
             'google_flights' => config('serpapi.enabled') && ! empty(config('serpapi.api_key')),
             'ebay' => config('ebay.enabled') && ! empty(config('ebay.client_id')),
@@ -162,6 +163,7 @@ class UniversalMarketplaceBridge
     public static function isBridgeProvider(string $sourceKey): bool
     {
         return in_array($sourceKey, (array) config('live_platforms.universal_bridge.providers', [
+            'channel3',
             'google_shopping',
             'google_flights',
             'ebay',
@@ -183,6 +185,7 @@ class UniversalMarketplaceBridge
         return match ($sourceKey) {
             'google_flights' => $category === 'travel',
             'google_shopping' => $category !== 'travel' && ! CategoryCatalog::isAutomotiveParts($category),
+            'channel3' => ! in_array($category, ['travel', 'automotive', 'automotive_parts', 'real_estate'], true),
             'ebay' => $category !== 'travel',
             default => true,
         };

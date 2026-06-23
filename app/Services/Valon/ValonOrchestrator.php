@@ -11,6 +11,7 @@ use App\Services\Orchestration\SearchIntentFactory;
 use App\Services\Search\LocationExpansionEngine;
 use App\Support\AutomotivePartsIntentParser;
 use App\Support\CategoryCatalog;
+use App\Support\FashionIntentParser;
 use App\Support\GermanCarMarketplaces;
 use App\Support\KosovoAutomotiveIntent;
 use App\Support\KosovoMarketplaces;
@@ -106,6 +107,7 @@ class ValonOrchestrator
             && $countryCode !== ''
             && $countryCode !== 'XK'
             && LocalMarketplaceResolver::isTargeted($parsedQuery)
+            && $this->shouldRunFashionCatalogFallback($countryCode, $category)
             && ! $this->shouldSkipFashionDemoFallback($countryCode, $category)) {
             $catalogFallback = $this->runCatalogFashionFallback(
                 $parsedQuery,
@@ -124,7 +126,31 @@ class ValonOrchestrator
 
         if (($results === []
                 || (CategoryCatalog::isAutomotiveParts($category)
-                    && AutomotivePartsIntentParser::needsShoppingSupplement($results, $parsedQuery)))
+                    && AutomotivePartsIntentParser::needsShoppingSupplement($results, $parsedQuery))
+                || (in_array($category, ['fashion', 'sports_outdoor'], true)
+                    && $this->needsFashionShoppingSupplement($results, $parsedQuery)))
+            && UniversalMarketplaceBridge::allowsBridge('channel3', $countryCode, $category)) {
+            $channel3Fallback = $this->runChannel3Fallback(
+                $parsedQuery,
+                $expandedFilters,
+                $geo,
+                count($workerMeta),
+                $category,
+            );
+            if ($channel3Fallback['results'] !== []) {
+                $results = $results === []
+                    ? $channel3Fallback['results']
+                    : array_merge($results, $channel3Fallback['results']);
+                $workerReports = array_merge($workerReports, $channel3Fallback['report']);
+                $workerMeta = array_merge($workerMeta, $channel3Fallback['workers']);
+            }
+        }
+
+        if (($results === []
+                || (CategoryCatalog::isAutomotiveParts($category)
+                    && AutomotivePartsIntentParser::needsShoppingSupplement($results, $parsedQuery))
+                || (in_array($category, ['fashion', 'sports_outdoor'], true)
+                    && $this->needsFashionShoppingSupplement($results, $parsedQuery)))
             && UniversalMarketplaceBridge::allowsGoogleShoppingFallback($countryCode, $category)) {
             $shoppingFallback = $this->runGoogleShoppingFallback(
                 $parsedQuery,
@@ -145,7 +171,8 @@ class ValonOrchestrator
         if ($results === [] && config('marketplaces.demo_fallback_when_empty', true)
             && ! WebServicesIntentParser::isActive($parsedQuery)
             && ! KosovoToyIntent::shouldSkipDemoFallback($parsedQuery)
-            && ! KosovoAutomotiveIntent::shouldSkipDemoFallback($parsedQuery)) {
+            && ! KosovoAutomotiveIntent::shouldSkipDemoFallback($parsedQuery)
+            && ! $this->shouldSkipGenericDemoFallback($parsedQuery, $category, $countryCode)) {
             $fallback = $this->runDemoFallback($parsedQuery, $expandedFilters, $geo, count($workerMeta));
             if ($fallback['results'] !== []) {
                 $results = $fallback['results'];
@@ -533,6 +560,75 @@ class ValonOrchestrator
     }
 
     /**
+     * @return array{
+     *   results: array<int, array<string, mixed>>,
+     *   report: array<int, array<string, mixed>>,
+     *   workers: array<int, array<string, mixed>>
+     * }
+     */
+    private function runChannel3Fallback(
+        array $parsedQuery,
+        array $expandedFilters,
+        array $geo,
+        int $workerOffset = 0,
+        string $category = 'marketplace',
+    ): array {
+        $provider = null;
+        foreach ($this->registry->all() as $candidate) {
+            if ($candidate->sourceKey() === 'channel3' && $candidate->isAvailable()) {
+                $provider = $candidate;
+                break;
+            }
+        }
+
+        if (! $provider instanceof FederatedSearchProviderInterface) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $started = microtime(true);
+
+        try {
+            $items = $provider->search($parsedQuery, $expandedFilters);
+        } catch (\Throwable) {
+            $items = [];
+        }
+
+        $count = is_array($items) ? count($items) : 0;
+        if ($count === 0) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $latencyMs = (int) round((microtime(true) - $started) * 1000);
+        $prefix = $this->workerPrefixForCategory(CategoryCatalog::normalize($category));
+        $workerId = "{$prefix}-".($workerOffset + 1);
+
+        return [
+            'results' => $items,
+            'report' => [[
+                'worker_id' => $workerId,
+                'platform' => 'channel3',
+                'platform_label' => $provider->label(),
+                'role' => 'Channel3 catalog',
+                'mode' => 'live',
+                'count' => $count,
+                'status' => 'ok',
+                'location_tier' => $geo['city'] ?? '',
+                'latency_ms' => $latencyMs,
+                'error' => null,
+            ]],
+            'workers' => [[
+                'id' => $workerId,
+                'role' => 'Channel3 catalog',
+                'platform' => 'channel3',
+                'platform_label' => $provider->label(),
+                'status' => 'ok',
+                'results' => $count,
+                'latency_ms' => $latencyMs,
+            ]],
+        ];
+    }
+
+    /**
      * @param  array<int, FederatedSearchProviderInterface>  $providers
      * @return array<int, FederatedSearchProviderInterface>
      */
@@ -561,11 +657,70 @@ class ValonOrchestrator
 
     private function shouldSkipFashionDemoFallback(string $countryCode, string $category): bool
     {
+        if ($countryCode !== 'CH' || ! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return false;
+        }
+
         if (! UniversalMarketplaceBridge::allowsBridge('google_shopping', $countryCode, $category)) {
             return false;
         }
 
         return in_array('google_shopping', UniversalMarketplaceBridge::providerKeys(), true);
+    }
+
+    private function shouldRunFashionCatalogFallback(string $countryCode, string $category): bool
+    {
+        if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return false;
+        }
+
+        // Static fashion.json catalog is curated for CH demo stores only.
+        return $countryCode === 'CH';
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $results
+     * @param  array<string, mixed>  $parsedQuery
+     */
+    private function needsFashionShoppingSupplement(array $results, array $parsedQuery): bool
+    {
+        $wantedType = FashionIntentParser::normalizeType((string) ($parsedQuery['product_type'] ?? ''));
+        $matching = 0;
+
+        foreach ($results as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $sourceKey = (string) ($row['source_key'] ?? '');
+            if ($sourceKey === 'google_shopping' || $sourceKey === 'channel3'
+                || in_array('google_shopping', (array) ($row['tags'] ?? []), true)
+                || in_array('channel3', (array) ($row['tags'] ?? []), true)) {
+                continue;
+            }
+
+            if ($wantedType !== '' && ! FashionIntentParser::productMatchesType($row, $wantedType)) {
+                continue;
+            }
+
+            $matching++;
+        }
+
+        return $matching < 6;
+    }
+
+    private function shouldSkipGenericDemoFallback(array $parsedQuery, string $category, string $countryCode): bool
+    {
+        if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return false;
+        }
+
+        if (! LocalMarketplaceResolver::isTargeted($parsedQuery)) {
+            return false;
+        }
+
+        return UniversalMarketplaceBridge::allowsGoogleShoppingFallback($countryCode, $category)
+            || UniversalMarketplaceBridge::allowsBridge('channel3', $countryCode, $category);
     }
 
     private function workerPrefixForCategory(string $category): string

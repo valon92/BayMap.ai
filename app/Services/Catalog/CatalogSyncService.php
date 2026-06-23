@@ -31,8 +31,10 @@ class CatalogSyncService
         $parts = is_file($partsPath) ? (array) require $partsPath : [];
         $vehiclesPath = database_path('data/global_automotive_vehicles_platforms.php');
         $vehicles = is_file($vehiclesPath) ? (array) require $vehiclesPath : [];
+        $fashionPath = database_path('data/global_fashion_platforms.php');
+        $fashion = is_file($fashionPath) ? (array) require $fashionPath : [];
 
-        return array_merge($live, $global, $parts, $vehicles);
+        return array_merge($live, $global, $parts, $vehicles, $fashion);
     }
 
     /**

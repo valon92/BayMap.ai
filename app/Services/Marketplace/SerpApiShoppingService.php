@@ -24,6 +24,18 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
     /** @var array<string, string> */
     private const MERCHANT_PLATFORM_KEYS = [
         'hornbach' => 'hornbach_de',
+        'zara' => 'zara_us',
+        'zara.com' => 'zara_us',
+        'h&m' => 'hm_us',
+        'hm.com' => 'hm_us',
+        'fashion nova' => 'fashion_nova_us',
+        'target' => 'target_us',
+        'gap' => 'gap_us',
+        'old navy' => 'old_navy_us',
+        'asos' => 'asos_us',
+        'nordstrom' => 'nordstrom_us',
+        'macys' => 'macys_us',
+        "macy's" => 'macys_us',
         'obi.de' => 'obi_de',
         'obi' => 'obi_de',
         'home24.de' => 'home24_de',
@@ -106,10 +118,6 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
 
                             continue;
                         }
-
-                        if ($expandImmersive) {
-                            continue;
-                        }
                     }
 
                     $key = (string) ($item['product_id'] ?? md5((string) ($item['title'] ?? '')));
@@ -144,6 +152,10 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
                 );
             }
 
+            if ($merged === [] && in_array($category, ['fashion', 'sports_outdoor'], true)) {
+                $merged = $this->fetchFashionWithoutImmersive($queries, $geo, $limit, $resultCountryCode);
+            }
+
             return $merged;
         } catch (\Throwable $e) {
             Log::warning('SerpAPI exception', ['error' => $e->getMessage()]);
@@ -161,7 +173,11 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
             return false;
         }
 
-        return CategoryCatalog::normalize($parsedQuery['category'] ?? '') === 'home_furniture';
+        return in_array(CategoryCatalog::normalize($parsedQuery['category'] ?? ''), [
+            'home_furniture',
+            'fashion',
+            'sports_outdoor',
+        ], true);
     }
 
     /**
@@ -254,6 +270,41 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
         }
 
         return $chain;
+    }
+
+    /**
+     * Plain shopping results when immersive expansion returns nothing.
+     *
+     * @param  array<int, string>  $queries
+     * @param  array{gl: string, hl: string, country_code: string}  $geo
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchFashionWithoutImmersive(array $queries, array $geo, int $limit, string $countryCode): array
+    {
+        $merged = [];
+        $seen = [];
+
+        foreach ($queries as $query) {
+            if (count($merged) >= $limit) {
+                break;
+            }
+
+            foreach ($this->fetchResults($query, $geo, $limit) as $item) {
+                $key = (string) ($item['product_id'] ?? md5((string) ($item['title'] ?? '')));
+                if (isset($seen[$key])) {
+                    continue;
+                }
+
+                $seen[$key] = true;
+                $merged[] = $this->normalize($item, $countryCode);
+
+                if (count($merged) >= $limit) {
+                    break 2;
+                }
+            }
+        }
+
+        return $merged;
     }
 
     /**
@@ -573,8 +624,8 @@ class SerpApiShoppingService implements MarketplaceSearchInterface
             'source_key' => $platformKey !== 'google_shopping' ? $platformKey : $this->resolveSourceKey($item, $countryCode),
             'affiliate_ready' => true,
             'sponsored' => false,
-            'tags' => ['google_shopping', 'live', 'bridge'],
-            'live' => true,
+            'tags' => ['google_shopping', 'bridge'],
+            'live' => false,
             'rating' => isset($item['rating']) ? (float) $item['rating'] : null,
             'reviews' => isset($item['reviews']) ? (int) $item['reviews'] : null,
         ];

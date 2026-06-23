@@ -19,6 +19,7 @@ use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\CountryMatcher;
 use App\Support\ElectronicsIntentParser;
+use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\HomeFurnitureIntentParser;
 use App\Support\KosovoMarketplaces;
@@ -66,6 +67,7 @@ class SearchOrchestratorService
         int $perPage = 12,
         ?string $marketMode = null,
         ?string $marketCode = null,
+        bool $refineFilters = false,
     ): array {
         $started = microtime(true);
         $geo = $this->geo->resolve();
@@ -123,7 +125,9 @@ class SearchOrchestratorService
         } else {
             $parsed['country'] = $parsed['search_country'] ?? $parsed['country'] ?? $geo['country'];
         }
+        $aiParsed = $parsed;
         $filters = $this->intentEnricher->mergeDefaultFilters($parsed, $filters);
+        $parsed = $this->intentEnricher->applyFilterOverridesToParsed($parsed, $filters, $aiParsed, $locale, $refineFilters);
         $parsed = $this->landmarks->enrich($parsed, $parsed['raw_query'] ?? $query, $searchGeo, $locale);
         $locationContext = $this->landmarks->locationContext($parsed);
 
@@ -139,6 +143,7 @@ class SearchOrchestratorService
         $expanded['location_tiers'] = $locationTiers;
         $expanded['location_scope'] = $locationScope;
         $dynamicFilters = $this->expansion->buildDynamicFilters($parsed, $locale);
+        $dynamicFilters = $this->intentEnricher->syncDynamicFilterValues($dynamicFilters, $filters);
         $searchIntent = SearchIntentFactory::fromParsed($parsed, $expanded, $searchGeo);
 
         // Step 3: Federated search — dynamic agent pool (3–6 agents), parallel execution
@@ -256,6 +261,7 @@ class SearchOrchestratorService
                 'internet_search' => [
                     'ebay_live' => $this->ebayOAuth->isConfigured(),
                     'google_shopping_live' => $this->serpApi->isConfigured(),
+                    'channel3_live' => config('channel3.enabled') && ! empty(config('channel3.api_key')),
                     'live_sources' => count(array_filter($sourceReport, fn ($r) => ($r['mode'] ?? '') === 'live')),
                     'federated' => true,
                     'connectors_queried' => count($sourceReport),
@@ -425,6 +431,15 @@ class SearchOrchestratorService
                     && in_array('google_shopping', (array) ($product['tags'] ?? []), true)) {
                     $countryMatch = true;
                 }
+                if (! $countryMatch
+                    && in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {
+                    if ($this->isBridgeAggregatorListing($product)) {
+                        $countryMatch = true;
+                    } elseif (($product['source_key'] ?? '') === 'ebay'
+                        && strtoupper((string) ($parsed['search_country_code'] ?? '')) === 'US') {
+                        $countryMatch = true;
+                    }
+                }
                 if (! $countryMatch && ! empty($parsed['search_countries']) && is_array($parsed['search_countries'])) {
                     foreach ($parsed['search_countries'] as $country) {
                         if (CountryMatcher::locationMatchesFilter(
@@ -460,6 +475,11 @@ class SearchOrchestratorService
                         $countryMatch = true;
                         break;
                     }
+                    if (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)
+                        && $this->isBridgeAggregatorListing($product)) {
+                        $countryMatch = true;
+                        break;
+                    }
                 }
                 if (! $countryMatch) {
                     return false;
@@ -492,7 +512,7 @@ class SearchOrchestratorService
                 }
             }
             if (isset($filters['gender']) && $filters['gender'] !== '' && ! $isWebServices) {
-                if (! $this->productMatchesGender($product, (string) $filters['gender'])) {
+                if (! $this->productMatchesGender($product, (string) $filters['gender'], $parsed)) {
                     return false;
                 }
             }
@@ -507,7 +527,8 @@ class SearchOrchestratorService
                         return false;
                     }
                 } elseif (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {
-                    if (! FashionIntentParser::productMatchesType($product, $wantedType)) {
+                    if (! $this->isBridgeAggregatorListing($product)
+                        && ! FashionIntentParser::productMatchesType($product, $wantedType)) {
                         return false;
                     }
                 }
@@ -604,10 +625,13 @@ class SearchOrchestratorService
     private function productMatchesBrand(array $product, string $brand): bool
     {
         $brand = mb_strtolower($brand);
+        $category = CategoryCatalog::normalize($product['category'] ?? '');
         $needles = match ($brand) {
             'apple' => ['apple', 'iphone', 'ipad', 'macbook', 'airpods'],
             'samsung' => ['samsung', 'galaxy'],
-            default => [$brand],
+            default => in_array($category, ['fashion', 'sports_outdoor', 'luxury_collectibles'], true)
+                ? FashionFilterCatalog::brandNeedles($brand)
+                : [$brand],
         };
         $title = mb_strtolower($product['title'] ?? '');
         $tags = array_map('mb_strtolower', $product['tags'] ?? []);
@@ -624,8 +648,13 @@ class SearchOrchestratorService
     /**
      * @param  array<string, mixed>  $product
      */
-    private function productMatchesGender(array $product, string $gender): bool
+    private function productMatchesGender(array $product, string $gender, array $parsed = []): bool
     {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+        if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return FashionIntentParser::matchesGender($product, $gender);
+        }
+
         $gender = mb_strtolower(trim($gender));
         $itemGender = mb_strtolower((string) ($product['gender'] ?? ''));
 
@@ -811,20 +840,19 @@ class SearchOrchestratorService
      */
     private function preferDirectPlatformResults(array $products, array $parsed): array
     {
-        if (! CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+        if (! CategoryCatalog::isAutomotiveParts($category) && ! in_array($category, ['fashion', 'sports_outdoor'], true)) {
             return $products;
         }
 
         $direct = array_values(array_filter(
             $products,
-            fn (array $product): bool => ($product['source_key'] ?? '') !== 'google_shopping'
-                && ! in_array('google_shopping', (array) ($product['tags'] ?? []), true),
+            fn (array $product): bool => ! $this->isBridgeAggregatorListing($product),
         ));
 
         $shopping = array_values(array_filter(
             $products,
-            fn (array $product): bool => ($product['source_key'] ?? '') === 'google_shopping'
-                || in_array('google_shopping', (array) ($product['tags'] ?? []), true),
+            fn (array $product): bool => $this->isBridgeAggregatorListing($product),
         ));
 
         if ($direct === []) {
@@ -835,21 +863,36 @@ class SearchOrchestratorService
             return $direct;
         }
 
-        $rawQuery = (string) ($parsed['raw_query'] ?? '');
-        $component = AutomotivePartsIntentParser::extractComponent($parsed, $rawQuery);
-        if ($component === '') {
-            return $direct;
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            $rawQuery = (string) ($parsed['raw_query'] ?? '');
+            $component = AutomotivePartsIntentParser::extractComponent($parsed, $rawQuery);
+            if ($component === '') {
+                return $direct;
+            }
+
+            $matchingDirect = array_values(array_filter(
+                $direct,
+                static fn (array $product): bool => AutomotivePartsIntentParser::matchesListing(
+                    (string) ($product['title'] ?? ''),
+                    $parsed,
+                ),
+            ));
+
+            if (count($matchingDirect) < 3) {
+                return $this->dedupeListings(array_merge($matchingDirect, $shopping));
+            }
+
+            return $matchingDirect;
         }
 
+        $wantedType = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
         $matchingDirect = array_values(array_filter(
             $direct,
-            static fn (array $product): bool => AutomotivePartsIntentParser::matchesListing(
-                (string) ($product['title'] ?? ''),
-                $parsed,
-            ),
+            static fn (array $product): bool => $wantedType === ''
+                || FashionIntentParser::productMatchesType($product, $wantedType),
         ));
 
-        if (count($matchingDirect) < 3) {
+        if (count($matchingDirect) < 6) {
             return $this->dedupeListings(array_merge($matchingDirect, $shopping));
         }
 
@@ -1086,5 +1129,18 @@ class SearchOrchestratorService
 
             return $product;
         }, $products);
+    }
+
+    /**
+     * @param  array<string, mixed>  $product
+     */
+    private function isBridgeAggregatorListing(array $product): bool
+    {
+        $sourceKey = (string) ($product['source_key'] ?? '');
+        $tags = (array) ($product['tags'] ?? []);
+
+        return in_array($sourceKey, ['google_shopping', 'channel3'], true)
+            || in_array('google_shopping', $tags, true)
+            || in_array('channel3', $tags, true);
     }
 }

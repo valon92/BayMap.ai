@@ -85,6 +85,10 @@
             </button>
           </div>
 
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            {{ t('filters_edit_hint') }}
+          </p>
+
           <div v-for="filter in filters" :key="filter.key" class="space-y-1.5">
             <label class="text-xs text-slate-500 font-medium">{{ filter.label }}</label>
 
@@ -100,7 +104,7 @@
                 :key="optionValue(opt)"
                 :value="optionValue(opt)"
               >
-                {{ optionLabel(opt) }}
+                {{ optionLabel(opt, filter.key) }}
               </option>
             </select>
 
@@ -133,6 +137,23 @@
               </span>
             </template>
           </div>
+
+          <div class="pt-1 space-y-2">
+            <button
+              type="button"
+              class="w-full px-4 py-2.5 rounded-xl font-semibold text-sm text-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              :class="hasPendingChanges
+                ? 'bg-blue-600 hover:bg-blue-700 shadow-[0_4px_14px_-4px_rgba(37,99,235,0.45)]'
+                : 'bg-slate-300 cursor-not-allowed'"
+              :disabled="!hasPendingChanges || applying"
+              @click="applyFilters"
+            >
+              {{ applying ? t('filters_applying') : t('filters_apply_search') }}
+            </button>
+            <p v-if="hasPendingChanges" class="text-[11px] text-blue-600 text-center">
+              {{ t('filters_pending_hint') }}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -145,9 +166,11 @@ import { computed, inject, ref, onMounted, onUnmounted } from 'vue';
 const props = defineProps({
   filters: { type: Array, default: () => [] },
   modelValue: { type: Object, default: () => ({}) },
+  appliedFilters: { type: Object, default: () => ({}) },
+  applying: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['update:modelValue', 'change']);
+const emit = defineEmits(['update:modelValue', 'apply', 'clear']);
 const { t } = inject('i18n');
 
 const mobileOpen = ref(false);
@@ -162,11 +185,15 @@ const active = computed({
 
 const hasActive = computed(() => activeFilterChips.value.length > 0);
 
+const hasPendingChanges = computed(() => {
+  return JSON.stringify(normalizeFilterMap(active.value)) !== JSON.stringify(normalizeFilterMap(props.appliedFilters));
+});
+
 const activeFilterChips = computed(() => {
   const chips = [];
 
   for (const filter of props.filters) {
-    const val = active.value[filter.key];
+    const val = props.appliedFilters[filter.key];
     if (val == null || val === '') continue;
     if (filter.type === 'sort' && (String(val) === 'relevance' || String(val) === 'popularity')) continue;
 
@@ -181,10 +208,23 @@ const activeFilterChips = computed(() => {
 
 const activeFilterCount = computed(() => activeFilterChips.value.length);
 
+function normalizeFilterMap(map) {
+  const out = {};
+  for (const [key, val] of Object.entries(map || {})) {
+    if (val != null && val !== '') {
+      out[key] = String(val);
+    }
+  }
+  return Object.keys(out).sort().reduce((acc, key) => {
+    acc[key] = out[key];
+    return acc;
+  }, {});
+}
+
 function displayValue(filter, val) {
   if (filter.type === 'select' || filter.type === 'sort') {
     const opt = (filter.options || []).find((o) => optionValue(o) === val);
-    return opt ? optionLabel(opt) : String(val);
+    return opt ? optionLabel(opt, filter.key) : optionLabel(val, filter.key);
   }
   return String(val);
 }
@@ -197,20 +237,43 @@ function update(key, value) {
     next[key] = value;
   }
   emit('update:modelValue', next);
-  emit('change', next);
+}
+
+function applyFilters() {
+  if (!hasPendingChanges.value || props.applying) return;
+  emit('apply', { ...active.value });
 }
 
 function clearAll() {
   emit('update:modelValue', {});
-  emit('change', {});
+  emit('clear');
 }
 
 function optionValue(opt) {
   return typeof opt === 'object' && opt !== null ? opt.value : opt;
 }
 
-function optionLabel(opt) {
-  return typeof opt === 'object' && opt !== null ? opt.label : opt;
+function optionLabel(opt, filterKey) {
+  const val = optionValue(opt);
+  if (typeof opt === 'object' && opt !== null && opt.label) {
+    return opt.label;
+  }
+  if (filterKey === 'product_type') {
+    const pk = `product_type_values.${val}`;
+    const pl = t(pk);
+    if (pl !== pk) return pl;
+  }
+  if (filterKey === 'brand') {
+    const bk = `brand_values.${val}`;
+    const bl = t(bk);
+    if (bl !== bk) return bl;
+  }
+  if (filterKey === 'color') {
+    const ck = `color_values.${val}`;
+    const cl = t(ck);
+    if (cl !== ck) return cl;
+  }
+  return String(val).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function syncViewport() {

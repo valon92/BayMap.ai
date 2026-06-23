@@ -332,10 +332,18 @@ class ProductListingNormalizer
             }
 
             if ($productType !== '') {
+                $tags = (array) ($item['tags'] ?? []);
+                $sourceKey = (string) ($item['source_key'] ?? '');
+                $bridgeListing = in_array($sourceKey, ['channel3', 'google_shopping'], true)
+                    || in_array('channel3', $tags, true)
+                    || in_array('google_shopping', $tags, true)
+                    || in_array('bridge', $tags, true);
+
                 $typeMatch = match (true) {
                     $isToy => true,
                     $isAutomotive => true,
                     $isElectronics => ElectronicsIntentParser::productMatchesType($item, $productType),
+                    $isFashion && $bridgeListing => true,
                     $isFashion => FashionIntentParser::productMatchesType($item, $productType),
                     CategoryCatalog::isBookSearch($parsed) => BookIntentParser::productMatchesType($item, $productType),
                     default => true,

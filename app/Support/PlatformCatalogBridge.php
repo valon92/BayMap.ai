@@ -26,6 +26,10 @@ class PlatformCatalogBridge
         }
 
         return match ($countryCode) {
+            'US' => match (true) {
+                in_array($category, ['fashion', 'sports_outdoor'], true) => USFashionMarketplaces::keys(),
+                default => [],
+            },
             'CH' => match (true) {
                 CategoryCatalog::isElectronics($category) => SwissElectronicsMarketplaces::keys(),
                 $category === 'real_estate' => SwissRealEstateMarketplaces::keys(),
@@ -58,6 +62,7 @@ class PlatformCatalogBridge
 
         return AutomotiveVehiclesMarketplaces::label($key)
             ?: KosovoCarMarketplaces::label($key)
+            ?: USFashionMarketplaces::label($key)
             ?: SwissFashionMarketplaces::label($key)
             ?: SwissCarMarketplaces::label($key)
             ?: UKRealEstateMarketplaces::label($key)

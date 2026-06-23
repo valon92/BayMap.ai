@@ -91,10 +91,13 @@ class EbayBrowseService implements MarketplaceSearchInterface
         $location = $item['itemLocation'] ?? $item['seller'] ?? [];
 
         $locationStr = '';
+        $countryCode = '';
         if (is_array($location)) {
+            $countryRaw = trim((string) ($location['country'] ?? ''));
             $locationStr = trim(
-                ($location['city'] ?? '').', '.($location['country'] ?? $location['stateOrProvince'] ?? '')
+                ($location['city'] ?? '').', '.($countryRaw !== '' ? $countryRaw : ($location['stateOrProvince'] ?? ''))
             );
+            $countryCode = $this->mapItemCountryCode($countryRaw);
         }
 
         $tags = array_filter(array_map('mb_strtolower', array_filter([
@@ -108,6 +111,7 @@ class EbayBrowseService implements MarketplaceSearchInterface
             'price' => isset($price['value']) ? (float) $price['value'] : 0,
             'currency' => $price['currency'] ?? 'EUR',
             'location' => $locationStr ?: 'eBay',
+            'country_code' => $countryCode !== '' ? $countryCode : null,
             'condition' => strtolower($item['condition'] ?? 'used'),
             'url' => $item['itemWebUrl'] ?? 'https://www.ebay.com',
             'source' => 'eBay',
@@ -117,5 +121,25 @@ class EbayBrowseService implements MarketplaceSearchInterface
             'tags' => array_merge($tags, ['live']),
             'live' => true,
         ];
+    }
+
+    private function mapItemCountryCode(string $country): string
+    {
+        $country = strtoupper(trim($country));
+        if ($country === '') {
+            return '';
+        }
+
+        if (strlen($country) === 2) {
+            return $country;
+        }
+
+        return match ($country) {
+            'US', 'USA', 'UNITED STATES' => 'US',
+            'CN', 'CHINA' => 'CN',
+            'GB', 'UK', 'UNITED KINGDOM' => 'GB',
+            'DE', 'GERMANY' => 'DE',
+            default => $country,
+        };
     }
 }

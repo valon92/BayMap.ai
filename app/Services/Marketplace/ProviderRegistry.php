@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Contracts\FederatedSearchProviderInterface;
+use App\Services\Marketplace\Providers\Channel3SearchProvider;
 use App\Services\Marketplace\Providers\EbaySearchProvider;
 use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiFlightsSearchProvider;
@@ -35,6 +36,7 @@ class ProviderRegistry
 
     public function __construct(
         private EbaySearchProvider $ebay,
+        private Channel3SearchProvider $channel3,
         private SerpApiSearchProvider $serpApi,
         private SerpApiFlightsSearchProvider $serpFlights,
         private WebServicesSearchProvider $webServices,
@@ -51,7 +53,7 @@ class ProviderRegistry
         }
 
         $this->providers = array_merge(
-            [$this->ebay, $this->serpApi, $this->serpFlights, $this->webServices],
+            [$this->channel3, $this->ebay, $this->serpApi, $this->serpFlights, $this->webServices],
             $this->liveFactory->all(),
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),

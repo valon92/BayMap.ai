@@ -23,6 +23,7 @@ class SearchController extends Controller
             'filters' => 'nullable',
             'page' => 'nullable|integer|min:1|max:50',
             'per_page' => 'nullable|integer|min:6|max:48',
+            'refine_filters' => 'nullable|boolean',
         ]);
 
         $query = trim($validated['q'] ?? '');
@@ -53,6 +54,7 @@ class SearchController extends Controller
             (int) ($validated['per_page'] ?? 12),
             $validated['market_mode'] ?? null,
             $validated['market_code'] ?? null,
+            (bool) ($validated['refine_filters'] ?? false),
         );
 
         return response()->json($result);

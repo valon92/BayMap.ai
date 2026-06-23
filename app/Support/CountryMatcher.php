@@ -75,8 +75,9 @@ class CountryMatcher
             return (bool) preg_match('/germany|deutschland|amazon de|ebay de|munich|münchen|berlin|frankfurt|hamburg|stuttgart|cologne|köln|düsseldorf|dusseldorf|hannover|leipzig|dresden/u', $loc);
         }
 
-        if (str_contains($needle, 'united states') || $needle === 'us' || str_contains($needle, 'usa')) {
-            return (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/u', $loc);
+        if (str_contains($needle, 'united states') || $needle === 'us' || str_contains($needle, 'usa')
+            || str_contains($needle, 'bashkuara') || str_contains($needle, 'shtete')) {
+            return (bool) preg_match('/united states|usa|\bus\b|, us\b|u\.s\.|shtetet e bashkuara|miami|new york|los angeles|california|texas|florida/u', $loc);
         }
 
         if (str_contains($needle, 'uae') || str_contains($needle, 'emirates') || str_contains($needle, 'dubai')) {

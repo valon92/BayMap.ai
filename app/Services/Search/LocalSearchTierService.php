@@ -80,7 +80,7 @@ class LocalSearchTierService
                     [
                         'level' => 'country',
                         'label' => $country,
-                        'suffix' => $country,
+                        'suffix' => '',
                     ],
                 ];
             }

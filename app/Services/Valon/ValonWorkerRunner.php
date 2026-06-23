@@ -100,6 +100,10 @@ class ValonWorkerRunner
             $provider = $worker['provider'];
             $expanded = $worker['expanded_filters'] ?? [];
             $expanded['location_suffix'] = $primaryTier['suffix'] ?? '';
+            if ($provider instanceof FederatedSearchProviderInterface
+                && \App\Support\UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())) {
+                $expanded['location_suffix'] = '';
+            }
             $expanded['location_tier'] = $primaryTier;
             $expanded['valon_worker_id'] = $worker['worker_id'];
 

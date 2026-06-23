@@ -8,6 +8,7 @@ use App\Support\AutomotiveModelResolver;
 use App\Support\BookIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\ElectronicsIntentParser;
+use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\HomeFurnitureIntentParser;
 use App\Support\PriceIntentParser;
@@ -119,6 +120,14 @@ class QueryIntentEnricher
 
         if (WebServicesIntentParser::isActive($parsed)) {
             $parsed = WebServicesIntentParser::finalize($parsed);
+        }
+
+        if (in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)
+            && ! empty($parsed['search_target'])) {
+            $marketplaceQuery = FashionIntentParser::marketplaceQuery($parsed);
+            if ($marketplaceQuery !== '') {
+                $parsed['search_query'] = $marketplaceQuery;
+            }
         }
 
         if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
@@ -389,7 +398,17 @@ class QueryIntentEnricher
             return $parsed;
         }
 
+        // Rule-based signals from the query beat AI mislabels (e.g. bluze ≠ fustan).
+        foreach (['product_type', 'gender', 'color', 'size'] as $key) {
+            if (! empty($fashion[$key])) {
+                $parsed[$key] = $fashion[$key];
+            }
+        }
+
         foreach ($fashion as $key => $value) {
+            if (in_array($key, ['product_type', 'gender', 'color', 'size'], true)) {
+                continue;
+            }
             if (empty($parsed[$key])) {
                 $parsed[$key] = $value;
             }
@@ -541,6 +560,9 @@ class QueryIntentEnricher
                 if ($key === 'product_type' && in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {
                     $value = FashionIntentParser::normalizeType((string) $value);
                 }
+                if ($key === 'brand' && in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor', 'luxury_collectibles'], true)) {
+                    $value = FashionFilterCatalog::slugify((string) $value);
+                }
                 $defaults[$key] = $value;
             }
         }
@@ -551,5 +573,265 @@ class QueryIntentEnricher
         }
 
         return array_merge($defaults, $clientFilters);
+    }
+
+    /**
+     * When the buyer changes AI filters (e.g. Lloji: Xhinse), re-run marketplace search with the new type.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $aiParsed  Parsed intent before client filter merge
+     * @return array<string, mixed>
+     */
+    public function applyFilterOverridesToParsed(
+        array $parsed,
+        array $filters,
+        array $aiParsed,
+        ?string $locale = 'en',
+        bool $refineFilters = false,
+    ): array {
+        $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+        if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
+            return $parsed;
+        }
+
+        foreach (['product_type', 'brand', 'gender', 'color'] as $key) {
+            if (! isset($filters[$key]) || $filters[$key] === '') {
+                continue;
+            }
+
+            $value = (string) $filters[$key];
+            if ($key === 'product_type') {
+                $parsed['product_type'] = FashionIntentParser::normalizeType($value);
+            } elseif ($key === 'brand') {
+                $parsed['brand'] = FashionFilterCatalog::slugify($value);
+            } elseif ($key === 'gender') {
+                $parsed['gender'] = CategoryCatalog::normalizeGender($value) ?? $value;
+            } else {
+                $parsed[$key] = $value;
+            }
+        }
+
+        if ($refineFilters && $this->hasFashionFilterSelections($filters)) {
+            $parsed = $this->rebuildFashionSearchQuery($parsed, $filters);
+            $parsed['description'] = $this->buildActiveFashionDescription($parsed, $locale ?? 'en');
+            $parsed['filter_refined'] = true;
+
+            return $parsed;
+        }
+
+        if ($this->fashionFiltersChangedSearchIntent($filters, $aiParsed)) {
+            $parsed = $this->rebuildFashionSearchQuery($parsed, $filters);
+            $parsed['description'] = $this->buildActiveFashionDescription($parsed, $locale ?? 'en');
+            $parsed['filter_refined'] = true;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function hasFashionFilterSelections(array $filters): bool
+    {
+        foreach (['product_type', 'brand', 'gender', 'color', 'size', 'condition'] as $key) {
+            if (! empty($filters[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Keep filter dropdown selections aligned with the active client filter state.
+     *
+     * @param  array<int, array<string, mixed>>  $dynamicFilters
+     * @param  array<string, mixed>  $activeFilters
+     * @return array<int, array<string, mixed>>
+     */
+    public function syncDynamicFilterValues(array $dynamicFilters, array $activeFilters): array
+    {
+        foreach ($dynamicFilters as &$filter) {
+            $key = (string) ($filter['key'] ?? '');
+            if ($key === '' || ! isset($activeFilters[$key]) || $activeFilters[$key] === '') {
+                continue;
+            }
+
+            $value = $activeFilters[$key];
+            if ($key === 'product_type') {
+                $value = FashionIntentParser::normalizeType((string) $value);
+            } elseif ($key === 'brand') {
+                $value = FashionFilterCatalog::slugify((string) $value);
+            } elseif ($key === 'gender') {
+                $value = CategoryCatalog::normalizeGender((string) $value) ?? $value;
+            }
+
+            $filter['value'] = $value;
+        }
+        unset($filter);
+
+        return $dynamicFilters;
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $aiParsed
+     */
+    private function fashionFiltersChangedSearchIntent(array $filters, array $aiParsed): bool
+    {
+        foreach (['product_type', 'brand', 'gender', 'color'] as $key) {
+            if (! isset($filters[$key]) || $filters[$key] === '') {
+                continue;
+            }
+
+            $filterVal = (string) $filters[$key];
+            $aiVal = (string) ($aiParsed[$key] ?? '');
+
+            if ($key === 'product_type') {
+                if (FashionIntentParser::normalizeType($filterVal) !== FashionIntentParser::normalizeType($aiVal)) {
+                    return true;
+                }
+            } elseif ($key === 'brand') {
+                if (FashionFilterCatalog::slugify($filterVal) !== FashionFilterCatalog::slugify($aiVal)) {
+                    return true;
+                }
+            } elseif ($key === 'gender') {
+                $filterGender = CategoryCatalog::normalizeGender($filterVal);
+                $aiGender = CategoryCatalog::normalizeGender($aiVal);
+                if ($filterGender !== null && $filterGender !== $aiGender) {
+                    return true;
+                }
+            } elseif ($key === 'color') {
+                if (mb_strtolower($filterVal) !== mb_strtolower($aiVal)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    private function rebuildFashionSearchQuery(array $parsed, array $filters): array
+    {
+        $parts = [];
+
+        if (! empty($filters['brand'])) {
+            $parts[] = str_replace('_', ' ', FashionFilterCatalog::slugify((string) $filters['brand']));
+        }
+
+        $gender = CategoryCatalog::normalizeGender((string) ($filters['gender'] ?? $parsed['gender'] ?? ''));
+        if (in_array($gender, ['women', 'female'], true)) {
+            $parts[] = 'women';
+        } elseif (in_array($gender, ['men', 'male'], true)) {
+            $parts[] = 'men';
+        }
+
+        $type = FashionIntentParser::normalizeType((string) ($filters['product_type'] ?? $parsed['product_type'] ?? ''));
+        if ($type !== '') {
+            $parts[] = FashionIntentParser::marketplaceSearchTerm($type, $gender);
+        } elseif (! empty($parsed['raw_query'])) {
+            $parts[] = trim((string) $parsed['raw_query']);
+        }
+
+        $color = mb_strtolower((string) ($filters['color'] ?? $parsed['color'] ?? ''));
+        if ($color === 'multicolor') {
+            $parts[] = 'multicolor';
+        } elseif ($color !== '') {
+            $parts[] = $color;
+        }
+
+        $size = strtoupper(trim((string) ($filters['size'] ?? $parsed['size'] ?? '')));
+        if ($size !== '' && preg_match('/^(XXS|XS|S|M|L|XL|XXL|XXXL|2XL|3XL)$/u', $size)) {
+            $parts[] = 'size '.$size;
+        }
+
+        unset($parsed['search_query']);
+        $parsed['raw_query'] = trim(implode(' ', array_filter($parts)));
+
+        return $parsed;
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     */
+    private function buildActiveFashionDescription(array $parsed, string $locale): string
+    {
+        $type = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
+        $brand = FashionFilterCatalog::slugify((string) ($parsed['brand'] ?? ''));
+        $gender = CategoryCatalog::normalizeGender((string) ($parsed['gender'] ?? ''));
+        $color = mb_strtolower((string) ($parsed['color'] ?? ''));
+
+        if ($locale === 'sq') {
+            $parts = [];
+            if ($type !== '') {
+                $parts[] = match ($type) {
+                    'blouse' => 'Bluza',
+                    'dress' => 'Fustan',
+                    'jeans' => 'Xhinse',
+                    'shirt', 't_shirt' => 'Këmishë',
+                    'sneakers' => 'Patika',
+                    default => ucfirst(str_replace('_', ' ', $type)),
+                };
+            }
+            if ($brand !== '') {
+                $parts[] = $this->fashionBrandLabel($brand);
+            }
+            if (in_array($gender, ['men', 'male'], true)) {
+                $parts[] = 'për meshkuj';
+            } elseif (in_array($gender, ['women', 'female'], true)) {
+                $parts[] = 'për femra';
+            }
+            if ($color !== '') {
+                $parts[] = 'me ngjyra '.$this->fashionColorLabelSq($color);
+            }
+
+            return trim(implode(' ', $parts));
+        }
+
+        $parts = [];
+        if ($brand !== '') {
+            $parts[] = $this->fashionBrandLabel($brand);
+        }
+        if ($type !== '') {
+            $parts[] = str_replace('_', ' ', $type);
+        }
+        if (in_array($gender, ['men', 'male'], true)) {
+            $parts[] = 'for men';
+        } elseif (in_array($gender, ['women', 'female'], true)) {
+            $parts[] = 'for women';
+        }
+        if ($color !== '') {
+            $parts[] = $color === 'multicolor' ? 'multicolor' : 'in '.$color;
+        }
+
+        return trim(implode(' ', $parts));
+    }
+
+    private function fashionBrandLabel(string $brand): string
+    {
+        $label = str_replace('_', ' ', $brand);
+
+        return mb_convert_case($label, MB_CASE_TITLE, 'UTF-8');
+    }
+
+    private function fashionColorLabelSq(string $color): string
+    {
+        return match ($color) {
+            'white' => 'të bardha',
+            'black' => 'të zeza',
+            'red' => 'të kuqe',
+            'blue' => 'të kaltra',
+            'grey', 'gray' => 'të hirta',
+            'green' => 'të gjelbra',
+            'silver' => 'argjendi',
+            'multicolor' => 'të ndryshme',
+            default => $color,
+        };
     }
 }

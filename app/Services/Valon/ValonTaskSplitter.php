@@ -36,6 +36,8 @@ class ValonTaskSplitter
         if (($expanded['_multi_country_search'] ?? false) && $multiCountryCount > 1) {
             if (CategoryCatalog::isAutomotiveParts($category)) {
                 $perCountryCap = max(5, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
+            } elseif (in_array($category, ['fashion', 'sports_outdoor'], true)) {
+                $perCountryCap = max(6, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
             } else {
                 $perCountryCap = max(3, (int) floor((int) config('search.max_workers', 12) / $multiCountryCount));
             }
@@ -51,6 +53,12 @@ class ValonTaskSplitter
 
         if (($expanded['_multi_country_search'] ?? false) && CategoryCatalog::isAutomotive($category)) {
             [$agents, $providers] = $this->prioritizeLocalAutomotiveWorkers($agents, $providers, $countryCode);
+        }
+
+        if ($liveFanOut
+            && in_array($category, ['fashion', 'sports_outdoor'], true)
+            && UniversalMarketplaceBridge::shouldAugmentLocalSearch()) {
+            [$agents, $providers] = $this->prioritizeBridgeWorkers($agents, $providers);
         }
 
         $providerByKey = [];
@@ -176,6 +184,45 @@ class ValonTaskSplitter
         usort($local, fn (FederatedSearchProviderInterface $a, FederatedSearchProviderInterface $b) => $a->priority() <=> $b->priority());
 
         return [$agents, array_merge($local, $other)];
+    }
+
+    /**
+     * Reserve worker slots for SerpAPI/eBay bridge before live HTML scrapers.
+     *
+     * @param  array<int, array<string, mixed>>  $agents
+     * @param  array<int, FederatedSearchProviderInterface>  $providers
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, FederatedSearchProviderInterface>}
+     */
+    private function prioritizeBridgeWorkers(array $agents, array $providers): array
+    {
+        $bridgeAgents = [];
+        $otherAgents = [];
+        foreach ($agents as $agent) {
+            $isBridge = false;
+            foreach ((array) ($agent['sources'] ?? []) as $source) {
+                if (UniversalMarketplaceBridge::isBridgeProvider((string) $source)) {
+                    $isBridge = true;
+                    break;
+                }
+            }
+            if ($isBridge) {
+                $bridgeAgents[] = $agent;
+            } else {
+                $otherAgents[] = $agent;
+            }
+        }
+
+        $bridgeProviders = [];
+        $otherProviders = [];
+        foreach ($providers as $provider) {
+            if (UniversalMarketplaceBridge::isBridgeProvider($provider->sourceKey())) {
+                $bridgeProviders[] = $provider;
+            } else {
+                $otherProviders[] = $provider;
+            }
+        }
+
+        return [array_merge($bridgeAgents, $otherAgents), array_merge($bridgeProviders, $otherProviders)];
     }
 
     /**
