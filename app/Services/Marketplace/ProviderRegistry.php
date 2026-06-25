@@ -5,6 +5,7 @@ namespace App\Services\Marketplace;
 use App\Contracts\FederatedSearchProviderInterface;
 use App\Services\Marketplace\Providers\Channel3SearchProvider;
 use App\Services\Marketplace\Providers\EbaySearchProvider;
+use App\Services\Marketplace\Providers\WalmartSearchProvider;
 use App\Services\Marketplace\Providers\MockSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiFlightsSearchProvider;
 use App\Services\Marketplace\Providers\SerpApiSearchProvider;
@@ -37,6 +38,7 @@ class ProviderRegistry
     public function __construct(
         private EbaySearchProvider $ebay,
         private Channel3SearchProvider $channel3,
+        private WalmartSearchProvider $walmart,
         private SerpApiSearchProvider $serpApi,
         private SerpApiFlightsSearchProvider $serpFlights,
         private WebServicesSearchProvider $webServices,
@@ -53,7 +55,7 @@ class ProviderRegistry
         }
 
         $this->providers = array_merge(
-            [$this->channel3, $this->ebay, $this->serpApi, $this->serpFlights, $this->webServices],
+            [$this->channel3, $this->walmart, $this->ebay, $this->serpApi, $this->serpFlights, $this->webServices],
             $this->liveFactory->all(),
             $this->mockProviders(),
             $this->swissAutomotiveProviders(),
@@ -516,6 +518,50 @@ class ProviderRegistry
                 priority: 72,
                 categories: ['fashion', 'sports_outdoor', 'marketplace'],
                 countries: [$countryCode],
+            );
+        }
+
+        return $providers;
+    }
+
+    /**
+     * Catalog demo providers for industrial / B2B when live scrapers are blocked.
+     *
+     * @return array<int, MockSearchProvider>
+     */
+    public function catalogIndustrialB2BDemoProviders(string $countryCode, string $category): array
+    {
+        if (! config('live_platforms.industrial_demo_fallback', true)) {
+            return [];
+        }
+
+        $category = CategoryCatalog::normalize($category);
+        if ($category !== 'industrial_b2b') {
+            return [];
+        }
+
+        $countryCode = strtoupper($countryCode);
+        if ($countryCode === '') {
+            return [];
+        }
+
+        $keys = PlatformCatalogBridge::keysFor($countryCode, $category);
+        if ($keys === []) {
+            return [];
+        }
+
+        $providers = [];
+        foreach ($keys as $key) {
+            $label = LivePlatformRegistry::label($key)
+                ?: PlatformCatalogBridge::label($key)
+                ?: ucfirst(str_replace('_', ' ', $key));
+
+            $providers[] = new MockSearchProvider(
+                sourceKey: $key,
+                sourceLabel: $label,
+                priority: 68,
+                categories: ['industrial_b2b'],
+                countries: [$countryCode, 'WW'],
             );
         }
 

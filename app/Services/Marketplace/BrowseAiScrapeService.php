@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Services\Marketplace\Scrapers\ProductListingNormalizer;
+use App\Support\CategoryCatalog;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -157,8 +158,12 @@ class BrowseAiScrapeService
 
             $priceRaw = (string) ($row[$fields['price'] ?? 'Price'] ?? $row['price'] ?? '');
             $price = $this->parsePrice($priceRaw);
-            $category = (string) ($config['category'] ?? $platform['category'] ?? 'automotive');
-            $minPrice = $category === 'real_estate' ? 50000 : 800;
+            $category = CategoryCatalog::normalize((string) ($config['category'] ?? $platform['category'] ?? 'automotive'));
+            $minPrice = match (true) {
+                $category === 'real_estate' => 50000,
+                CategoryCatalog::isAutomotiveParts($category) => 5,
+                default => 800,
+            };
             if ($price > 0 && $price < $minPrice) {
                 continue;
             }
@@ -189,6 +194,11 @@ class BrowseAiScrapeService
                     'country_code' => strtoupper((string) ($platform['country'] ?? 'CH')),
                     'currency' => (string) ($platform['currency'] ?? 'CHF'),
                     'live' => true,
+                ]));
+            } elseif (CategoryCatalog::isAutomotiveParts($category)) {
+                $items[] = ProductListingNormalizer::finalize($platform, $storeKey, array_merge($baseItem, [
+                    'category' => 'automotive_parts',
+                    'currency' => (string) ($platform['currency'] ?? 'EUR'),
                 ]));
             } else {
                 $items[] = ProductListingNormalizer::finalizeAutomotive($platform, $storeKey, array_merge($baseItem, [

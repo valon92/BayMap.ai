@@ -11,6 +11,7 @@ use App\Support\ElectronicsIntentParser;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
 use App\Support\GlobalBookMarketplaces;
+use App\Support\IndustrialB2BIntentParser;
 use App\Support\KosovoCarMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\ListingEnricher;
@@ -176,6 +177,14 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 $items,
                 fn (array $item) => ($item['store'] ?? '') === $this->source
                     || (($item['store'] ?? 'general') === 'general' && in_array($this->source, ['ebay', 'google_shopping'], true))
+            ));
+        }
+
+        if ($this->isIndustrialB2BPlatform($this->source)) {
+            return array_values(array_filter(
+                $items,
+                fn (array $item) => ($item['store'] ?? '') === $this->source
+                    || (($item['store'] ?? 'general') === 'general' && str_contains($this->source, 'ebay'))
             ));
         }
 
@@ -348,6 +357,17 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 }
             }
 
+            if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'industrial_b2b') {
+                if (! empty($parsed['search_target']) && ! empty($parsed['search_country_code'])
+                    && ! $this->locationMatchesCountry($item, (string) $parsed['search_country_code'])) {
+                    return false;
+                }
+
+                if (! IndustrialB2BIntentParser::matchesListing((string) ($item['title'] ?? ''), $parsed)) {
+                    return false;
+                }
+            }
+
             return true;
         }));
     }
@@ -373,6 +393,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             'US' => (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc),
             'AE' => (bool) preg_match('/uae|dubai|abu dhabi|emirates/', $loc),
             'GB' => (bool) preg_match('/united kingdom|england|london|manchester|uk/', $loc),
+            'CN' => (bool) preg_match('/china|shanghai|guangdong|shenzhen|beijing|hangzhou|ningbo|jiangsu|zhejiang|foshan|dongguan|shandong/', $loc),
             'AT' => str_contains($loc, 'austria') || str_contains($loc, 'vienna'),
             default => str_contains($loc, mb_strtolower($code)),
         };
@@ -504,6 +525,15 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             'ricardo' => 'Ricardo.ch',
             default => ucfirst(str_replace('_', ' ', $this->source)),
         };
+    }
+
+    private function isIndustrialB2BPlatform(string $source): bool
+    {
+        return str_contains($source, 'alibaba')
+            || str_contains($source, 'global_sources')
+            || str_contains($source, 'machinio')
+            || str_contains($source, 'europages')
+            || str_contains($source, 'amazon_business');
     }
 
     private function listingUrl(?string $fallback): string

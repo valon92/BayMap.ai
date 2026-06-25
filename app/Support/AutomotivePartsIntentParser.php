@@ -67,13 +67,13 @@ class AutomotivePartsIntentParser
                 '/\bmotor\s+(?:per|për|for)\b/ui',
                 '/\b(?:gebraucht(?:s)?motor|komplettmotor)\b/ui',
             ],
-            'title_regex' => '/\b(gebrauchtmotor|komplett(?:er\s+)?motor|motor(?:block|satz)?|complete\s+engine|used\s+engine)\b/ui',
+            'title_regex' => '/\b(gebrauchtmotor|komplett(?:er\s+)?motor|komplettmot|tauschmotor|rumpfmotor|motor(?:block|satz|ger(?:ä|a)t)?|benzinmotor|dieselmotor|ottomotor|complete\s+engine|used\s+engine)\b/ui',
             'search' => [
-                'DE' => 'Motor', 'AT' => 'Motor', 'CH' => 'Motor',
+                'DE' => 'Komplettmotor', 'AT' => 'Komplettmotor', 'CH' => 'Komplettmotor',
                 'FR' => 'moteur', 'IT' => 'motore', 'ES' => 'motor', 'PT' => 'motor',
                 'NL' => 'motor', 'PL' => 'silnik', 'default' => 'engine',
             ],
-            'serp_extra' => ['Gebrauchtmotor', 'Komplettmotor', 'used engine'],
+            'serp_extra' => ['Gebrauchtmotor', 'Komplettmotor', 'Tauschmotor', 'used engine'],
         ],
         'filter' => [
             'query_patterns' => [
@@ -294,6 +294,11 @@ class AutomotivePartsIntentParser
      */
     public static function isPartsSearch(array $parsed, string $rawQuery = ''): bool
     {
+        $rawQuery = $rawQuery !== '' ? $rawQuery : (string) ($parsed['raw_query'] ?? '');
+        if (IndustrialB2BIntentParser::isIndustrialQuery($parsed, $rawQuery)) {
+            return false;
+        }
+
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'automotive_parts') {
             return true;
         }
@@ -388,16 +393,18 @@ class AutomotivePartsIntentParser
         $component = self::extractComponent($parsed, $rawQuery);
         $country = strtoupper((string) ($parsed['search_country_code'] ?? ''));
         $localizedComponent = self::localizedComponentSearchTerm($country, $component);
+        $brandTerm = self::formatBrandForSearch($brand, $country);
+        $modelTerm = self::formatModelForSearch($model, $country);
 
-        if ($brand !== '' && $model !== '' && $localizedComponent !== '') {
-            return trim($brand.' '.$model.' '.$localizedComponent);
+        if ($brandTerm !== '' && $modelTerm !== '' && $localizedComponent !== '') {
+            return trim($brandTerm.' '.$modelTerm.' '.$localizedComponent);
         }
 
-        if ($brand !== '' && $model !== '') {
-            return trim($brand.' '.$model.($localizedComponent !== '' ? ' '.$localizedComponent : ''));
+        if ($brandTerm !== '' && $modelTerm !== '') {
+            return trim($brandTerm.' '.$modelTerm.($localizedComponent !== '' ? ' '.$localizedComponent : ''));
         }
 
-        $parts = array_filter([$brand, $model, $localizedComponent]);
+        $parts = array_filter([$brandTerm, $modelTerm, $localizedComponent]);
 
         return $parts !== [] ? trim(implode(' ', $parts)) : self::genericPartsTerm($country);
     }
@@ -416,23 +423,32 @@ class AutomotivePartsIntentParser
         $model = trim((string) ($parsed['model'] ?? '')) ?: $inferredModel;
         $country = strtoupper((string) ($parsed['search_country_code'] ?? ''));
         $localized = self::localizedComponentSearchTerm($country, $component);
+        $brandTerm = self::formatBrandForSearch($brand, $country);
+        $modelTerm = self::formatModelForSearch($model, $country);
         $def = self::componentDef($component);
 
         $queries = [$base];
 
-        if ($brand !== '' && $model !== '' && $localized !== '') {
-            $queries[] = trim($brand.' '.$model.' '.$localized);
+        if ($brandTerm !== '' && $modelTerm !== '' && $localized !== '') {
+            $queries[] = trim($brandTerm.' '.$modelTerm.' '.$localized);
         }
-        if ($model !== '' && $localized !== '') {
-            $queries[] = trim($model.' '.$localized);
+        if ($modelTerm !== '' && $localized !== '') {
+            $queries[] = trim($modelTerm.' '.$localized);
         }
 
         foreach ((array) ($def['serp_extra'] ?? []) as $extra) {
-            if ($brand !== '' && $model !== '') {
-                $queries[] = trim($brand.' '.$model.' '.$extra);
+            if ($brandTerm !== '' && $modelTerm !== '') {
+                $queries[] = trim($brandTerm.' '.$modelTerm.' '.$extra);
             }
-            if ($model !== '') {
-                $queries[] = trim($model.' '.$extra);
+            if ($modelTerm !== '') {
+                $queries[] = trim($modelTerm.' '.$extra);
+            }
+        }
+
+        if ($component === 'engine' && in_array($country, ['DE', 'AT', 'CH'], true)) {
+            if ($brandTerm !== '' && $modelTerm !== '') {
+                $queries[] = trim($brandTerm.' '.$modelTerm.' Gebrauchtmotor');
+                $queries[] = trim($brandTerm.' '.$modelTerm.' Komplettmotor');
             }
         }
 
@@ -501,7 +517,24 @@ class AutomotivePartsIntentParser
         $def = self::componentDef($component);
         $regex = (string) ($def['title_regex'] ?? '');
 
-        return $regex !== '' && preg_match($regex, $lower) === 1;
+        if ($regex !== '' && preg_match($regex, $lower) === 1) {
+            return true;
+        }
+
+        if ($component === 'engine') {
+            if (preg_match('/\b(motor[oö]l|engine\s*oil|ölfilter)\b/ui', $lower)) {
+                return false;
+            }
+
+            if (preg_match('/\b(gebrauchtmotor|komplettmotor|tauschmotor|rumpfmotor|motorblock|complete\s+engine|used\s+engine)\b/ui', $lower) === 1) {
+                return true;
+            }
+
+            return preg_match('/\b(motor|engine|moteur|motore|silnik)\b/u', $lower) === 1
+                && preg_match('/\b(motor[oö]l|engine\s*oil)\b/ui', $lower) !== 1;
+        }
+
+        return false;
     }
 
     private static function normalizeComponentAlias(string $term): string
@@ -551,6 +584,10 @@ class AutomotivePartsIntentParser
             $model = (string) $auto['model'];
         }
 
+        if ($brand === '' && $model !== '' && preg_match('/\bgolf\b/i', $model)) {
+            $brand = 'Volkswagen';
+        }
+
         if ($brand !== '' && $model !== '') {
             $model = AutomotiveModelResolver::normalizeModelForBrand($brand, $model);
         }
@@ -568,6 +605,35 @@ class AutomotivePartsIntentParser
         $search = (array) ($def['search'] ?? []);
 
         return AutomotivePartsLocale::resolve($countryCode, $search) ?: $component;
+    }
+
+    private static function formatBrandForSearch(string $brand, string $countryCode): string
+    {
+        $brand = trim($brand);
+        if ($brand === '') {
+            return '';
+        }
+
+        if (in_array($countryCode, ['DE', 'AT', 'CH'], true)
+            && strcasecmp($brand, 'Volkswagen') === 0) {
+            return 'VW';
+        }
+
+        return $brand;
+    }
+
+    private static function formatModelForSearch(string $model, string $countryCode): string
+    {
+        $model = trim($model);
+        if ($model === '') {
+            return '';
+        }
+
+        if (preg_match('/\bgolf\s*(7|vii)\b/i', $model)) {
+            return 'Golf 7';
+        }
+
+        return ucwords($model);
     }
 
     /**
@@ -588,7 +654,7 @@ class AutomotivePartsIntentParser
         if ($merged === null) {
             $merged = array_merge(AutomotivePartsComponentRegistry::definitions(), self::COMPONENTS);
             if (isset($merged['engine'])) {
-                $merged['engine']['search'] = AutomotivePartsLocale::searchMap('Motor', 'engine', [
+                $merged['engine']['search'] = AutomotivePartsLocale::searchMap('Komplettmotor', 'engine', [
                     'FR' => 'moteur',
                     'IT' => 'motore',
                     'ES' => 'motor',
@@ -671,6 +737,7 @@ class AutomotivePartsIntentParser
                 'tachometer', 'drehzahlmesser', 'drehzahl', 'speedometer', 'kilometerteller',
                 'instrumentencluster', 'instrument cluster', 'kombiinstrument', 'cockpit',
                 'wischermotor', 'scheibenwischer', 'anlasser', 'startermotor', 'fensterheber',
+                'motoröl', 'motorol', 'engine oil', 'öl ', ' oil ',
             ],
             default => [],
         };

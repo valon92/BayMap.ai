@@ -9,13 +9,16 @@
         "serve:lan": "bash scripts/serve-lan.sh",
         "lan": "npm run build && npm run serve:lan",
         "iphone": "npm run lan",
-        "lan:stop": "lsof -ti :8000 | xargs kill 2>/dev/null || true; lsof -ti :8766 | xargs kill 2>/dev/null || true; lsof -ti :5173 | xargs kill 2>/dev/null || true; rm -f public/hot"
+        "lan:stop": "lsof -ti :8000 | xargs kill 2>/dev/null || true; lsof -ti :8766 | xargs kill 2>/dev/null || true; lsof -ti :5173 | xargs kill 2>/dev/null || true; rm -f public/hot",
+        "playwright:install": "playwright install chromium",
+        "playwright:fetch": "node scripts/playwright-fetch.mjs"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.11",
         "autoprefixer": "^10.5.0",
         "axios": "^1.6.4",
         "laravel-vite-plugin": "^1.0.0",
+        "playwright": "^1.61.0",
         "postcss": "^8.5.15",
         "tailwindcss": "^3.4.19",
         "vite": "^5.0.0"

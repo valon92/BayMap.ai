@@ -3,6 +3,7 @@
 namespace App\Services\Search;
 
 use App\Support\AutomotiveIntentParser;
+use App\Support\AutomotivePartsFilterCatalog;
 use App\Support\AutomotivePartsIntentParser;
 use App\Support\AutomotiveModelResolver;
 use App\Support\BookIntentParser;
@@ -591,6 +592,11 @@ class QueryIntentEnricher
         bool $refineFilters = false,
     ): array {
         $category = CategoryCatalog::normalize($parsed['category'] ?? '');
+
+        if (CategoryCatalog::isAutomotiveParts($category)) {
+            return $this->applyAutomotivePartsFilterOverrides($parsed, $filters, $aiParsed, $locale ?? 'en', $refineFilters);
+        }
+
         if (! in_array($category, ['fashion', 'sports_outdoor'], true)) {
             return $parsed;
         }
@@ -630,6 +636,57 @@ class QueryIntentEnricher
     }
 
     /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $filters
+     * @param  array<string, mixed>  $aiParsed
+     * @return array<string, mixed>
+     */
+    private function applyAutomotivePartsFilterOverrides(
+        array $parsed,
+        array $filters,
+        array $aiParsed,
+        string $locale,
+        bool $refineFilters,
+    ): array {
+        foreach (['product_type', 'item', 'brand', 'model', 'condition'] as $key) {
+            if (! isset($filters[$key]) || $filters[$key] === '') {
+                continue;
+            }
+
+            $value = (string) $filters[$key];
+            if ($key === 'product_type') {
+                $parsed['product_type'] = AutomotivePartsFilterCatalog::normalizeTopType($value);
+            } elseif ($key === 'brand') {
+                $parsed['brand'] = AutomotivePartsFilterCatalog::brandLabel($value);
+            } else {
+                $parsed[$key] = $value;
+            }
+        }
+
+        if (isset($filters['price_max']) && $filters['price_max'] !== '') {
+            $parsed['max_price'] = (float) $filters['price_max'];
+        }
+
+        $sq = $locale === 'sq';
+
+        if ($refineFilters && AutomotivePartsFilterCatalog::hasSelections($filters)) {
+            $parsed = AutomotivePartsFilterCatalog::rebuildSearchQuery($parsed, $filters);
+            $parsed['description'] = AutomotivePartsFilterCatalog::activeDescription($parsed, $sq);
+            $parsed['filter_refined'] = true;
+
+            return $parsed;
+        }
+
+        if (AutomotivePartsFilterCatalog::changedSearchIntent($filters, $aiParsed)) {
+            $parsed = AutomotivePartsFilterCatalog::rebuildSearchQuery($parsed, $filters);
+            $parsed['description'] = AutomotivePartsFilterCatalog::activeDescription($parsed, $sq);
+            $parsed['filter_refined'] = true;
+        }
+
+        return $parsed;
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      */
     private function hasFashionFilterSelections(array $filters): bool
@@ -662,9 +719,14 @@ class QueryIntentEnricher
             if ($key === 'product_type') {
                 $value = FashionIntentParser::normalizeType((string) $value);
             } elseif ($key === 'brand') {
-                $value = FashionFilterCatalog::slugify((string) $value);
+                $autoBrand = AutomotivePartsFilterCatalog::slugifyBrand((string) $value);
+                $value = in_array($autoBrand, AutomotivePartsFilterCatalog::brandOptions([]), true)
+                    ? $autoBrand
+                    : FashionFilterCatalog::slugify((string) $value);
             } elseif ($key === 'gender') {
                 $value = CategoryCatalog::normalizeGender((string) $value) ?? $value;
+            } elseif ($key === 'item') {
+                $value = mb_strtolower(trim((string) $value));
             }
 
             $filter['value'] = $value;

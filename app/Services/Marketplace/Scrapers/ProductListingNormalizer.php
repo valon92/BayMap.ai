@@ -302,12 +302,18 @@ class ProductListingNormalizer
         $isFashion = in_array(CategoryCatalog::normalize($parsed['category'] ?? ''), ['fashion', 'sports_outdoor'], true);
         $isHomeFurniture = CategoryCatalog::normalize($parsed['category'] ?? '') === 'home_furniture';
         $isAutomotiveParts = CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '');
+        $isIndustrialB2b = CategoryCatalog::normalize($parsed['category'] ?? '') === 'industrial_b2b';
         $productType = FashionIntentParser::normalizeType((string) ($parsed['product_type'] ?? ''));
         $maxPrice = isset($parsed['max_price']) ? (float) $parsed['max_price'] : null;
 
-        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isAutomotiveParts, $isElectronics, $isFashion, $isHomeFurniture, $isToy, $productType, $maxPrice) {
+        return array_values(array_filter($items, function (array $item) use ($brand, $model, $size, $wantedColor, $wantedEngine, $parsed, $isAutomotive, $isAutomotiveParts, $isIndustrialB2b, $isElectronics, $isFashion, $isHomeFurniture, $isToy, $productType, $maxPrice) {
             if ($isHomeFurniture
                 && ! HomeFurnitureIntentParser::matchesListing((string) ($item['title'] ?? ''), $parsed)) {
+                return false;
+            }
+
+            if ($isIndustrialB2b
+                && ! \App\Support\IndustrialB2BIntentParser::matchesListing((string) ($item['title'] ?? ''), $parsed)) {
                 return false;
             }
 

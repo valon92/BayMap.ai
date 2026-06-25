@@ -30,7 +30,7 @@ class LivePlatformScraperService
             $model = \App\Support\AutomotiveModelResolver::normalizeModelForBrand($brand, $model);
         }
 
-        $cacheKey = 'live:'.$platformKey.':v43:'.md5(json_encode([
+        $cacheKey = 'live:'.$platformKey.':v46:'.md5(json_encode([
             $brand,
             $model,
             $parsedQuery['year_min'] ?? '',
