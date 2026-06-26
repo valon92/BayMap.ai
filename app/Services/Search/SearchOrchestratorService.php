@@ -117,9 +117,7 @@ class SearchOrchestratorService
         $parsed = HomeFurnitureIntentParser::merge($parsed, $query);
         $parsed = IndustrialB2BIntentParser::merge($parsed, $query);
         $parsed = $this->resolveSearchMarket($parsed, $marketMode, $marketCode, $locale);
-        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
-            $parsed = AutomotivePartsIntentParser::merge($parsed, $query);
-        }
+        $parsed = AutomotivePartsIntentParser::merge($parsed, $query);
         $parsed['category'] = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
         $searchGeo = $this->intentEnricher->searchGeo($geo, $parsed);
         if (empty($parsed['search_target'])) {

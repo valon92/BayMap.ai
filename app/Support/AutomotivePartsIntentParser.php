@@ -149,6 +149,25 @@ class AutomotivePartsIntentParser
             'search' => ['DE' => 'Scheinwerfer', 'default' => 'headlight'],
             'serp_extra' => [],
         ],
+        'dashcam' => [
+            'query_patterns' => [
+                '/\bkamera\s+(?:per|për|for)\s+(?:vetur|makina|auto|car)/ui',
+                '/\b(?:dash\s*cam|dashcam|drive\s*recorder|auto\s*dvr)\b/ui',
+                '/\b(?:perpara|përpara|front|vorne).*(?:permas|përmas|pasme|hinten|rear|back)/ui',
+                '/\b(?:permas|përmas|pasme|hinten|rear).*(?:perpara|përpara|front|vorne)/ui',
+                '/\brückfahrkamera\b/ui',
+                '/\bfront\s*(?:and|&|\+|\/?)\s*rear\s*(?:cam|camera|kamera)?/ui',
+                '/\bkamera\s+(?:perpara|përpara|front).*(?:pasme|permas|përmas|rear)/ui',
+            ],
+            'title_regex' => '/\b(dash\s*cam|dashcam|rückfahrkamera|backup\s*camera|front\s*rear|vorne\s*hinten|dual\s*channel|drive\s*recorder|auto\s*kamera|car\s*camera|kamera\s*set)\b/ui',
+            'search' => [
+                'DE' => 'Dashcam Front Rückfahrkamera',
+                'AT' => 'Dashcam Front Rückfahrkamera',
+                'CH' => 'Dashcam Front Rückfahrkamera',
+                'default' => 'dash cam front rear',
+            ],
+            'serp_extra' => ['Dashcam', 'Rückfahrkamera Set', 'dual dash cam'],
+        ],
         'injector' => [
             'query_patterns' => ['/\\binjector/i', '/\\beinspritz/i', '/\\biniettore/i'],
             'title_regex' => '/\\b(injector|einspritz(?:düse|duse)|iniettore)\\b/u',
@@ -299,6 +318,10 @@ class AutomotivePartsIntentParser
             return false;
         }
 
+        if (self::isCarAccessoryQuery($rawQuery)) {
+            return true;
+        }
+
         if (CategoryCatalog::normalize($parsed['category'] ?? '') === 'automotive_parts') {
             return true;
         }
@@ -313,6 +336,23 @@ class AutomotivePartsIntentParser
         }
 
         if (self::extractComponent($parsed, $rawQuery) !== '') {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function isCarAccessoryQuery(string $rawQuery): bool
+    {
+        $lower = mb_strtolower(trim($rawQuery));
+
+        if (preg_match('/\b(?:kamera|dash\s*cam|dashcam|dvr|drive\s*recorder)\b/ui', $lower)
+            && preg_match('/\b(?:vetur|makina|auto|car|automjet)\b/ui', $lower)) {
+            return true;
+        }
+
+        if (preg_match('/\b(?:kamera|dash\s*cam|dashcam)\b/ui', $lower)
+            && preg_match('/\b(?:perpara|përpara|front|vorne).*(?:permas|përmas|pasme|hinten|rear)/ui', $lower)) {
             return true;
         }
 
@@ -347,6 +387,10 @@ class AutomotivePartsIntentParser
 
         if (in_array($component, ['engine', 'engine_block', 'cylinder_head'], true)) {
             return 'engine';
+        }
+
+        if (in_array($component, ['dashcam', 'backup_camera', 'parking_sensor', 'radio', 'infotainment', 'speaker'], true)) {
+            return 'accessory';
         }
 
         return 'auto_part';
@@ -738,6 +782,12 @@ class AutomotivePartsIntentParser
                 'instrumentencluster', 'instrument cluster', 'kombiinstrument', 'cockpit',
                 'wischermotor', 'scheibenwischer', 'anlasser', 'startermotor', 'fensterheber',
                 'motoröl', 'motorol', 'engine oil', 'öl ', ' oil ',
+            ],
+            'dashcam', 'backup_camera' => [
+                'bmw ', 'audi ', 'mercedes', 'volkswagen', 'opel ', 'ford ', 'toyota ',
+                '520d', '530d', 'q5', 'q7', 'a6', 'a4', 'golf', 'tiguan', 'passat',
+                'gebrauchtwagen', 'fahrzeug', 'pkw', 'limousine', 'coupe', ' km', 'kilometer',
+                'efficientdynamics', 'm sport', 'tdi quattro', 'tfsi quattro',
             ],
             default => [],
         };

@@ -27,7 +27,7 @@ class AutomotivePartsFilterCatalog
         ],
         'machinery' => ['machinery'],
         'tire' => ['tire'],
-        'accessory' => ['accessory'],
+        'accessory' => ['accessory', 'dashcam', 'backup_camera', 'parking_sensor', 'radio', 'infotainment'],
     ];
 
     /** @var array<int, string> */
