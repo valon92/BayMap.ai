@@ -21,6 +21,7 @@ return [
         'ebay' => 92,
         'google_shopping' => 88,
         'channel3' => 90,
+        'walmart_us' => 91,
         'amazon' => 85,
         'mobile.de' => 90,
         'autoscout24' => 90,

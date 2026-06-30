@@ -56,7 +56,15 @@ return [
             'label' => 'Channel3',
             'mode' => 'live',
             'priority' => 12,
-            'categories' => ['fashion', 'sports_outdoor', 'electronics_tech', 'home_appliances', 'home_furniture', 'beauty', 'grocery', 'marketplace', 'luxury_collectibles'],
+            'categories' => ['fashion', 'sports_outdoor', 'electronics_tech', 'home_appliances', 'home_furniture', 'beauty', 'grocery', 'marketplace', 'luxury_collectibles', 'industrial_b2b'],
+        ],
+        'walmart_us' => [
+            'adapter' => 'walmart',
+            'label' => 'Walmart',
+            'mode' => 'live',
+            'priority' => 5,
+            'categories' => ['electronics_tech', 'home_appliances', 'fashion', 'sports_outdoor', 'marketplace', 'grocery', 'beauty'],
+            'countries' => ['US'],
         ],
         'amazon' => [
             'adapter' => 'mock',

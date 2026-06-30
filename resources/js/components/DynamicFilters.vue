@@ -263,10 +263,18 @@ function optionLabel(opt, filterKey) {
     const pl = t(pk);
     if (pl !== pk) return pl;
   }
+  if (filterKey === 'item') {
+    const ik = `part_component_values.${val}`;
+    const il = t(ik);
+    if (il !== ik) return il;
+  }
   if (filterKey === 'brand') {
     const bk = `brand_values.${val}`;
     const bl = t(bk);
     if (bl !== bk) return bl;
+    const autoBk = `automotive_brand_values.${val}`;
+    const autoBl = t(autoBk);
+    if (autoBl !== autoBk) return autoBl;
   }
   if (filterKey === 'color') {
     const ck = `color_values.${val}`;

@@ -2,6 +2,8 @@
 
 namespace App\Services\Marketplace\Scrapers;
 
+use App\Services\Marketplace\BrowseAiScrapeService;
+use App\Services\Marketplace\PlaywrightScrapeService;
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
 use App\Support\AutomotiveDisplayNormalizer;
 use App\Support\CategoryCatalog;
@@ -14,6 +16,8 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
 
     public function __construct(
         private ScraperHttpClient $http,
+        private BrowseAiScrapeService $browseAi,
+        private PlaywrightScrapeService $playwright,
         private CsCartScraperAdapter $csCart,
         private WooCommerceScraperAdapter $wooCommerce,
     ) {}
@@ -32,10 +36,22 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         $storeKey = (string) ($platform['_key'] ?? 'generic');
         $platform['_parsed_query'] = $parsedQuery;
         $searchUrl = PlatformCatalogUrlBuilder::build($platform, $parsedQuery);
+
+        if ($this->browseAi->shouldUse($storeKey)) {
+            $viaBrowse = $this->scrapeViaBrowseAi($storeKey, $searchUrl, $platform, $parsedQuery);
+            if ($viaBrowse !== []) {
+                return $viaBrowse;
+            }
+        }
+
         $referer = rtrim((string) ($platform['base_url'] ?? ''), '/').'/';
         $html = $this->http->get($searchUrl, $platform['locale'] ?? null, $referer, $storeKey);
 
         if ($html === '') {
+            if ($this->browseAi->shouldUse($storeKey)) {
+                return $this->scrapeViaBrowseAi($storeKey, $searchUrl, $platform, $parsedQuery);
+            }
+
             return [];
         }
 
@@ -57,6 +73,74 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
             $items = $this->scrapePro4maticFallbacks($platform, $parsedQuery, $storeKey);
         }
 
+        $items = ProductListingNormalizer::filterForIntent($items, $parsedQuery);
+
+        if ($items === [] && $this->playwright->isConfigured()) {
+            $viaPlaywright = $this->scrapeViaPlaywright($storeKey, $searchUrl, $platform, $parsedQuery);
+            if ($viaPlaywright !== []) {
+                return $viaPlaywright;
+            }
+        }
+
+        if ($items === [] && $this->browseAi->shouldUse($storeKey)) {
+            $viaBrowse = $this->scrapeViaBrowseAi($storeKey, $searchUrl, $platform, $parsedQuery);
+            if ($viaBrowse !== []) {
+                return $viaBrowse;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function scrapeViaBrowseAi(string $storeKey, string $searchUrl, array $platform, array $parsedQuery): array
+    {
+        $items = $this->browseAi->scrapeListings($storeKey, $searchUrl, $platform, $parsedQuery);
+        if ($items !== []) {
+            return $items;
+        }
+
+        $html = $this->browseAi->fetchHtml($storeKey, $searchUrl);
+        if ($html === '') {
+            return [];
+        }
+
+        $items = $this->parseStructuredCatalog($html, $storeKey, $platform);
+        if ($items === []) {
+            $items = $this->parseHeuristic($html, $storeKey, $platform);
+        }
+
+        return ProductListingNormalizer::filterForIntent($items, $parsedQuery);
+    }
+
+    /**
+     * @param  array<string, mixed>  $platform
+     * @param  array<string, mixed>  $parsedQuery
+     * @return array<int, array<string, mixed>>
+     */
+    private function scrapeViaPlaywright(string $storeKey, string $searchUrl, array $platform, array $parsedQuery): array
+    {
+        $referer = rtrim((string) ($platform['base_url'] ?? ''), '/').'/';
+        $html = $this->playwright->fetchHtml(
+            $searchUrl,
+            $platform['locale'] ?? null,
+            $referer,
+            $storeKey,
+        );
+
+        if (! $this->playwright->isUsableHtml($html, $storeKey)) {
+            return [];
+        }
+
+        $items = $this->parseStructuredCatalog($html, $storeKey, $platform);
+        if ($items === []) {
+            $items = $this->parseHeuristic($html, $storeKey, $platform);
+        }
+
         return ProductListingNormalizer::filterForIntent($items, $parsedQuery);
     }
 
@@ -70,6 +154,8 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
 
         foreach ([
             fn () => $this->parseAutodocListings($html, $storeKey, $platform),
+            fn () => $this->parseAmazonSearchResults($html, $storeKey, $platform),
+            fn () => $this->parseAlibabaSearchResults($html, $storeKey, $platform),
             fn () => $this->parsePro4maticProducts($html, $storeKey, $platform),
             fn () => $this->parseShopifySearchAnalytics($html, $storeKey, $platform),
             fn () => $this->parseShopifyDataProductCards($html, $storeKey, $platform),
@@ -197,7 +283,11 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
                     break;
                 }
 
-                $type = (string) ($node['@type'] ?? '');
+                $type = $node['@type'] ?? '';
+                if (is_array($type)) {
+                    $type = implode(' ', array_map('strval', $type));
+                }
+                $type = (string) $type;
                 if ($type === 'ItemList' && isset($node['itemListElement']) && is_array($node['itemListElement'])) {
                     foreach ($node['itemListElement'] as $element) {
                         if (count($items) >= self::MAX_LISTINGS) {
@@ -685,6 +775,140 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
         }
 
         return [];
+    }
+
+    /**
+     * Amazon search results (amazon.de, amazon.com, …).
+     *
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseAmazonSearchResults(string $html, string $storeKey, array $platform): array
+    {
+        if (! str_contains($storeKey, 'amazon')
+            && ! str_contains($html, 's-search-result')) {
+            return [];
+        }
+
+        if (! preg_match_all(
+            '/data-asin="([A-Z0-9]{10})"[^>]*data-component-type="s-search-result"[\s\S]*?<h2[^>]*>[\s\S]*?<span>([^<]+)<\/span>[\s\S]*?class="a-offscreen">([^<]+)</iu',
+            $html,
+            $matches,
+            PREG_SET_ORDER,
+        )) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) ($platform['base_url'] ?? 'https://www.amazon.de'), '/');
+        $items = [];
+        $seen = [];
+
+        foreach ($matches as $match) {
+            if (count($items) >= self::MAX_LISTINGS) {
+                break;
+            }
+
+            $asin = $match[1];
+            $title = trim(html_entity_decode(strip_tags($match[2]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($title === '' || isset($seen[$asin])) {
+                continue;
+            }
+
+            $price = $this->parseGermanPrice(html_entity_decode($match[3], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $url = $baseUrl.'/dp/'.$asin;
+
+            $seen[$asin] = true;
+            $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                'product_id' => $asin,
+                'title' => $title,
+                'url' => $url,
+                'price' => $price,
+                'currency' => (string) ($platform['currency'] ?? 'EUR'),
+                'location' => (string) ($platform['location'] ?? AutomotiveDisplayNormalizer::platformCountryLabel($platform)),
+            ]);
+        }
+
+        return $items;
+    }
+
+    /**
+     * Alibaba.com B2B search cards.
+     *
+     * @param  array<string, mixed>  $platform
+     * @return array<int, array<string, mixed>>
+     */
+    private function parseAlibabaSearchResults(string $html, string $storeKey, array $platform): array
+    {
+        if (! str_contains($storeKey, 'alibaba') && ! str_contains($html, 'alibaba.com')) {
+            return [];
+        }
+
+        $items = [];
+        $seen = [];
+
+        if (preg_match_all(
+            '/"title":"([^"]{4,200})"[^}]{0,400}?"price(?:Text)?":"([^"]+)"[^}]{0,800}?"productUrl":"([^"]+)"/i',
+            $html,
+            $matches,
+            PREG_SET_ORDER,
+        )) {
+            foreach ($matches as $match) {
+                if (count($items) >= self::MAX_LISTINGS) {
+                    break;
+                }
+                $title = trim(html_entity_decode(stripslashes($match[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if ($title === '' || isset($seen[$title])) {
+                    continue;
+                }
+                $url = str_replace('\\/', '/', stripslashes($match[3]));
+                if (! str_starts_with($url, 'http')) {
+                    $url = 'https://www.alibaba.com'.$url;
+                }
+                $seen[$title] = true;
+                $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                    'product_id' => md5($title.$url),
+                    'title' => $title,
+                    'url' => $url,
+                    'price' => $this->parseGermanPrice($match[2]),
+                    'currency' => (string) ($platform['currency'] ?? 'USD'),
+                    'category' => 'industrial_b2b',
+                    'location' => (string) ($platform['location'] ?? 'China'),
+                ]);
+            }
+        }
+
+        if ($items !== []) {
+            return $items;
+        }
+
+        if (preg_match_all(
+            '/href="(https:\/\/www\.alibaba\.com\/product-detail\/[^"]+)"[^>]*>[\s\S]{0,1200}?<[^>]+>([^<]{4,160})<\//i',
+            $html,
+            $linkMatches,
+            PREG_SET_ORDER,
+        )) {
+            foreach ($linkMatches as $match) {
+                if (count($items) >= self::MAX_LISTINGS) {
+                    break;
+                }
+                $title = trim(html_entity_decode($match[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if ($title === '' || isset($seen[$title])) {
+                    continue;
+                }
+                $seen[$title] = true;
+                $items[] = ProductListingNormalizer::finalize($platform, $storeKey, [
+                    'product_id' => md5($title.$match[1]),
+                    'title' => $title,
+                    'url' => html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                    'price' => 0.0,
+                    'currency' => (string) ($platform['currency'] ?? 'USD'),
+                    'category' => 'industrial_b2b',
+                    'location' => (string) ($platform['location'] ?? 'China'),
+                ]);
+            }
+        }
+
+        return $items;
     }
 
     /**

@@ -208,7 +208,12 @@ class LivePlatformRegistry
             return self::keysFor($countryCode, $category) !== [];
         }
 
-        return self::countrySpecificKeysFromParsed($parsed) !== [];
+        if ($category === 'industrial_b2b') {
+            return self::keysFromParsed($parsed) !== [];
+        }
+
+        return self::countrySpecificKeysFromParsed($parsed) !== []
+            || self::keysFromParsed($parsed) !== [];
     }
 
     /**

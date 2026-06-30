@@ -190,6 +190,8 @@ class CategoryCatalog
             case 'gaming_entertainment':
             case 'home_appliances':
                 return 'electronics';
+            case 'industrial_b2b':
+                return 'industrial';
             default:
                 return 'marketplace';
         }
@@ -332,8 +334,24 @@ class CategoryCatalog
             ),
             'automotive' => self::automotiveFilters($parsed, $sq),
             'automotive_parts' => array_merge(
-                self::select('product_type', $sq ? 'Lloji' : 'Type', ['engine', 'auto_part', 'machinery', 'tire', 'accessory'], $parsed['product_type'] ?? null),
-                self::select('brand', $sq ? 'Marka' : 'Brand', ['bmw', 'audi', 'mercedes', 'volkswagen', 'toyota', 'ford'], isset($parsed['brand']) ? mb_strtolower((string) $parsed['brand']) : null),
+                self::select(
+                    'product_type',
+                    $sq ? 'Lloji' : 'Type',
+                    AutomotivePartsFilterCatalog::topTypes($parsed),
+                    AutomotivePartsFilterCatalog::normalizeTopType((string) ($parsed['product_type'] ?? '')),
+                ),
+                self::select(
+                    'item',
+                    $sq ? 'Artikulli' : 'Component',
+                    AutomotivePartsFilterCatalog::componentOptions($parsed),
+                    isset($parsed['item']) ? (string) $parsed['item'] : null,
+                ),
+                self::select(
+                    'brand',
+                    $sq ? 'Marka' : 'Brand',
+                    AutomotivePartsFilterCatalog::brandOptions($parsed),
+                    isset($parsed['brand']) ? AutomotivePartsFilterCatalog::slugifyBrand((string) $parsed['brand']) : null,
+                ),
                 self::conditionFilter($parsed, $sq, ['new', 'used', 'refurbished']),
                 self::priceFilter($parsed, $sq, 5, 5000),
             ),

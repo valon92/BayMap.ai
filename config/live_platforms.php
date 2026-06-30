@@ -16,6 +16,9 @@ return [
     /** When true, country fashion catalogs back live scrapers when anti-bot blocks HTML scraping. */
     'fashion_demo_fallback' => (bool) env('LIVE_FASHION_DEMO_FALLBACK', true),
 
+    /** When true, industrial / B2B catalogs back live scrapers when anti-bot blocks HTML scraping. */
+    'industrial_demo_fallback' => (bool) env('LIVE_INDUSTRIAL_DEMO_FALLBACK', true),
+
     /** Multi-page automotive scraping (AutoScout24, Kleinanzeigen). */
     'automotive_max_pages' => (int) env('AUTOMOTIVE_MAX_PAGES', 10),
 
@@ -38,12 +41,20 @@ return [
 
     'max_workers_cap' => (int) env('LIVE_PLATFORM_MAX_WORKERS', 24),
 
+    /** Optional Playwright wait selectors per platform key (see config/playwright.php). */
+    'playwright_wait_selectors' => [
+        'amazon_automotive_de' => '[data-component-type="s-search-result"], .s-result-item',
+        'autodoc_de' => '.listing-item, .listing-item__name',
+        'kfzteile24_de' => '.product, .product-item',
+        'mobile_de' => '[data-testid="result-list-entry"]',
+    ],
+
     /**
      * Universal connector — SerpAPI Google Shopping + eBay for any country (bridge layer).
      */
     'universal_bridge' => [
         'enabled' => (bool) env('UNIVERSAL_BRIDGE_ENABLED', true),
-        'providers' => ['channel3', 'google_shopping', 'google_flights', 'ebay'],
+        'providers' => ['channel3', 'walmart_us', 'google_shopping', 'google_flights', 'ebay'],
         'always_with_local' => true,
         'when_no_local' => true,
     ],
@@ -55,9 +66,14 @@ return [
     'local_search' => [
         'exclude_global' => ['amazon', 'etsy', 'facebook_marketplace'],
         'allow_ebay_categories' => ['DE:automotive', 'DE:automotive_parts', '*:automotive_parts', '*:automotive'],
-        'allow_bridge_categories' => ['CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor', 'DE:home_furniture', '*:home_furniture'],
+        'allow_bridge_categories' => [
+            'CH:fashion', 'CH:sports_outdoor', '*:fashion', '*:sports_outdoor',
+            'DE:home_furniture', '*:home_furniture',
+            'DE:automotive_parts', '*:automotive_parts',
+            '*:industrial_b2b',
+        ],
         /** Google Shopping when live scrapers return 0 (eBay still allowed via allow_ebay_categories). */
-        'google_shopping_fallback_categories' => ['*:automotive_parts', '*:automotive', '*:fashion', '*:sports_outdoor'],
+        'google_shopping_fallback_categories' => ['*:automotive_parts', '*:automotive', '*:fashion', '*:sports_outdoor', '*:industrial_b2b'],
         'by_country' => [
             'CH' => [
                 'exclude_global' => ['amazon', 'etsy'],

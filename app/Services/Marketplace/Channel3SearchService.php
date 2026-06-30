@@ -5,6 +5,7 @@ namespace App\Services\Marketplace;
 use App\Support\CategoryCatalog;
 use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
+use App\Support\IndustrialB2BIntentParser;
 use App\Support\SearchCountryResolver;
 use App\Support\UniversalMarketplaceBridge;
 use Illuminate\Support\Facades\Cache;
@@ -55,15 +56,25 @@ class Channel3SearchService
         $channel3Country = $this->mapCountry($countryCode);
         $currency = UniversalMarketplaceBridge::currencyForCountry($countryCode !== '' ? $countryCode : 'US');
 
+        $config = array_filter([
+            'country' => $channel3Country,
+            'currency' => $this->mapCurrency($currency),
+        ]);
+
+        $filters = $this->buildFilters($parsedQuery);
+
         $body = [
             'query' => $query,
             'limit' => (int) config('channel3.limit', 20),
-            'config' => array_filter([
-                'country' => $channel3Country,
-                'currency' => $this->mapCurrency($currency),
-            ]),
-            'filters' => $this->buildFilters($parsedQuery),
         ];
+
+        if ($config !== []) {
+            $body['config'] = $config;
+        }
+
+        if ($filters !== []) {
+            $body['filters'] = $filters;
+        }
 
         $cacheKey = 'channel3:search:v2:'.md5(json_encode($body));
         $ttl = (int) config('channel3.cache_ttl_seconds', 300);
@@ -182,6 +193,16 @@ class Channel3SearchService
 
         if (in_array(CategoryCatalog::normalize($parsedQuery['category'] ?? ''), ['fashion', 'sports_outdoor'], true)) {
             $query = $this->enrichFashionSearchQuery($query, $parsedQuery);
+        }
+
+        if (CategoryCatalog::normalize($parsedQuery['category'] ?? '') === 'industrial_b2b') {
+            $term = IndustrialB2BIntentParser::searchTerm(
+                $parsedQuery,
+                (string) ($parsedQuery['raw_query'] ?? ''),
+            );
+            if ($term !== '') {
+                return $term;
+            }
         }
 
         return $query;
@@ -311,7 +332,7 @@ class Channel3SearchService
             return 'EU';
         }
 
-        return $countryCode !== '' && $countryCode !== 'WW' ? 'US' : null;
+        return null;
     }
 
     private function mapCurrency(string $currency): ?string

@@ -22,7 +22,7 @@ return array_merge(
     // ── Germany (DE) ───────────────────────────────────────────────────
     [
         'autodoc_de' => ['adapter' => 'generic', 'label' => 'Autodoc Germany', 'country' => 'DE', 'categories' => ['automotive_parts'], 'base_url' => 'https://www.autodoc.de', 'priority' => 5, ...$search('/search?keyword={query}')],
-        'kfzteile24_de' => ['adapter' => 'generic', 'label' => 'kfzteile24', 'country' => 'DE', 'categories' => ['automotive_parts'], 'base_url' => 'https://www.kfzteile24.de', 'priority' => 6, ...$search('/catalog/search?query={query}')],
+        'kfzteile24_de' => ['adapter' => 'generic', 'label' => 'kfzteile24', 'country' => 'DE', 'categories' => ['automotive_parts'], 'base_url' => 'https://www.kfzteile24.de', 'priority' => 6, ...$search('/index.cgi?rm=articleSearch&search={query}')],
         'atp_autoteile_de' => ['adapter' => 'generic', 'label' => 'ATP Autoteile', 'country' => 'DE', 'categories' => ['automotive_parts'], 'base_url' => 'https://www.atp-autoteile.de', 'priority' => 8, ...$search('/de/search?query={query}')],
         'mister_auto_de' => ['adapter' => 'generic', 'label' => 'Mister Auto Germany', 'country' => 'DE', 'categories' => ['automotive_parts'], 'base_url' => 'https://www.mister-auto.de', 'priority' => 9, ...$search('/de/c/search?q={query}')],
         'oscaro_de' => ['adapter' => 'generic', 'label' => 'Oscaro Germany', 'country' => 'DE', 'categories' => ['automotive_parts'], 'base_url' => 'https://www.oscaro.de', 'priority' => 10, ...$search('/de/search?q={query}')],

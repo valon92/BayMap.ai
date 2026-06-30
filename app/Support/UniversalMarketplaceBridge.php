@@ -29,7 +29,8 @@ class UniversalMarketplaceBridge
         'IN' => 'in',
         'BR' => 'br',
         'MX' => 'mx',
-        'CA' => 'ca',
+        'CN' => 'cn',
+        'HK' => 'hk',
         'AU' => 'au',
         'FJ' => 'fj',
         'NZ' => 'nz',
@@ -77,6 +78,8 @@ class UniversalMarketplaceBridge
         'IN' => 'en',
         'BR' => 'pt',
         'MX' => 'es',
+        'CN' => 'zh',
+        'HK' => 'zh',
         'JP' => 'ja',
         'KR' => 'ko',
         'XK' => 'sq',
@@ -112,6 +115,8 @@ class UniversalMarketplaceBridge
         'AU' => 'AUD',
         'FJ' => 'FJD',
         'CA' => 'CAD',
+        'CN' => 'CNY',
+        'HK' => 'HKD',
     ];
 
     /** @var array<string, string> */
@@ -153,6 +158,7 @@ class UniversalMarketplaceBridge
 
         return array_values(array_filter($keys, fn (string $key) => match ($key) {
             'channel3' => config('channel3.enabled') && ! empty(config('channel3.api_key')),
+            'walmart_us' => config('walmart.enabled') && ! empty(config('walmart.client_id')),
             'google_shopping' => config('serpapi.enabled') && ! empty(config('serpapi.api_key')),
             'google_flights' => config('serpapi.enabled') && ! empty(config('serpapi.api_key')),
             'ebay' => config('ebay.enabled') && ! empty(config('ebay.client_id')),
@@ -164,6 +170,7 @@ class UniversalMarketplaceBridge
     {
         return in_array($sourceKey, (array) config('live_platforms.universal_bridge.providers', [
             'channel3',
+            'walmart_us',
             'google_shopping',
             'google_flights',
             'ebay',
@@ -184,8 +191,10 @@ class UniversalMarketplaceBridge
 
         return match ($sourceKey) {
             'google_flights' => $category === 'travel',
-            'google_shopping' => $category !== 'travel' && ! CategoryCatalog::isAutomotiveParts($category),
+            'google_shopping' => $category !== 'travel',
             'channel3' => ! in_array($category, ['travel', 'automotive', 'automotive_parts', 'real_estate'], true),
+            'walmart_us' => strtoupper($countryCode) === 'US'
+                && ! in_array($category, ['travel', 'automotive', 'automotive_parts', 'real_estate'], true),
             'ebay' => $category !== 'travel',
             default => true,
         };

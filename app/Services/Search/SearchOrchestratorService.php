@@ -22,6 +22,7 @@ use App\Support\ElectronicsIntentParser;
 use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\HomeFurnitureIntentParser;
+use App\Support\IndustrialB2BIntentParser;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
@@ -114,10 +115,9 @@ class SearchOrchestratorService
         $parsed = $this->intentEnricher->enrich($parsed, $query);
         $parsed = $this->marketIntent->apply($parsed, $marketMode, $marketCode, $locale);
         $parsed = HomeFurnitureIntentParser::merge($parsed, $query);
+        $parsed = IndustrialB2BIntentParser::merge($parsed, $query);
         $parsed = $this->resolveSearchMarket($parsed, $marketMode, $marketCode, $locale);
-        if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
-            $parsed = AutomotivePartsIntentParser::merge($parsed, $query);
-        }
+        $parsed = AutomotivePartsIntentParser::merge($parsed, $query);
         $parsed['category'] = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
         $searchGeo = $this->intentEnricher->searchGeo($geo, $parsed);
         if (empty($parsed['search_target'])) {

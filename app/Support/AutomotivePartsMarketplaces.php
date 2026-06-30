@@ -80,6 +80,11 @@ class AutomotivePartsMarketplaces
         'ebay_motors_ww',
         'rockauto_ww',
         'amazon_automotive_ww',
+        'alibaba_ww',
+        'global_sources',
+        'machinio_ww',
+        'machinio_parts_ww',
+        'amazon_business',
     ];
 
     /** Autodoc TLD suffixes — platform key autodoc_{suffix} when present in catalog */

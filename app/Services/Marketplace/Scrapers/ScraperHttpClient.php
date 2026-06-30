@@ -3,12 +3,17 @@
 namespace App\Services\Marketplace\Scrapers;
 
 use App\Services\Marketplace\BrowseAiScrapeService;
+use App\Services\Marketplace\PlaywrightScrapeService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class ScraperHttpClient
 {
-    public function __construct(private BrowseAiScrapeService $browseAi) {}
+    public function __construct(
+        private BrowseAiScrapeService $browseAi,
+        private PlaywrightScrapeService $playwright,
+        private PageQualityGuard $pageQuality,
+    ) {}
 
     public function get(
         string $url,
@@ -17,14 +22,30 @@ class ScraperHttpClient
         ?string $platformKey = null,
         ?int $timeoutSeconds = null,
     ): string {
+        $preferPlaywright = $this->playwright->shouldPrefer($platformKey);
+
+        if ($preferPlaywright) {
+            $viaPlaywright = $this->fetchViaPlaywright($url, $locale, $referer, $platformKey);
+            if ($viaPlaywright !== '') {
+                return $viaPlaywright;
+            }
+        }
+
         $html = $this->fetchDirect($url, $locale, $referer, $timeoutSeconds);
-        if ($html !== '') {
+        if ($this->playwright->isUsableHtml($html, $platformKey)) {
             return $html;
+        }
+
+        if (! $preferPlaywright) {
+            $viaPlaywright = $this->fetchViaPlaywright($url, $locale, $referer, $platformKey);
+            if ($viaPlaywright !== '') {
+                return $viaPlaywright;
+            }
         }
 
         if ($platformKey !== null && $this->browseAi->shouldUse($platformKey)) {
             $viaBrowse = $this->browseAi->fetchHtml($platformKey, $url);
-            if ($viaBrowse !== '') {
+            if ($viaBrowse !== '' && $this->playwright->isUsableHtml($viaBrowse, $platformKey)) {
                 Log::info('Live platform fetched via Browse AI', [
                     'platform' => $platformKey,
                     'url' => $url,
@@ -33,6 +54,24 @@ class ScraperHttpClient
 
                 return $viaBrowse;
             }
+        }
+
+        return $html !== '' && ! $this->pageQuality->isBlocked($html) ? $html : '';
+    }
+
+    private function fetchViaPlaywright(
+        string $url,
+        ?string $locale,
+        ?string $referer,
+        ?string $platformKey,
+    ): string {
+        if (! $this->playwright->isConfigured()) {
+            return '';
+        }
+
+        $html = $this->playwright->fetchHtml($url, $locale, $referer, $platformKey);
+        if ($this->playwright->isUsableHtml($html, $platformKey)) {
+            return $html;
         }
 
         return '';
@@ -78,7 +117,7 @@ class ScraperHttpClient
             }
 
             $body = (string) $response->body();
-            if ($this->isBlockedPage($body)) {
+            if ($this->pageQuality->isBlocked($body)) {
                 Log::info('Live platform blocked by bot protection', ['url' => $url]);
 
                 return '';
@@ -90,27 +129,5 @@ class ScraperHttpClient
 
             return '';
         }
-    }
-
-    private function isBlockedPage(string $html): bool
-    {
-        if ($html === '') {
-            return false;
-        }
-
-        if (str_contains($html, 'Bot Verification') || str_contains($html, 'Verifying that you are not a robot')) {
-            return true;
-        }
-
-        if (strlen($html) < 12000 && str_contains($html, 'Just a moment...')) {
-            return true;
-        }
-
-        $lower = mb_strtolower($html);
-        if (str_contains($lower, 'zugriff verweigert') || str_contains($lower, 'access denied')) {
-            return true;
-        }
-
-        return false;
     }
 }

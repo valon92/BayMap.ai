@@ -124,6 +124,25 @@ class ValonOrchestrator
             }
         }
 
+        if ($results === []
+            && config('live_platforms.industrial_demo_fallback', true)
+            && $category === 'industrial_b2b'
+            && $countryCode !== ''
+            && LocalMarketplaceResolver::isTargeted($parsedQuery)) {
+            $catalogFallback = $this->runCatalogIndustrialB2BFallback(
+                $parsedQuery,
+                $expandedFilters,
+                $geo,
+                $countryCode,
+                count($workerMeta),
+            );
+            if ($catalogFallback['results'] !== []) {
+                $results = $catalogFallback['results'];
+                $workerReports = array_merge($workerReports, $catalogFallback['report']);
+                $workerMeta = array_merge($workerMeta, $catalogFallback['workers']);
+            }
+        }
+
         if (($results === []
                 || (CategoryCatalog::isAutomotiveParts($category)
                     && AutomotivePartsIntentParser::needsShoppingSupplement($results, $parsedQuery))
@@ -466,6 +485,100 @@ class ValonOrchestrator
                 'platform' => $platform,
                 'platform_label' => $platformLabel,
                 'status' => $count > 0 ? 'ok' : 'ok',
+                'results' => $count,
+                'latency_ms' => $latencyMs,
+            ];
+
+            $index++;
+
+            if (count($results) >= $targetResults) {
+                break;
+            }
+        }
+
+        return [
+            'results' => $results,
+            'report' => $report,
+            'workers' => $workers,
+        ];
+    }
+
+    /**
+     * Industrial / B2B catalog fallback when Alibaba, Machinio, etc. block bots.
+     *
+     * @return array{
+     *   results: array<int, array<string, mixed>>,
+     *   report: array<int, array<string, mixed>>,
+     *   workers: array<int, array<string, mixed>>
+     * }
+     */
+    private function runCatalogIndustrialB2BFallback(
+        array $parsedQuery,
+        array $expandedFilters,
+        array $geo,
+        string $countryCode,
+        int $workerOffset = 0,
+    ): array {
+        $providers = $this->registry->catalogIndustrialB2BDemoProviders($countryCode, 'industrial_b2b');
+        if ($providers === []) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $demoFilters = $expandedFilters;
+        unset($demoFilters['marketplaces']);
+
+        $targetResults = max(
+            16,
+            (int) config('marketplaces.demo_fallback_target_results', 8) * 2,
+        );
+
+        $results = [];
+        $report = [];
+        $workers = [];
+        $prefix = $this->workerPrefixForCategory('industrial_b2b');
+        $index = $workerOffset + 1;
+
+        foreach ($providers as $provider) {
+            $started = microtime(true);
+
+            try {
+                $items = $provider->search($parsedQuery, $demoFilters);
+            } catch (\Throwable) {
+                $items = [];
+            }
+
+            $count = is_array($items) ? count($items) : 0;
+            if ($count === 0) {
+                continue;
+            }
+
+            $latencyMs = (int) round((microtime(true) - $started) * 1000);
+            $platform = $provider->sourceKey();
+            $platformLabel = $provider->label();
+
+            foreach ($items as $item) {
+                $results[] = $item;
+            }
+
+            $report[] = [
+                'worker_id' => "{$prefix}-{$index}",
+                'platform' => $platform,
+                'platform_label' => $platformLabel,
+                'role' => 'Local catalog',
+                'mode' => 'demo',
+                'count' => $count,
+                'status' => 'ok',
+                'location_tier' => $geo['city'] ?? '',
+                'latency_ms' => $latencyMs,
+                'error' => null,
+            ];
+
+            $workers[] = [
+                'id' => "{$prefix}-{$index}",
+                'role' => 'Local catalog',
+                'platform' => $platform,
+                'platform_label' => $platformLabel,
+                'status' => 'ok',
                 'results' => $count,
                 'latency_ms' => $latencyMs,
             ];

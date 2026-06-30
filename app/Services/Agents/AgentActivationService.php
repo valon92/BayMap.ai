@@ -502,6 +502,16 @@ class AgentActivationService
             return LivePlatformRegistry::keysFor($countryCode, $category);
         }
 
-        return LivePlatformRegistry::countrySpecificKeysFromParsed($parsed);
+        $countrySpecific = LivePlatformRegistry::countrySpecificKeysFromParsed($parsed);
+        if ($countrySpecific !== []) {
+            return $countrySpecific;
+        }
+
+        $discovered = LivePlatformRegistry::keysFromParsed($parsed);
+        if ($discovered !== []) {
+            return $discovered;
+        }
+
+        return LivePlatformRegistry::keysFor($countryCode, $category);
     }
 }

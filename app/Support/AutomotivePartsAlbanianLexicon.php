@@ -123,6 +123,16 @@ class AutomotivePartsAlbanianLexicon
         'sensorët e parkimit' => 'parking_sensor',
         'sensorët e park' => 'parking_sensor',
         'kamera e pasme' => 'backup_camera',
+        'kamera per vetura' => 'dashcam',
+        'kamera per vetur' => 'dashcam',
+        'kamera per makina' => 'dashcam',
+        'kamera per makine' => 'dashcam',
+        'kamera perpara dhe pasme' => 'dashcam',
+        'kamera perpara dhe permas' => 'dashcam',
+        'vendos perpara dhe permas' => 'dashcam',
+        'me vendos perpara dhe permas' => 'dashcam',
+        'dashcam' => 'dashcam',
+        'dash cam' => 'dashcam',
         'moduli i airbagut' => 'airbag_module',
         'moduli i airbag' => 'airbag_module',
         'çelësi i veturës' => 'car_key',
@@ -325,6 +335,7 @@ class AutomotivePartsAlbanianLexicon
             'luftfeder', 'luftbalg', 'luftfederung', 'pneumat',
             'kremaliera', 'katalizator', 'radiator', 'alternator', 'starteri',
             'injektor', 'bobina', 'qirinj', 'bateria', 'gomat', 'fellnet',
+            'kamera', 'dashcam', 'dash cam', 'rückfahrkamera',
         ];
     }
 }
