@@ -272,6 +272,7 @@
   "market_popular": "Tregje të njohura",
   "market_search_country": "Kërko shtet",
   "market_search_placeholder": "Shkruaj shtetin, p.sh. Holandë, Gjermani…",
+  "market_search_no_results": "Nuk u gjet asnjë shtet për «:query»",
   "market_hide": "Mbyll",
   "market_change": "Ndrysho",
   "market_by_region": "Sipas rajonit",

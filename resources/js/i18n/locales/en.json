@@ -272,6 +272,7 @@
   "market_popular": "Popular markets",
   "market_search_country": "Search country",
   "market_search_placeholder": "Type a country, e.g. Netherlands, Germany…",
+  "market_search_no_results": "No country found for “:query”",
   "market_hide": "Hide",
   "market_change": "Change",
   "market_by_region": "By region",
