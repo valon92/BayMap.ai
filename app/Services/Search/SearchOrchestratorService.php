@@ -13,6 +13,7 @@ use App\Services\Marketplace\SerpApiShoppingService;
 use App\Services\Orchestration\SearchIntentFactory;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
+use App\Support\AutomotiveIntentParser;
 use App\Support\AutomotiveModelResolver;
 use App\Support\AutomotivePartsIntentParser;
 use App\Support\BookIntentParser;
