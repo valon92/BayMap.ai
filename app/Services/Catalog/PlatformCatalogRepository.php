@@ -22,20 +22,33 @@ class PlatformCatalogRepository
 
     private const COUNTRIES_CACHE = 'catalog:countries:v1';
 
+    private function schemaHasTable(string $table): bool
+    {
+        try {
+            return Schema::hasTable($table);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function isActive(): bool
     {
         if (! config('catalog.enabled', true)) {
             return false;
         }
 
-        if (! Schema::hasTable('platforms')) {
+        if (! $this->schemaHasTable('platforms')) {
             return false;
         }
 
-        return Platform::query()->where('enabled', true)->whereIn('status', [
-            Platform::STATUS_LIVE,
-            Platform::STATUS_VERIFIED,
-        ])->exists();
+        try {
+            return Platform::query()->where('enabled', true)->whereIn('status', [
+                Platform::STATUS_LIVE,
+                Platform::STATUS_VERIFIED,
+            ])->exists();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -86,7 +99,15 @@ class PlatformCatalogRepository
      */
     public function categorySlugs(): array
     {
-        if (! Schema::hasTable('categories') || Category::query()->count() === 0) {
+        if (! $this->schemaHasTable('categories')) {
+            return CategoryCatalog::ALL;
+        }
+
+        try {
+            if (Category::query()->count() === 0) {
+                return CategoryCatalog::ALL;
+            }
+        } catch (\Throwable) {
             return CategoryCatalog::ALL;
         }
 
@@ -106,7 +127,15 @@ class PlatformCatalogRepository
      */
     public function countries(): array
     {
-        if (! Schema::hasTable('countries') || Country::query()->count() === 0) {
+        if (! $this->schemaHasTable('countries')) {
+            return [];
+        }
+
+        try {
+            if (Country::query()->count() === 0) {
+                return [];
+            }
+        } catch (\Throwable) {
             return [];
         }
 
@@ -132,7 +161,7 @@ class PlatformCatalogRepository
      */
     public function resolveCountryCode(string $needle): ?string
     {
-        if (! Schema::hasTable('country_aliases')) {
+        if (! $this->schemaHasTable('country_aliases')) {
             return null;
         }
 
@@ -141,16 +170,20 @@ class PlatformCatalogRepository
             return null;
         }
 
-        $country = Country::query()
-            ->where('enabled', true)
-            ->where(function ($query) use ($needle) {
-                $query->whereRaw('LOWER(iso2) = ?', [$needle])
-                    ->orWhereRaw('LOWER(name) = ?', [$needle])
-                    ->orWhereHas('aliases', fn ($q) => $q->whereRaw('LOWER(alias) = ?', [$needle]));
-            })
-            ->first(['iso2']);
+        try {
+            $country = Country::query()
+                ->where('enabled', true)
+                ->where(function ($query) use ($needle) {
+                    $query->whereRaw('LOWER(iso2) = ?', [$needle])
+                        ->orWhereRaw('LOWER(name) = ?', [$needle])
+                        ->orWhereHas('aliases', fn ($q) => $q->whereRaw('LOWER(alias) = ?', [$needle]));
+                })
+                ->first(['iso2']);
 
-        return $country?->iso2;
+            return $country?->iso2;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function flushCache(): void
