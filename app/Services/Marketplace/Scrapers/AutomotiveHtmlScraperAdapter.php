@@ -11,6 +11,7 @@ use App\Support\AutomotiveModelResolver;
 use App\Support\AutoScout24ListingParser;
 use App\Support\GermanAutomotiveIntent;
 use App\Support\PlatformCatalogUrlBuilder;
+use App\Support\SwissAutomotiveIntent;
 
 class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
 {
@@ -85,6 +86,12 @@ class AutomotiveHtmlScraperAdapter implements ScraperAdapterInterface
             && GermanAutomotiveIntent::isGermanSearch($parsedQuery)
             && GermanAutomotiveIntent::shouldUseCatalogFallback($storeKey)) {
             $raw = GermanAutomotiveIntent::catalogFallback($storeKey, $parsedQuery);
+        }
+
+        if ($raw === []
+            && SwissAutomotiveIntent::isSwissSearch($parsedQuery)
+            && SwissAutomotiveIntent::shouldUseCatalogFallback($storeKey)) {
+            $raw = SwissAutomotiveIntent::catalogFallback($storeKey, $parsedQuery);
         }
 
         $raw = ProductListingNormalizer::filterForIntent($raw, $parsedQuery);
