@@ -75,19 +75,23 @@ class ProductCategoryResolver
     'domain', 'domen', 'domenë', 'domena', 'domenen', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar',
   ];
 
-  public static function categoryFromQuery(string $query): ?string
-  {
-    $lower = mb_strtolower($query);
+    public static function categoryFromQuery(string $query): ?string
+    {
+        $lower = mb_strtolower($query);
 
-    if (WebServicesIntentParser::isWebServicesQuery($query)) {
-      return 'ai_software';
-    }
+        if (WebServicesIntentParser::isWebServicesQuery($query)) {
+            return 'ai_software';
+        }
 
-    if (self::isChildrenToyVehicleQuery($query)) {
-      return 'gaming_entertainment';
-    }
+        if (self::isChildrenToyVehicleQuery($query)) {
+            return 'gaming_entertainment';
+        }
 
-    if (AutomotivePartsIntentParser::isPartsSearch([], $query)
+        if (IndustrialB2BIntentParser::isIndustrialQuery($query)) {
+            return 'industrial_b2b';
+        }
+
+        if (AutomotivePartsIntentParser::isPartsSearch([], $query)
       && ! AutomotivePartsIntentParser::isVehiclePurchaseQuery([], $query)) {
       return 'automotive_parts';
     }
@@ -119,6 +123,7 @@ class ProductCategoryResolver
 
     $current = CategoryCatalog::normalize($parsed['category'] ?? 'marketplace');
     $shouldOverride = $current === 'marketplace'
+      || ($detected === 'industrial_b2b' && $current !== 'travel')
       || ($detected === 'automotive_parts' && $current !== 'travel')
       || ($detected === 'automotive' && $current === 'real_estate')
       || ($detected === 'electronics_tech' && in_array($current, ['marketplace', 'real_estate'], true))

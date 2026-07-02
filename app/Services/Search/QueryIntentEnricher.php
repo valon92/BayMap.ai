@@ -11,6 +11,7 @@ use App\Support\ElectronicsIntentParser;
 use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\HomeFurnitureIntentParser;
+use App\Support\IndustrialB2BIntentParser;
 use App\Support\PriceIntentParser;
 use App\Support\ProductCategoryResolver;
 use App\Support\SearchCountryResolver;
@@ -84,6 +85,7 @@ class QueryIntentEnricher
 
         $parsed = self::mergeFashionIntent($parsed, $rawQuery);
         $parsed = self::mergeElectronicsIntent($parsed, $rawQuery);
+        $parsed = IndustrialB2BIntentParser::merge($parsed, $rawQuery);
         $parsed = AutomotivePartsIntentParser::merge($parsed, $rawQuery);
         $parsed = self::mergeAutomotiveIntent($parsed, $rawQuery);
         $parsed = self::mergeRealEstateIntent($parsed, $rawQuery);

@@ -243,7 +243,7 @@ class AutomotivePartsIntentParser
             'serp_extra' => ['Luftfederung', 'Luftbalg', 'air spring'],
         ],
         'machinery' => [
-            'query_patterns' => ['/\\bmachinery/i', '/\\bmakineri/i', '/\\btractor/i', '/\\bexcavator/i', '/\\bforklift/i'],
+            'query_patterns' => ['/\\bmachinery\\b/i', '/\\btractor/i', '/\\bexcavator/i', '/\\bforklift/i'],
             'title_regex' => '/\\b(machinery|tractor|excavator|forklift|bulldozer|bagger|stapler)\\b/u',
             'search' => ['default' => 'machinery parts'],
             'serp_extra' => [],
@@ -299,6 +299,10 @@ class AutomotivePartsIntentParser
         }
 
         $rawQuery = $rawQuery !== '' ? $rawQuery : (string) ($parsed['raw_query'] ?? '');
+        if (IndustrialB2BIntentParser::isIndustrialQuery($rawQuery)) {
+            return false;
+        }
+
         $lower = mb_strtolower($rawQuery);
 
         foreach (self::partsKeywords() as $keyword) {
