@@ -372,7 +372,20 @@
     "quantity": "Sasia",
     "language": "Gjuha",
     "colors": "Ngjyrat",
-    "size": "Numri (EU)"
+    "size": "Numri (EU)",
+    "search_scope": "Shtrirja e kërkimit"
+  },
+  "parser_values": {
+    "semantic": "Semantik AI",
+    "gemini": "Gemini AI",
+    "openai": "OpenAI",
+    "rules": "Semantik AI",
+    "gemini-vision": "Gemini Vision",
+    "openai-vision": "OpenAI Vision"
+  },
+  "search_scope_values": {
+    "targeted": "i synuar",
+    "universal": "botë (universal)"
   },
   "product_type_values": {
     "engine": "Motore",

@@ -259,7 +259,7 @@ class SearchOrchestratorService
                 'location_scope' => $locationScope,
                 'location' => $this->intentEnricher->locationMeta($parsed, $geo, $searchGeo),
                 'processing_ms' => $processingMs,
-                'parser' => $parsed['parser'] ?? 'rules',
+                'parser' => $parsed['parser'] ?? 'semantic',
                 'has_image' => (bool) $imageBase64,
                 'internet_search' => [
                     'ebay_live' => $this->ebayOAuth->isConfigured(),

@@ -372,7 +372,20 @@
     "quantity": "Quantity",
     "language": "Language",
     "colors": "Colors",
-    "size": "Size (EU)"
+    "size": "Size (EU)",
+    "search_scope": "Search scope"
+  },
+  "parser_values": {
+    "semantic": "Semantic AI",
+    "gemini": "Gemini AI",
+    "openai": "OpenAI",
+    "rules": "Semantic AI",
+    "gemini-vision": "Gemini Vision",
+    "openai-vision": "OpenAI Vision"
+  },
+  "search_scope_values": {
+    "targeted": "targeted",
+    "universal": "worldwide"
   },
   "product_type_values": {
     "engine": "Engine",

@@ -12,6 +12,7 @@ use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\HomeFurnitureIntentParser;
 use App\Support\IndustrialB2BIntentParser;
+use App\Support\IntentDescriptionBuilder;
 use App\Support\PriceIntentParser;
 use App\Support\ProductCategoryResolver;
 use App\Support\SearchCountryResolver;
@@ -168,6 +169,14 @@ class QueryIntentEnricher
 
         if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
             $parsed = AutomotivePartsIntentParser::merge($parsed, $rawQuery);
+        }
+
+        if (empty($parsed['description'])) {
+            $parsed['description'] = IntentDescriptionBuilder::build($parsed, $parsed['language_hint'] ?? 'en');
+        }
+
+        if (($parsed['parser'] ?? '') === 'rules') {
+            $parsed['parser'] = 'semantic';
         }
 
         return array_filter($parsed, fn ($v) => $v !== null && $v !== '' && $v !== []);
