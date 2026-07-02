@@ -183,10 +183,14 @@ class IntentDescriptionBuilder
         $from = trim((string) ($parsed['origin_city'] ?? ''));
         $to = trim((string) ($parsed['destination_city'] ?? $parsed['destination'] ?? ''));
         $date = trim((string) ($parsed['departure_date'] ?? ''));
+        $returnDate = trim((string) ($parsed['return_date'] ?? ''));
+        $travelType = mb_strtolower((string) ($parsed['travel_type'] ?? ''));
 
         if ($from !== '' && $to !== '') {
             $route = $sq ? "Udhëtim {$from} → {$to}" : "Trip {$from} → {$to}";
-            if ($date !== '') {
+            if ($date !== '' && $returnDate !== '' && in_array($travelType, ['round_trip', 'return', 'roundtrip'], true)) {
+                $route .= $sq ? " ({$date} – {$returnDate})" : " ({$date} – {$returnDate})";
+            } elseif ($date !== '') {
                 $route .= $sq ? " më {$date}" : " on {$date}";
             }
 

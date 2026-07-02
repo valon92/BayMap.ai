@@ -55,6 +55,12 @@ class TravelIntentParser
         'madrid' => ['city' => 'Madrid', 'country_code' => 'ES', 'airport' => 'MAD'],
         'barcelona' => ['city' => 'Barcelona', 'country_code' => 'ES', 'airport' => 'BCN'],
         'istanbul' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
+        'istanbuli' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
+        'istanbulit' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
+        'stamboll' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
+        'stambolli' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
+        'stambollit' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
+        'stambol' => ['city' => 'Istanbul', 'country_code' => 'TR', 'airport' => 'IST'],
         'dubai' => ['city' => 'Dubai', 'country_code' => 'AE', 'airport' => 'DXB'],
         'new york' => ['city' => 'New York', 'country_code' => 'US', 'airport' => 'JFK'],
         'nyc' => ['city' => 'New York', 'country_code' => 'US', 'airport' => 'JFK'],
@@ -129,27 +135,20 @@ class TravelIntentParser
             return $parsed;
         }
 
-        if (preg_match('/\b(?:nga|from|prej|von|de)\s+([a-zëçáéíóúäöü\- ]{2,40}?)\s+(?:ne|në|to|deri|nach|à|a)\s+([a-zëçáéíóúäöü\- ]{2,40})\b/ui', $lower, $route)) {
-            $origin = self::resolvePlace(trim($route[1])) ?? self::resolveCountryHub(trim($route[1]));
-            $destination = self::resolvePlace(trim($route[2])) ?? self::resolveCountryHub(trim($route[2]));
-            if ($origin !== null) {
-                self::applyEndpoint($result, 'origin', $origin);
+        if ($route = self::matchRoute($lower)) {
+            if ($route['origin'] !== null) {
+                self::applyEndpoint($result, 'origin', $route['origin']);
             }
-            if ($destination !== null) {
-                self::applyEndpoint($result, 'destination', $destination);
-            }
-        } elseif (preg_match('/\b([a-zëçáéíóúäöü\- ]{2,40}?)\s*[–\-—−]\s*([a-zëçáéíóúäöü\- ]{2,40})\b/ui', $lower, $route)) {
-            $origin = self::resolvePlace(trim($route[1])) ?? self::resolveCountryHub(trim($route[1]));
-            $destination = self::resolvePlace(trim($route[2])) ?? self::resolveCountryHub(trim($route[2]));
-            if ($origin !== null) {
-                self::applyEndpoint($result, 'origin', $origin);
-            }
-            if ($destination !== null) {
-                self::applyEndpoint($result, 'destination', $destination);
+            if ($route['destination'] !== null) {
+                self::applyEndpoint($result, 'destination', $route['destination']);
             }
         }
 
-        if (preg_match('/\b(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](20\d{2})\b/u', $query, $dateMatch)) {
+        if ($range = self::parseAlbanianDateRange($query)) {
+            $result['departure_date'] = $range['departure_date'];
+            $result['return_date'] = $range['return_date'];
+            $result['travel_type'] = 'round_trip';
+        } elseif (preg_match('/\b(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](20\d{2})\b/u', $query, $dateMatch)) {
             $day = str_pad($dateMatch[1], 2, '0', STR_PAD_LEFT);
             $month = str_pad($dateMatch[2], 2, '0', STR_PAD_LEFT);
             $result['departure_date'] = "{$dateMatch[3]}-{$month}-{$day}";
@@ -164,8 +163,9 @@ class TravelIntentParser
         if (preg_match('/\b(?:ora|at)\s*(\d{1,2})(?:[:\.]?(\d{2}))?\s*(?:e\s+)?(?:mengjesit|morning|am)\b/ui', $lower, $time)) {
             $result['departure_time_from'] = sprintf('%02d:%02d', (int) $time[1], (int) ($time[2] ?? 0));
         }
-        if (preg_match('/\b(?:deri|until|to)\s*(\d{1,2})(?:[:\.]?(\d{2}))?\s*(?:paradite|am|morning)?\b/ui', $lower, $time)) {
-            $result['departure_time_to'] = sprintf('%02d:%02d', (int) $time[1], (int) ($time[2] ?? 0));
+        $departureTimeTo = self::parseDepartureTimeTo($lower);
+        if ($departureTimeTo !== null) {
+            $result['departure_time_to'] = $departureTimeTo;
         }
 
         if (preg_match('/\b(round\s*trip|roundtrip|vajtje\s*[- ]?ardhje|rt|kthy[së]?e|kthyes|kthese|bilet[aë]?\s+(?:avioni\s+)?kthy)\b/ui', $lower)) {
@@ -321,8 +321,51 @@ class TravelIntentParser
             return null;
         }
 
-        $day = max(1, min(31, (int) $match[1]));
-        $month = self::ALBANIAN_MONTHS[$match[2]] ?? null;
+        return self::buildNamedDate((int) $match[1], (string) $match[2], $query);
+    }
+
+    /**
+     * @return array{departure_date: string, return_date: string}|null
+     */
+    public static function parseAlbanianDateRange(string $query): ?array
+    {
+        $lower = mb_strtolower(trim($query));
+        $monthPattern = implode('|', array_map('preg_quote', array_keys(self::ALBANIAN_MONTHS)));
+
+        if (! preg_match(
+            '/\bprej\s+(?:dates?\s+)?(\d{1,2})\s+(?:e\s+)?('.$monthPattern.')\s+deri\s+(\d{1,2})\s+(?:e\s+)?('.$monthPattern.')\b/u',
+            $lower,
+            $match,
+        ) && ! preg_match(
+            '/\b(?:nga|from)\s+(\d{1,2})\s+(?:e\s+)?('.$monthPattern.')\s+deri\s+(\d{1,2})\s+(?:e\s+)?('.$monthPattern.')\b/u',
+            $lower,
+            $match,
+        )) {
+            return null;
+        }
+
+        $departure = self::buildNamedDate((int) $match[1], (string) $match[2], $query);
+        $return = self::buildNamedDate((int) $match[3], (string) $match[4], $query);
+
+        if ($departure === null || $return === null) {
+            return null;
+        }
+
+        if ($return < $departure) {
+            $returnCarbon = Carbon::parse($return)->addYear();
+            $return = $returnCarbon->format('Y-m-d');
+        }
+
+        return [
+            'departure_date' => $departure,
+            'return_date' => $return,
+        ];
+    }
+
+    private static function buildNamedDate(int $day, string $monthKey, string $query): ?string
+    {
+        $day = max(1, min(31, $day));
+        $month = self::ALBANIAN_MONTHS[$monthKey] ?? null;
         if ($month === null) {
             return null;
         }
@@ -333,11 +376,68 @@ class TravelIntentParser
         }
 
         $candidate = Carbon::create($year, $month, $day)->startOfDay();
-        if ($candidate->isPast() && ! preg_match('/\b(20\d{2})\b/u', $query)) {
+        if ($candidate->isPast() && ! $candidate->isToday() && ! preg_match('/\b(20\d{2})\b/u', $query)) {
             $candidate = $candidate->addYear();
         }
 
         return $candidate->format('Y-m-d');
+    }
+
+    private static function parseDepartureTimeTo(string $lower): ?string
+    {
+        $monthPattern = implode('|', array_map('preg_quote', array_keys(self::ALBANIAN_MONTHS)));
+
+        if (! preg_match('/\b(?:deri|until|to)\s*(\d{1,2})(?:[:\.](\d{2}))?\s*(?:paradite|am|morning)?\b/ui', $lower, $time)) {
+            return null;
+        }
+
+        if (preg_match('/\b(?:deri|until|to)\s*'.preg_quote($time[1], '/').'\s+(?:e\s+)?(?:'.$monthPattern.')\b/ui', $lower)) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d', (int) $time[1], (int) ($time[2] ?? 0));
+    }
+
+    /**
+     * @return array{origin: array{city: string, country_code: string, airport: string}|null, destination: array{city: string, country_code: string, airport: string}|null}|null
+     */
+    private static function matchRoute(string $lower): ?array
+    {
+        $dateStop = '(?=\s+(?:prej|deri|per|për|me|nga|from|në\s+datën|ne\s+daten|on|for)\b|\s*$)';
+        $patterns = [
+            '/\b(?:nga|from|von|de)\s+([a-zëçáéíóúäöü\-]+(?:\s+[a-zëçáéíóúäöü\-]+){0,2}?)\s+(?:ne|në|to|nach|à|a)\s+([a-zëçáéíóúäöü\-]+(?:\s+[a-zëçáéíóúäöü\-]+){0,2}?)'.$dateStop.'/ui',
+            '/\b([a-zëçáéíóúäöü\-]+(?:\s+[a-zëçáéíóúäöü\-]+){0,2}?)\s*[–\-—−]\s*([a-zëçáéíóúäöü\-]+(?:\s+[a-zëçáéíóúäöü\-]+){0,2}?)'.$dateStop.'/ui',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (! preg_match($pattern, $lower, $route)) {
+                continue;
+            }
+
+            $originPhrase = self::trimRoutePhrase(trim($route[1]));
+            $destinationPhrase = self::trimRoutePhrase(trim($route[2]));
+
+            return [
+                'origin' => self::resolvePlace($originPhrase) ?? self::resolveCountryHub($originPhrase),
+                'destination' => self::resolvePlace($destinationPhrase) ?? self::resolveCountryHub($destinationPhrase),
+            ];
+        }
+
+        return null;
+    }
+
+    private static function trimRoutePhrase(string $phrase): string
+    {
+        $phrase = trim($phrase);
+        if ($phrase === '') {
+            return $phrase;
+        }
+
+        if (preg_match('/^(.+?)\s+(?:prej|deri|per|për|me|nga|from)\s+/ui', $phrase, $match)) {
+            return trim($match[1]);
+        }
+
+        return $phrase;
     }
 
     /**
@@ -534,7 +634,10 @@ class TravelIntentParser
                 self::applyEndpoint($parsed, 'destination', $places[1]);
             }
         } elseif (count($places) === 1 && empty($parsed['destination_city'])) {
-            self::applyEndpoint($parsed, 'destination', $places[0]);
+            $originCity = mb_strtolower((string) ($parsed['origin_city'] ?? ''));
+            if ($originCity === '' || $originCity !== mb_strtolower($places[0]['city'])) {
+                self::applyEndpoint($parsed, 'destination', $places[0]);
+            }
         }
 
         return $parsed;
