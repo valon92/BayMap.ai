@@ -21,7 +21,12 @@ class MetaSearchEngine
         $toCluster = [];
 
         foreach ($products as $product) {
-            if ($this->isQuoteListing($product) || $this->isWebServiceListing($product) || $this->isAutomotivePriceOnRequest($product) || $this->isRealEstateListing($product) || $this->isFashionListing($product)) {
+            if ($this->isQuoteListing($product)
+                || $this->isWebServiceListing($product)
+                || $this->isAutomotivePriceOnRequest($product)
+                || $this->isRealEstateListing($product)
+                || $this->isFashionListing($product)
+                || $this->isTravelFlightListing($product)) {
                 $passthrough[] = $product;
 
                 continue;
@@ -132,6 +137,22 @@ class MetaSearchEngine
         $category = CategoryCatalog::normalize($product['category'] ?? '');
 
         return in_array($category, ['fashion', 'sports_outdoor'], true);
+    }
+
+    /**
+     * Each flight is a distinct itinerary (airline, time, stops) — do not collapse by route title.
+     *
+     * @param  array<string, mixed>  $product
+     */
+    private function isTravelFlightListing(array $product): bool
+    {
+        if (CategoryCatalog::normalize($product['category'] ?? '') !== 'travel') {
+            return false;
+        }
+
+        $mode = mb_strtolower((string) ($product['travel_mode'] ?? $product['product_type'] ?? ''));
+
+        return $mode === 'flight';
     }
 
     /**
