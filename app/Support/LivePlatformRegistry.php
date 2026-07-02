@@ -85,6 +85,20 @@ class LivePlatformRegistry
             }
         }
 
+        if (CategoryCatalog::isIndustrialB2B($category)) {
+            foreach (self::all() as $key => $meta) {
+                $platformCountry = strtoupper((string) ($meta['country'] ?? ''));
+                $isGlobal = in_array($platformCountry, ['WW', 'GLOBAL', '*'], true) || ! empty($meta['global']);
+                if (! $isGlobal) {
+                    continue;
+                }
+                $cats = (array) ($meta['categories'] ?? []);
+                if (in_array($category, $cats, true)) {
+                    $keys[] = $key;
+                }
+            }
+        }
+
         if (in_array($category, ['fashion', 'sports_outdoor'], true)) {
             foreach (self::all() as $key => $meta) {
                 $platformCountry = strtoupper((string) ($meta['country'] ?? ''));

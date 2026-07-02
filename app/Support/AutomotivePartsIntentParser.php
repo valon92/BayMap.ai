@@ -243,7 +243,7 @@ class AutomotivePartsIntentParser
             'serp_extra' => ['Luftfederung', 'Luftbalg', 'air spring'],
         ],
         'machinery' => [
-            'query_patterns' => ['/\\bmachinery/i', '/\\bmakineri/i', '/\\btractor/i', '/\\bexcavator/i', '/\\bforklift/i'],
+            'query_patterns' => ['/\\bmachinery\\b/i', '/\\btractor/i', '/\\bexcavator/i', '/\\bforklift/i'],
             'title_regex' => '/\\b(machinery|tractor|excavator|forklift|bulldozer|bagger|stapler)\\b/u',
             'search' => ['default' => 'machinery parts'],
             'serp_extra' => [],
@@ -299,6 +299,10 @@ class AutomotivePartsIntentParser
         }
 
         $rawQuery = $rawQuery !== '' ? $rawQuery : (string) ($parsed['raw_query'] ?? '');
+        if (IndustrialB2BIntentParser::isIndustrialQuery($rawQuery)) {
+            return false;
+        }
+
         $lower = mb_strtolower($rawQuery);
 
         foreach (self::partsKeywords() as $keyword) {
@@ -326,10 +330,34 @@ class AutomotivePartsIntentParser
 
         $lower = mb_strtolower($rawQuery);
 
-        return (bool) preg_match(
-            '/\b(vetur[aëe]?|makina|car)\b.*\b(viti|year|km|kilomet|mileage|diesel|benzin|automatic|manual)\b/u',
+        if (preg_match(
+            '/\b(vetur[aëe]?|makina|car|auto)\b.*\b(viti|year|km|kilomet|mileage|diesel|disell|dizel|dizell|benzin|automatic|manual)\b/u',
             $lower
-        );
+        )) {
+            return true;
+        }
+
+        if (AutomotiveIntentParser::isCarQuery($rawQuery)
+            && preg_match('/\b20\d{2}\s*[-–—]\s*20\d{2}\b/u', $lower)) {
+            return true;
+        }
+
+        if (preg_match('/\b(golf|passat|polo|tiguan|arteon|jetta|scirocco|audi|bmw|mercedes|vw|volkswagen)\b/ui', $lower)
+            && preg_match('/\b(vetur[aëe]?|makina|car|auto)\b/u', $lower)) {
+            return true;
+        }
+
+        if (preg_match('/\b(vetur[aëe]?|makina|car|golf|passat|polo)\b/ui', $lower)
+            && preg_match('/\b\d\.\d\b/u', $lower)
+            && preg_match('/\b(diesel|disell|dizel|dizell|tdi|tsi|benzin|petrol|hybrid)\b/ui', $lower)) {
+            return true;
+        }
+
+        if (preg_match('/\bmotorri?\b/u', $lower) && preg_match('/\b\d\.\d\b/u', $lower)) {
+            return true;
+        }
+
+        return false;
     }
 
     public static function productType(string $rawQuery): string
@@ -444,6 +472,10 @@ class AutomotivePartsIntentParser
      */
     public static function extractComponent(array $parsed, string $rawQuery): string
     {
+        if (self::isVehiclePurchaseQuery($parsed, $rawQuery)) {
+            return '';
+        }
+
         $item = trim((string) ($parsed['item'] ?? ''));
         if ($item !== '') {
             $normalized = self::normalizeComponentAlias($item);

@@ -783,6 +783,16 @@ function formatTagValue(val, key) {
     const cl = t(ck);
     if (cl !== ck) return cl;
   }
+  if (key === 'parser') {
+    const pk = `parser_values.${val}`;
+    const pl = t(pk);
+    if (pl !== pk) return pl;
+  }
+  if (key === 'search_scope') {
+    const sk = `search_scope_values.${val}`;
+    const sl = t(sk);
+    if (sl !== sk) return sl;
+  }
   if (key === 'item') {
     const ck = `part_component_values.${val}`;
     const cl = t(ck);

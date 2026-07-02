@@ -171,16 +171,41 @@ class GlobalProviderRegistry
             return null;
         }
 
-        if (! Schema::hasTable('countries')) {
-            return null;
+        try {
+            if (! Schema::hasTable('countries')) {
+                return $this->regionFromWorldData($countryCode);
+            }
+
+            $continent = \App\Models\Catalog\Country::query()
+                ->where('iso2', $countryCode)
+                ->with('continent:id,code')
+                ->first(['continent_id']);
+
+            return $continent?->continent?->code ?? $this->regionFromWorldData($countryCode);
+        } catch (\Throwable) {
+            return $this->regionFromWorldData($countryCode);
+        }
+    }
+
+    private function regionFromWorldData(string $countryCode): ?string
+    {
+        static $map = null;
+        if ($map === null) {
+            /** @var array<int, array<string, mixed>> $rows */
+            $rows = require database_path('data/world_countries.php');
+            $map = [];
+            foreach ($rows as $row) {
+                $iso2 = strtoupper((string) ($row['iso2'] ?? ''));
+                if ($iso2 !== '') {
+                    $map[$iso2] = (string) ($row['continent'] ?? '');
+                }
+            }
+            $map['XK'] = 'EU';
         }
 
-        $continent = \App\Models\Catalog\Country::query()
-            ->where('iso2', $countryCode)
-            ->with('continent:id,code')
-            ->first(['continent_id']);
+        $code = strtoupper($countryCode);
 
-        return $continent?->continent?->code;
+        return $map[$code] ?? null;
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Support\ElectronicsIntentParser;
 use App\Support\GermanCarMarketplaces;
 use App\Support\GermanElectronicsMarketplaces;
 use App\Support\GlobalBookMarketplaces;
+use App\Support\IndustrialB2BMarketplaces;
 use App\Support\KosovoCarMarketplaces;
 use App\Support\KosovoMarketplaces;
 use App\Support\ListingEnricher;
@@ -177,6 +178,17 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 fn (array $item) => ($item['store'] ?? '') === $this->source
                     || (($item['store'] ?? 'general') === 'general' && in_array($this->source, ['ebay', 'google_shopping'], true))
             ));
+        }
+
+        if (IndustrialB2BMarketplaces::isPlatform($this->source)) {
+            return array_values(array_filter($items, function (array $item) {
+                if (($item['store'] ?? '') === $this->source) {
+                    return true;
+                }
+
+                return ($item['store'] ?? 'general') === 'general'
+                    && in_array($this->source, ['alibaba_ww', 'machinio_ww', 'global_sources'], true);
+            }));
         }
 
         if (KosovoMarketplaces::isTarget($this->source, GlobalBookMarketplaces::kosovoKeys())) {
@@ -348,6 +360,17 @@ class MockMarketplaceService implements MarketplaceSearchInterface
                 }
             }
 
+            if (CategoryCatalog::isIndustrialB2B($parsed['category'] ?? '')) {
+                if (! empty($parsed['search_country_code'])
+                    && ! $this->locationMatchesCountry($item, (string) $parsed['search_country_code'])) {
+                    return false;
+                }
+
+                if (! $this->matchesIndustrialQuery($item, (string) ($parsed['raw_query'] ?? $parsed['search_query'] ?? ''))) {
+                    return false;
+                }
+            }
+
             return true;
         }));
     }
@@ -373,6 +396,7 @@ class MockMarketplaceService implements MarketplaceSearchInterface
             'US' => (bool) preg_match('/united states|usa|miami|new york|los angeles|california|texas|florida/', $loc),
             'AE' => (bool) preg_match('/uae|dubai|abu dhabi|emirates/', $loc),
             'GB' => (bool) preg_match('/united kingdom|england|london|manchester|uk/', $loc),
+            'CN' => (bool) preg_match('/china|guangdong|zhejiang|jiangsu|shenzhen|shanghai|beijing/', $loc),
             'AT' => str_contains($loc, 'austria') || str_contains($loc, 'vienna'),
             default => str_contains($loc, mb_strtolower($code)),
         };
@@ -454,6 +478,46 @@ class MockMarketplaceService implements MarketplaceSearchInterface
         $tags = array_map('strtoupper', $item['tags'] ?? []);
 
         return str_contains($title, $storage) || in_array($storage, $tags, true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function matchesIndustrialQuery(array $item, string $query): bool
+    {
+        $query = mb_strtolower(trim($query));
+        if ($query === '') {
+            return true;
+        }
+
+        $haystack = mb_strtolower(implode(' ', array_filter([
+            $item['title'] ?? '',
+            implode(' ', $item['tags'] ?? []),
+            $item['equipment_type'] ?? '',
+            $item['industry'] ?? '',
+        ])));
+
+        $tokens = preg_split('/\s+/u', preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $query)) ?: [];
+        $significant = array_values(array_filter($tokens, fn (string $w) => mb_strlen($w) > 3
+            && ! in_array($w, ['per', 'për', 'prodhimin', 'prodhimi', 'blej', 'blerje'], true)));
+
+        if ($significant === []) {
+            return true;
+        }
+
+        $matched = 0;
+        foreach ($significant as $word) {
+            if (str_contains($haystack, $word)) {
+                $matched++;
+            }
+        }
+
+        if (preg_match('/\bplastik|plastic|plastike\b/u', $query)
+            && preg_match('/\bplastik|plastic|molding|injection|extrud\b/u', $haystack)) {
+            return true;
+        }
+
+        return $matched >= min(2, count($significant));
     }
 
     private function mapSourceToKey(): string

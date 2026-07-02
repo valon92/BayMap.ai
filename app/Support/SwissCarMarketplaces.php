@@ -144,4 +144,9 @@ class SwissCarMarketplaces
 
         return false;
     }
+
+    public static function isPlatform(string $source): bool
+    {
+        return isset(self::CATALOG[self::normalizeKey($source)]);
+    }
 }

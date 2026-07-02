@@ -13,6 +13,8 @@ use App\Support\AutomotivePartsIntentParser;
 use App\Support\CategoryCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\GermanCarMarketplaces;
+use App\Support\IndustrialB2BIntent;
+use App\Support\IndustrialB2BMarketplaces;
 use App\Support\KosovoAutomotiveIntent;
 use App\Support\KosovoMarketplaces;
 use App\Support\KosovoToyIntent;
@@ -165,6 +167,24 @@ class ValonOrchestrator
                     : array_merge($results, $shoppingFallback['results']);
                 $workerReports = array_merge($workerReports, $shoppingFallback['report']);
                 $workerMeta = array_merge($workerMeta, $shoppingFallback['workers']);
+            }
+        }
+
+        if (config('marketplaces.demo_fallback_when_empty', true)
+            && CategoryCatalog::isIndustrialB2B($category)
+            && $countryCode !== ''
+            && count($results) < max(3, (int) config('marketplaces.demo_fallback_target_results', 8))) {
+            $catalogFallback = $this->runCatalogIndustrialFallback(
+                $parsedQuery,
+                $expandedFilters,
+                $geo,
+                $countryCode,
+                count($workerMeta),
+            );
+            if ($catalogFallback['results'] !== []) {
+                $results = $catalogFallback['results'];
+                $workerReports = array_merge($workerReports, $catalogFallback['report']);
+                $workerMeta = array_merge($workerMeta, $catalogFallback['workers']);
             }
         }
 
@@ -466,6 +486,91 @@ class ValonOrchestrator
                 'platform' => $platform,
                 'platform_label' => $platformLabel,
                 'status' => $count > 0 ? 'ok' : 'ok',
+                'results' => $count,
+                'latency_ms' => $latencyMs,
+            ];
+
+            $index++;
+
+            if (count($results) >= $targetResults) {
+                break;
+            }
+        }
+
+        return [
+            'results' => $results,
+            'report' => $report,
+            'workers' => $workers,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   results: array<int, array<string, mixed>>,
+     *   report: array<int, array<string, mixed>>,
+     *   workers: array<int, array<string, mixed>>
+     * }
+     */
+    private function runCatalogIndustrialFallback(
+        array $parsedQuery,
+        array $expandedFilters,
+        array $geo,
+        string $countryCode,
+        int $workerOffset = 0,
+    ): array {
+        $platformKeys = array_slice(IndustrialB2BMarketplaces::keysFor($countryCode), 0, 5);
+        if ($platformKeys === []) {
+            return ['results' => [], 'report' => [], 'workers' => []];
+        }
+
+        $demoFilters = $expandedFilters;
+        unset($demoFilters['marketplaces']);
+
+        $targetResults = max(4, (int) config('marketplaces.demo_fallback_target_results', 8));
+        $results = [];
+        $report = [];
+        $workers = [];
+        $prefix = $this->workerPrefixForCategory('industrial_b2b');
+        $index = $workerOffset + 1;
+
+        foreach ($platformKeys as $platformKey) {
+            $started = microtime(true);
+
+            try {
+                $items = IndustrialB2BIntent::catalogFallback($platformKey, $parsedQuery);
+            } catch (\Throwable) {
+                $items = [];
+            }
+
+            $count = is_array($items) ? count($items) : 0;
+            $latencyMs = (int) round((microtime(true) - $started) * 1000);
+            $platformLabel = IndustrialB2BMarketplaces::label($platformKey);
+
+            if ($count > 0) {
+                foreach ($items as $item) {
+                    $results[] = $item;
+                }
+            }
+
+            $report[] = [
+                'worker_id' => "{$prefix}-{$index}",
+                'platform' => $platformKey,
+                'platform_label' => $platformLabel,
+                'role' => 'Industrial catalog',
+                'mode' => 'demo',
+                'count' => $count,
+                'status' => 'ok',
+                'location_tier' => $geo['city'] ?? '',
+                'latency_ms' => $latencyMs,
+                'error' => null,
+            ];
+
+            $workers[] = [
+                'id' => "{$prefix}-{$index}",
+                'role' => 'Industrial catalog',
+                'platform' => $platformKey,
+                'platform_label' => $platformLabel,
+                'status' => 'ok',
                 'results' => $count,
                 'latency_ms' => $latencyMs,
             ];

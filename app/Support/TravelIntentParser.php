@@ -68,6 +68,23 @@ class TravelIntentParser
         'tiranë' => ['city' => 'Tirana', 'country_code' => 'AL', 'airport' => 'TIA'],
     ];
 
+    /** @var array<string, int> */
+    private const ALBANIAN_MONTHS = [
+        'janar' => 1,
+        'shkurt' => 2,
+        'mars' => 3,
+        'prill' => 4,
+        'maj' => 5,
+        'qershor' => 6,
+        'korrik' => 7,
+        'gusht' => 8,
+        'shtator' => 9,
+        'tetor' => 10,
+        'nentor' => 11,
+        'nëntor' => 11,
+        'dhjetor' => 12,
+    ];
+
     /** Default hub airports when the user names a country, not a city. */
     private const COUNTRY_HUBS = [
         'DE' => ['city' => 'Frankfurt', 'country_code' => 'DE', 'airport' => 'FRA'],
@@ -138,6 +155,8 @@ class TravelIntentParser
             $result['departure_date'] = "{$dateMatch[3]}-{$month}-{$day}";
         } elseif (preg_match('/\b(20\d{2})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})\b/u', $query, $dateMatch)) {
             $result['departure_date'] = sprintf('%s-%02d-%02d', $dateMatch[1], (int) $dateMatch[2], (int) $dateMatch[3]);
+        } elseif ($named = self::parseAlbanianNamedDate($query)) {
+            $result['departure_date'] = $named;
         }
 
         $result = self::applyRelativeSchedule($result, $lower);
@@ -289,6 +308,38 @@ class TravelIntentParser
         return $parsed;
     }
 
+    public static function parseAlbanianNamedDate(string $query): ?string
+    {
+        $lower = mb_strtolower(trim($query));
+        $monthPattern = implode('|', array_map('preg_quote', array_keys(self::ALBANIAN_MONTHS)));
+
+        if (! preg_match(
+            '/\b(?:daten?|data|me|per|për)\s*(\d{1,2})[\.\/\s\-]*(?:e\s+)?('.$monthPattern.')\b/u',
+            $lower,
+            $match,
+        ) && ! preg_match('/\b(\d{1,2})[\.\/\s\-]+('.$monthPattern.')\b/u', $lower, $match)) {
+            return null;
+        }
+
+        $day = max(1, min(31, (int) $match[1]));
+        $month = self::ALBANIAN_MONTHS[$match[2]] ?? null;
+        if ($month === null) {
+            return null;
+        }
+
+        $year = (int) date('Y');
+        if (preg_match('/\b(20\d{2})\b/u', $query, $yearMatch)) {
+            $year = (int) $yearMatch[1];
+        }
+
+        $candidate = Carbon::create($year, $month, $day)->startOfDay();
+        if ($candidate->isPast() && ! preg_match('/\b(20\d{2})\b/u', $query)) {
+            $candidate = $candidate->addYear();
+        }
+
+        return $candidate->format('Y-m-d');
+    }
+
     /**
      * @param  array<string, mixed>  $parsed
      * @return array<string, mixed>
@@ -296,6 +347,13 @@ class TravelIntentParser
     public static function applyRelativeSchedule(array $parsed, string $query): array
     {
         $query = mb_strtolower(trim($query));
+
+        if ($query !== '' && empty($parsed['departure_date'])) {
+            $named = self::parseAlbanianNamedDate($query);
+            if ($named !== null) {
+                $parsed['departure_date'] = $named;
+            }
+        }
 
         if ($query !== '' && empty($parsed['departure_date'])) {
             if (preg_match('/\b(jav[eë]n?\s+e\s+ardhshme|java\s+e\s+ardhme|next\s+week)\b/u', $query)) {

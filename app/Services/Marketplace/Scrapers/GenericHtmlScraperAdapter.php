@@ -5,6 +5,7 @@ namespace App\Services\Marketplace\Scrapers;
 use App\Services\Marketplace\Scrapers\Contracts\ScraperAdapterInterface;
 use App\Support\AutomotiveDisplayNormalizer;
 use App\Support\CategoryCatalog;
+use App\Support\IndustrialB2BIntent;
 use App\Support\ListingEnricher;
 use App\Support\PlatformCatalogUrlBuilder;
 
@@ -55,6 +56,10 @@ class GenericHtmlScraperAdapter implements ScraperAdapterInterface
 
         if ($items === [] && $this->isPro4maticPlatform($platform)) {
             $items = $this->scrapePro4maticFallbacks($platform, $parsedQuery, $storeKey);
+        }
+
+        if ($items === [] && IndustrialB2BIntent::shouldUseCatalogFallback($storeKey, $parsedQuery)) {
+            $items = IndustrialB2BIntent::catalogFallback($storeKey, $parsedQuery);
         }
 
         return ProductListingNormalizer::filterForIntent($items, $parsedQuery);

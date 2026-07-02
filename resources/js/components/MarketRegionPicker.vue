@@ -114,27 +114,62 @@
           <label class="sr-only" for="market-country-search">{{ t('market_search_country') }}</label>
           <input
             id="market-country-search"
+            ref="searchInputRef"
             v-model="countryQuery"
             type="search"
             class="market-search-input"
+            role="combobox"
             :placeholder="t('market_search_placeholder')"
             :disabled="disabled"
+            :aria-expanded="showSearchResults"
+            :aria-controls="showSearchResults ? 'market-country-search-listbox' : undefined"
+            :aria-activedescendant="activeResultId"
+            aria-autocomplete="list"
             autocomplete="off"
-            @focus="searchFocused = true"
+            enterkeyhint="search"
+            @focus="onSearchFocus"
             @blur="onSearchBlur"
+            @input="onSearchInput"
+            @keydown="onSearchKeydown"
           />
-          <div v-if="searchFocused && filteredCountries.length" class="market-search-results">
-            <button
-              v-for="country in filteredCountries"
+          <ul
+            v-if="showSearchResults"
+            id="market-country-search-listbox"
+            role="listbox"
+            class="market-search-results"
+            :aria-label="t('market_search_country')"
+          >
+            <li
+              v-for="(country, index) in filteredCountries"
               :key="country.code"
-              type="button"
-              class="market-search-result"
-              @mousedown.prevent="pickSearchCountry(country)"
+              role="option"
+              :id="`market-country-option-${country.code}`"
+              :aria-selected="highlightedIndex === index"
             >
-              <span>{{ country.name }}</span>
-              <span class="market-search-meta">{{ country.continentName }}</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                class="market-search-result"
+                :class="{
+                  'market-search-result--active': highlightedIndex === index,
+                  'market-search-result--selected': isCountrySelected(country.code),
+                }"
+                @mousedown.prevent="pickSearchCountry(country)"
+                @mouseenter="highlightedIndex = index"
+              >
+                <span class="market-search-result-name">
+                  <CountrySearchHighlight :name="country.name" :query="countryQuery" />
+                </span>
+                <span class="market-search-meta">{{ country.continentName }}</span>
+              </button>
+            </li>
+          </ul>
+          <p
+            v-else-if="searchFocused && countryQuery.trim().length > 0 && !filteredCountries.length"
+            class="market-search-empty"
+            role="status"
+          >
+            {{ t('market_search_no_results', { query: countryQuery.trim() }) }}
+          </p>
         </div>
 
         <div v-if="popularCountries.length" class="market-popular">
@@ -204,6 +239,8 @@
 <script setup>
 import { ref, computed, onMounted, watch, inject } from 'vue';
 import api from '../services/api';
+import { filterCountries } from '../utils/countrySearch';
+import CountrySearchHighlight from './CountrySearchHighlight.vue';
 
 const PICKER_OPEN_KEY = 'powerbook_market_picker_open';
 const POPULAR_CODES = ['XK', 'NL', 'DE', 'CH', 'AL', 'IT', 'FR', 'GB', 'US'];
@@ -228,6 +265,8 @@ const loadingCatalog = ref(true);
 const activeContinent = ref(null);
 const countryQuery = ref('');
 const searchFocused = ref(false);
+const highlightedIndex = ref(0);
+const searchInputRef = ref(null);
 const expanded = ref(readExpandedPreference());
 const selectionLimitHit = ref(false);
 
@@ -249,6 +288,7 @@ const allCountries = computed(() => {
       list.push({
         code: country.code,
         name: country.name,
+        searchTerms: country.searchTerms || [],
         continentCode: continent.code,
         continentName: continent.name,
       });
@@ -257,22 +297,25 @@ const allCountries = computed(() => {
   return list;
 });
 
+const filteredCountries = computed(() =>
+  filterCountries(allCountries.value, countryQuery.value, {
+    limit: 12,
+    popularCodes: POPULAR_CODES,
+  })
+);
+
+const showSearchResults = computed(() =>
+  searchFocused.value && filteredCountries.value.length > 0
+);
+
+const activeResultId = computed(() => {
+  const country = filteredCountries.value[highlightedIndex.value];
+  return country ? `market-country-option-${country.code}` : undefined;
+});
+
 const popularCountries = computed(() => {
   const byCode = new Map(allCountries.value.map((c) => [String(c.code).toUpperCase(), c]));
   return POPULAR_CODES.map((code) => byCode.get(code)).filter(Boolean);
-});
-
-const filteredCountries = computed(() => {
-  const q = countryQuery.value.trim().toLowerCase();
-  if (q.length < 2) return [];
-
-  return allCountries.value
-    .filter((country) => {
-      const name = String(country.name || '').toLowerCase();
-      const code = String(country.code || '').toLowerCase();
-      return name.includes(q) || code.includes(q);
-    })
-    .slice(0, 10);
 });
 
 const activeContinentMeta = computed(() =>
@@ -489,9 +532,61 @@ function setActiveContinent(code) {
   activeContinent.value = activeContinent.value === code ? null : code;
 }
 
+function onSearchFocus(event) {
+  searchFocused.value = true;
+  highlightedIndex.value = 0;
+  event.target?.select?.();
+}
+
+function onSearchInput() {
+  highlightedIndex.value = 0;
+}
+
+function onSearchKeydown(event) {
+  if (!filteredCountries.value.length) {
+    if (event.key === 'Escape') {
+      searchFocused.value = false;
+      event.target?.blur?.();
+    }
+    return;
+  }
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    highlightedIndex.value = Math.min(
+      highlightedIndex.value + 1,
+      filteredCountries.value.length - 1
+    );
+    return;
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    highlightedIndex.value = Math.max(highlightedIndex.value - 1, 0);
+    return;
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const country = filteredCountries.value[highlightedIndex.value];
+    if (country) {
+      pickSearchCountry(country);
+    }
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    countryQuery.value = '';
+    searchFocused.value = false;
+    event.target?.blur?.();
+  }
+}
+
 function onSearchBlur() {
   window.setTimeout(() => {
     searchFocused.value = false;
+    highlightedIndex.value = 0;
   }, 120);
 }
 
@@ -521,6 +616,10 @@ async function loadCatalog() {
 onMounted(loadCatalog);
 
 watch(locale, loadCatalog);
+
+watch(countryQuery, () => {
+  highlightedIndex.value = 0;
+});
 
 watch(
   () => props.modelValue,

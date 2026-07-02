@@ -13,6 +13,7 @@ use App\Services\Marketplace\SerpApiShoppingService;
 use App\Services\Orchestration\SearchIntentFactory;
 use App\Support\AutomotiveColorResolver;
 use App\Support\AutomotiveEngineResolver;
+use App\Support\AutomotiveIntentParser;
 use App\Support\AutomotiveModelResolver;
 use App\Support\AutomotivePartsIntentParser;
 use App\Support\BookIntentParser;
@@ -22,6 +23,7 @@ use App\Support\ElectronicsIntentParser;
 use App\Support\FashionFilterCatalog;
 use App\Support\FashionIntentParser;
 use App\Support\HomeFurnitureIntentParser;
+use App\Support\IndustrialB2BIntentParser;
 use App\Support\KosovoMarketplaces;
 use App\Support\LivePlatformRegistry;
 use App\Support\LocalMarketplaceResolver;
@@ -115,6 +117,7 @@ class SearchOrchestratorService
         $parsed = $this->marketIntent->apply($parsed, $marketMode, $marketCode, $locale);
         $parsed = HomeFurnitureIntentParser::merge($parsed, $query);
         $parsed = $this->resolveSearchMarket($parsed, $marketMode, $marketCode, $locale);
+        $parsed = IndustrialB2BIntentParser::merge($parsed, $query);
         if (CategoryCatalog::isAutomotiveParts($parsed['category'] ?? '')) {
             $parsed = AutomotivePartsIntentParser::merge($parsed, $query);
         }
@@ -256,7 +259,7 @@ class SearchOrchestratorService
                 'location_scope' => $locationScope,
                 'location' => $this->intentEnricher->locationMeta($parsed, $geo, $searchGeo),
                 'processing_ms' => $processingMs,
-                'parser' => $parsed['parser'] ?? 'rules',
+                'parser' => $parsed['parser'] ?? 'semantic',
                 'has_image' => (bool) $imageBase64,
                 'internet_search' => [
                     'ebay_live' => $this->ebayOAuth->isConfigured(),
