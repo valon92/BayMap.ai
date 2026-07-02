@@ -17,8 +17,15 @@ class ProviderIntelligenceService
 
     public function isEnabled(): bool
     {
-        return (bool) config('providers.intelligence.enabled', true)
-            && Schema::hasTable('provider_metrics');
+        if (! (bool) config('providers.intelligence.enabled', true)) {
+            return false;
+        }
+
+        try {
+            return Schema::hasTable('provider_metrics');
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**

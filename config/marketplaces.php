@@ -109,6 +109,27 @@ return [
             'categories' => ['fashion', 'sports_outdoor', 'marketplace'],
             'countries' => ['XK'],
         ],
+        'alibaba_ww' => [
+            'adapter' => 'mock',
+            'label' => 'Alibaba',
+            'mode' => 'demo',
+            'priority' => 15,
+            'categories' => ['industrial_b2b', 'marketplace'],
+        ],
+        'machinio_ww' => [
+            'adapter' => 'mock',
+            'label' => 'Machinio',
+            'mode' => 'demo',
+            'priority' => 18,
+            'categories' => ['industrial_b2b', 'construction', 'marketplace'],
+        ],
+        'global_sources' => [
+            'adapter' => 'mock',
+            'label' => 'Global Sources',
+            'mode' => 'demo',
+            'priority' => 20,
+            'categories' => ['industrial_b2b', 'marketplace'],
+        ],
     ],
 
     /*

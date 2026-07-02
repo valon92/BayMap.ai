@@ -52,14 +52,26 @@ class AgentActivationService
                 && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category, $parsedForFanOut)) {
                 $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
 
-                return $this->mergeActivation($live, $bridge);
+                return $this->withTravelFlights(
+                    $this->mergeActivation($live, $bridge),
+                    $parsedForFanOut,
+                    $expanded,
+                    $geo,
+                    $countryCode,
+                );
             }
 
-            return $localKeys !== [] ? $live : [
-                'agents' => [],
-                'source_keys' => [],
-                'providers' => [],
-            ];
+            return $this->withTravelFlights(
+                $localKeys !== [] ? $live : [
+                    'agents' => [],
+                    'source_keys' => [],
+                    'providers' => [],
+                ],
+                $parsedForFanOut,
+                $expanded,
+                $geo,
+                $countryCode,
+            );
         }
 
         if (LivePlatformRegistry::shouldFanOut($parsedForFanOut, $countryCode)) {
@@ -69,10 +81,16 @@ class AgentActivationService
                 && ! $this->shouldSkipBridgeForMultiCountry($expanded, $category, $parsedForFanOut)) {
                 $bridge = $this->activateUniversalBridge($parsedForFanOut, $expanded, $geo, $countryCode, $category);
 
-                return $this->mergeActivation($live, $bridge);
+                return $this->withTravelFlights(
+                    $this->mergeActivation($live, $bridge),
+                    $parsedForFanOut,
+                    $expanded,
+                    $geo,
+                    $countryCode,
+                );
             }
 
-            return $live;
+            return $this->withTravelFlights($live, $parsedForFanOut, $expanded, $geo, $countryCode);
         }
         $poolAgents = $this->pools->poolForCategory($category);
         $allProviders = $this->registry->forSearch($parsed, $expanded, $geo);
@@ -142,10 +160,76 @@ class AgentActivationService
             }
         }
 
-        return [
+        return $this->withTravelFlights([
             'agents' => $agents,
             'source_keys' => array_values(array_unique($sourceKeys)),
             'providers' => array_values($providers),
+        ], $parsed, $expanded, $geo, $countryCode);
+    }
+
+    /**
+     * @param  array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }  $activation
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $expanded
+     * @param  array<string, mixed>  $geo
+     * @return array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }
+     */
+    private function withTravelFlights(array $activation, array $parsed, array $expanded, array $geo, string $countryCode): array
+    {
+        if (CategoryCatalog::normalize($parsed['category'] ?? '') !== 'travel') {
+            return $activation;
+        }
+
+        return $this->mergeActivation($activation, $this->activateTravelFlightsWorker($parsed, $expanded, $geo, $countryCode));
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsed
+     * @param  array<string, mixed>  $expanded
+     * @param  array<string, mixed>  $geo
+     * @return array{
+     *   agents: array<int, array<string, mixed>>,
+     *   source_keys: array<int, string>,
+     *   providers: array<int, FederatedSearchProviderInterface>
+     * }
+     */
+    private function activateTravelFlightsWorker(array $parsed, array $expanded, array $geo, string $countryCode): array
+    {
+        foreach ($this->registry->all() as $provider) {
+            if ($provider->sourceKey() !== 'google_flights') {
+                continue;
+            }
+            if (! $provider->supportsCategory('travel') || ! $provider->isAvailable()) {
+                continue;
+            }
+            if (! UniversalMarketplaceBridge::allowsBridge('google_flights', $countryCode, 'travel')) {
+                continue;
+            }
+
+            return [
+                'agents' => [[
+                    'id' => 'GoogleFlightsAgent',
+                    'score' => 95.0,
+                    'sources' => ['google_flights'],
+                    'trust' => 92,
+                ]],
+                'source_keys' => ['google_flights'],
+                'providers' => [$provider],
+            ];
+        }
+
+        return [
+            'agents' => [],
+            'source_keys' => [],
+            'providers' => [],
         ];
     }
 

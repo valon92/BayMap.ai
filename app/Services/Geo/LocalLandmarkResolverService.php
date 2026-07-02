@@ -59,7 +59,7 @@ class LocalLandmarkResolverService
         );
         $parsed['keywords'] = array_values(array_unique(array_filter($keywords)));
 
-        if (empty($parsed['description']) || ($parsed['parser'] ?? '') === 'rules') {
+        if (empty($parsed['description'])) {
             $parsed['description'] = $parsed['area_summary'];
         }
 

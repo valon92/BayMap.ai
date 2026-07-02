@@ -301,6 +301,14 @@ class AutomotiveModelResolver
             return [$min, $max];
         }
 
+        $userSetYearRange = (isset($filters['year_min']) && $filters['year_min'] !== '')
+            || (isset($filters['year_max']) && $filters['year_max'] !== '')
+            || (isset($parsed['year_min']) || isset($parsed['year_max']));
+
+        if ($userSetYearRange) {
+            return [$min, $max];
+        }
+
         $model = (string) ($parsed['model'] ?? '');
         $generation = self::generationFromModel($model);
         $base = self::baseModelName($model);

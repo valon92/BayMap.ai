@@ -88,7 +88,7 @@ class AutomotiveIntentParser
             $result['max_km'] = $km < 1000 ? $km * 1000 : $km;
         }
 
-        if (preg_match('/\b(dizell|diesel|dizel|disel|tdi)\b/ui', $lower)) {
+        if (preg_match('/\b(dizell|diesel|dizel|disel|disell|tdi)\b/ui', $lower)) {
             $result['fuel'] = 'diesel';
         } elseif (preg_match('/\b(benzin|petrol|benzinë|benzine|tfsi)\b/ui', $lower)) {
             $result['fuel'] = 'petrol';

@@ -4,6 +4,7 @@ namespace App\Services\Market;
 
 use App\Services\Catalog\PlatformCatalogRepository;
 use App\Support\LivePlatformRegistry;
+use App\Support\SearchCountryResolver;
 
 /**
  * Continents and countries for the marketplace region picker.
@@ -70,6 +71,7 @@ class MarketCatalogService
         'RS' => 'Serbi',
         'ME' => 'Mali i Zi',
         'GR' => 'Greqi',
+        'GE' => 'Gjeorgji',
         'TR' => 'Turqi',
         'BE' => 'Belgjikë',
         'PL' => 'Poloni',
@@ -112,6 +114,8 @@ class MarketCatalogService
             ];
         }
 
+        $aliasesByCode = SearchCountryResolver::aliasesByCountryCode();
+
         foreach ($countries as $country) {
             $continentCode = (string) ($country['continent_code'] ?? '');
             if (! isset($grouped[$continentCode])) {
@@ -123,9 +127,19 @@ class MarketCatalogService
                 continue;
             }
 
+            $displayName = $this->countryLabel($iso2, (string) ($country['name'] ?? $iso2), $locale);
+            $englishName = $this->countryLabel($iso2, (string) ($country['name'] ?? $iso2), 'en');
+
             $grouped[$continentCode]['countries'][] = [
                 'code' => $iso2,
-                'name' => $this->countryLabel($iso2, (string) ($country['name'] ?? $iso2), $locale),
+                'name' => $displayName,
+                'searchTerms' => $this->countrySearchTerms(
+                    $iso2,
+                    $displayName,
+                    $englishName,
+                    (string) ($country['name'] ?? ''),
+                    $aliasesByCode[$iso2] ?? []
+                ),
             ];
         }
 
@@ -260,6 +274,29 @@ class MarketCatalogService
         }
 
         return self::COUNTRY_LABELS_EN[$code] ?? $fallback;
+    }
+
+    /**
+     * @param  array<int, string>  $aliases
+     * @return array<int, string>
+     */
+    private function countrySearchTerms(
+        string $code,
+        string $displayName,
+        string $englishName,
+        string $catalogName,
+        array $aliases
+    ): array {
+        $terms = array_filter([
+            $code,
+            strtolower($code),
+            $displayName,
+            $englishName,
+            $catalogName,
+            ...$aliases,
+        ], fn ($term) => is_string($term) && trim($term) !== '');
+
+        return array_values(array_unique($terms));
     }
 
     /**

@@ -109,6 +109,11 @@ class CategoryCatalog
         return self::is($category, 'automotive_parts');
     }
 
+    public static function isIndustrialB2B(string $category): bool
+    {
+        return self::is($category, 'industrial_b2b');
+    }
+
     public static function isLocalFashion(string $category): bool
     {
         return in_array(self::normalize($category), ['fashion', 'sports_outdoor', 'luxury_collectibles'], true);
@@ -186,6 +191,10 @@ class CategoryCatalog
                 return 'fashion';
             case 'real_estate':
                 return 'real_estate';
+            case 'industrial_b2b':
+                return 'industrial';
+            case 'travel':
+                return 'travel';
             case 'electronics_tech':
             case 'gaming_entertainment':
             case 'home_appliances':
@@ -232,7 +241,7 @@ class CategoryCatalog
             'automotive_parts' => [
                 'autopjese', 'autopjesë', 'pjesë', 'pjese', 'spare part', 'ersatzteil', 'ricambi',
                 'turbina', 'turbolader', 'turbo', 'turbocharger', 'filter', 'filtër', 'brake', 'fren',
-                'alternator', 'clutch', 'radiator', 'machinery', 'makineri',
+                'alternator', 'clutch', 'radiator',
             ],
             'home_furniture' => ['sofa', 'chair', 'table', 'desk', 'bed', 'wardrobe', 'couch', 'living room', 'mobilje', 'dollap', 'karrige', 'kuzhina', 'kuzhinë', 'kitchen', 'küche', 'furniture'],
             'health_wellness' => ['supplement', 'vitamin', 'fitness', 'yoga', 'wellness', 'protein', 'shëndet', 'shendet', 'gym', 'massage'],
@@ -240,11 +249,14 @@ class CategoryCatalog
             'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm', 'domain', 'domen', 'domenë', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar', 'website', 'faqe internet'],
             'construction' => ['cement', 'concrete', 'drill', 'hammer', 'construction', 'ndërtim', 'ndertim', 'material ndertimi', 'tools', 'scaffold'],
             'online_education' => ['course', 'udemy', 'certification', 'training', 'book', 'libër', 'liber', 'librin', 'roman', 'thriller', 'psikologjik', 'papritur', 'novel', 'learn', 'edukim', 'kurs', 'tutorial', 'bestseller'],
-            'travel' => ['flight', 'hotel', 'travel', 'trip', 'vacation', 'udhëtim', 'udhetim', 'resort', 'airbnb', 'turizëm', 'turizem'],
+            'travel' => ['flight', 'flights', 'hotel', 'travel', 'trip', 'vacation', 'udhëtim', 'udhetim', 'udhetimi', 'bilet', 'bilete', 'avion', 'avioni', 'resort', 'airbnb', 'turizëm', 'turizem'],
             'pets' => ['dog', 'cat', 'pet food', 'kafshë', 'kafshe', 'qen', 'mace', 'pet', 'aquarium'],
             'sports_outdoor' => ['bike', 'bicycle', 'camping', 'hiking', 'football', 'sport', 'outdoor', 'ski', 'futboll', 'atletik'],
             'real_estate' => ['apartment', 'house', 'flat', 'bedroom', 'sqm', 'm2', 'rent', 'banes', 'banesa', 'apartament', 'patundsh', 'qira', 'blerje', 'gjykata', 'ferizaj'],
-            'industrial_b2b' => ['industrial', 'wholesale', 'machinery', 'b2b', 'warehouse', 'forklift', 'pallet', 'industri'],
+            'industrial_b2b' => [
+                'industrial', 'wholesale', 'machinery', 'makineri', 'makine', 'b2b', 'warehouse', 'forklift',
+                'pallet', 'industri', 'prodhim', 'plastik', 'plastike', 'injektim', 'extruder', 'fabrik',
+            ],
             'finance_fintech' => ['insurance', 'loan', 'credit card', 'fintech', 'bank', 'invest', 'sigurim', 'kredi', 'financ'],
             'media_streaming' => ['netflix', 'spotify', 'streaming', 'subscription', 'movie', 'music', 'film', 'serial', 'media'],
             'luxury_collectibles' => ['rolex', 'louis vuitton', 'gucci', 'chanel', 'luxury', 'collectible', 'vintage', 'watch', 'luks', 'art', 'painting', 'coin'],

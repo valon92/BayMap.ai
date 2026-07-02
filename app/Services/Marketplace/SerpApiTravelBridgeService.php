@@ -4,6 +4,7 @@ namespace App\Services\Marketplace;
 
 use App\Contracts\MarketplaceSearchInterface;
 use App\Support\TravelBridgeUrls;
+use App\Support\TravelCatalogIntent;
 use App\Support\TravelIntentParser;
 use App\Support\UniversalMarketplaceBridge;
 use Illuminate\Support\Facades\Http;
@@ -41,20 +42,12 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
         $parsedQuery = TravelIntentParser::normalizeTravelType($parsedQuery);
         $parsedQuery = TravelIntentParser::resolveReturnDate($parsedQuery);
 
-        $groundOnly = in_array(
-            mb_strtolower((string) ($parsedQuery['product_type'] ?? $parsedQuery['travel_mode'] ?? '')),
-            ['train', 'tren', 'bus', 'autobus'],
-            true,
-        );
-
-        if (! $this->isConfigured() && ! $groundOnly) {
-            return [];
-        }
-
         $items = [];
 
-        if ($this->canSearchFlights($parsedQuery)) {
+        if ($this->isConfigured() && $this->canSearchFlights($parsedQuery)) {
             $items = array_merge($items, $this->searchFlights($parsedQuery, $expandedFilters));
+        } elseif (self::flightRouteReady($parsedQuery)) {
+            $items = array_merge($items, TravelCatalogIntent::catalogFallback($parsedQuery));
         }
 
         if (($parsedQuery['product_type'] ?? '') !== 'hotel') {
@@ -62,6 +55,15 @@ class SerpApiTravelBridgeService implements MarketplaceSearchInterface
         }
 
         return $this->sortTravelItems($items, $parsedQuery);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parsedQuery
+     */
+    private static function flightRouteReady(array $parsedQuery): bool
+    {
+        return ($parsedQuery['departure_airport'] ?? '') !== ''
+            && ($parsedQuery['arrival_airport'] ?? '') !== '';
     }
 
     /**

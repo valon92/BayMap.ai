@@ -154,7 +154,7 @@ class UniversalMarketplaceBridge
         return array_values(array_filter($keys, fn (string $key) => match ($key) {
             'channel3' => config('channel3.enabled') && ! empty(config('channel3.api_key')),
             'google_shopping' => config('serpapi.enabled') && ! empty(config('serpapi.api_key')),
-            'google_flights' => config('serpapi.enabled') && ! empty(config('serpapi.api_key')),
+            'google_flights' => (bool) config('serpapi.enabled'),
             'ebay' => config('ebay.enabled') && ! empty(config('ebay.client_id')),
             default => false,
         }));

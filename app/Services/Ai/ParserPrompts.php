@@ -84,9 +84,11 @@ Return ONLY valid JSON with this shape:
 }
 
 Rules:
-- category: pick ONE best match from the list. Use automotive for cars, electronics_tech for phones/laptops, fashion for clothing/shoes, real_estate for apartments/houses, etc.
+- category: pick ONE best match from the list. Use automotive for cars, electronics_tech for phones/laptops, fashion for clothing/shoes, real_estate for apartments/houses, industrial_b2b for factory/production machinery (NOT automotive_parts), etc.
+- industrial_b2b: "makineri per prodhimin e plastikes" / plastic injection molding / extruder / factory equipment => category industrial_b2b, equipment_type machinery, industry manufacturing. NOT automotive_parts.
+- automotive_parts: spare parts for vehicles only (brake, turbo, filter, autopjese). NOT industrial production lines.
 - Set category-specific fields only (e.g. automotive: brand, model, year, max_km, fuel; fashion: size, brand, gender; travel: destination, travel_type, origin_city, destination_city, departure_date)
-- travel/flights: "bilet avioni nga Geneva ne London 21.06.2026" => category travel, product_type flight, origin_city Geneva, destination_city London, departure_date YYYY-MM-DD, travel_type one_way, travelers 1. Do NOT set year, year_min, year_max, or gender for travel. Route cities are not search countries — leave search_country null unless buyer names where to book.
+- travel/flights: "bilet avioni nga Geneva ne London 21.06.2026" => category travel, product_type flight, origin_city Geneva, destination_city London, departure_date YYYY-MM-DD, travel_type one_way, travelers 1. Albanian: "bilet udhetimi per daten 10 korrik nga londra ne berlin" => departure_date 2026-07-10, origin_city London, destination_city Berlin. Albanian date range: "nga parisi ne stamboll prej dates 2 korrik deri 20 korrik" => origin_city Paris, destination_city Istanbul, departure_date, return_date, travel_type round_trip. Months: janar, shkurt, mars, prill, maj, qershor, korrik, gusht, shtator, tetor, nentor, dhjetor. Do NOT set year, year_min, year_max, or gender for travel. Route cities are not search countries — leave search_country null unless buyer names where to book.
 - max_km: integer kilometers for cars (180k km => 180000)
 - year: integer if mentioned
 - keywords: 3-8 relevant terms, lowercase

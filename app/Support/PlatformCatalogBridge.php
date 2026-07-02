@@ -21,6 +21,10 @@ class PlatformCatalogBridge
             return AutomotivePartsMarketplaces::keysFor($countryCode);
         }
 
+        if (CategoryCatalog::isIndustrialB2B($category)) {
+            return IndustrialB2BMarketplaces::keysFor($countryCode);
+        }
+
         if (CategoryCatalog::isAutomotive($category)) {
             return self::automotiveVehicleKeys($countryCode);
         }

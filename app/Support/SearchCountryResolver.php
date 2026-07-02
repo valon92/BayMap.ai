@@ -88,7 +88,37 @@ class SearchCountryResolver
         'hyderabad' => ['code' => 'IN', 'name' => 'India'],
         'chennai' => ['code' => 'IN', 'name' => 'India'],
         'kolkata' => ['code' => 'IN', 'name' => 'India'],
+        'greece' => ['code' => 'GR', 'name' => 'Greece'],
+        'greqi' => ['code' => 'GR', 'name' => 'Greece'],
+        'greqia' => ['code' => 'GR', 'name' => 'Greece'],
+        'georgia' => ['code' => 'GE', 'name' => 'Georgia'],
+        'gjeorgji' => ['code' => 'GE', 'name' => 'Georgia'],
+        'gjeorgjia' => ['code' => 'GE', 'name' => 'Georgia'],
     ];
+
+    /**
+     * Search aliases grouped by ISO2 (for market picker autocomplete).
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function aliasesByCountryCode(): array
+    {
+        $byCode = [];
+
+        foreach (self::ALIASES as $alias => $meta) {
+            $code = strtoupper((string) ($meta['code'] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+            $byCode[$code][] = $alias;
+        }
+
+        foreach ($byCode as $code => $aliases) {
+            $byCode[$code] = array_values(array_unique($aliases));
+        }
+
+        return $byCode;
+    }
 
     /**
      * @return array{search_country: string, search_country_code: string}|array{}

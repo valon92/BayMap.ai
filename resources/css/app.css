@@ -456,19 +456,41 @@
   }
 
   .market-search-input {
-    @apply w-full px-3 py-2.5 rounded-xl text-xs text-slate-800
+    @apply w-full px-3 py-2.5 rounded-xl text-sm sm:text-xs text-slate-800
       bg-white border border-slate-200 placeholder:text-slate-400
       focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-400;
   }
 
   .market-search-results {
-    @apply absolute z-20 left-0 right-0 mt-1 max-h-52 overflow-y-auto
-      rounded-xl border border-slate-200 bg-white shadow-lg;
+    @apply absolute z-30 left-0 right-0 mt-1 max-h-[min(280px,45vh)] overflow-y-auto
+      overscroll-y-contain rounded-xl border border-slate-200 bg-white shadow-lg
+      list-none m-0 p-0;
   }
 
   .market-search-result {
-    @apply w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left
-      text-xs text-slate-700 hover:bg-blue-50 transition-colors;
+    @apply w-full flex items-center justify-between gap-2 px-3 py-3 sm:py-2.5 text-left
+      text-sm sm:text-xs text-slate-700 hover:bg-blue-50 transition-colors;
+  }
+
+  .market-search-result--active {
+    @apply bg-blue-50;
+  }
+
+  .market-search-result--selected {
+    @apply text-blue-800;
+  }
+
+  .market-search-result-name {
+    @apply min-w-0 truncate;
+  }
+
+  .market-search-highlight {
+    @apply bg-transparent font-bold text-blue-700 not-italic;
+  }
+
+  .market-search-empty {
+    @apply absolute z-30 left-0 right-0 mt-1 rounded-xl border border-slate-200
+      bg-white px-3 py-3 text-xs text-slate-500 shadow-lg;
   }
 
   .market-search-meta {
