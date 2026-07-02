@@ -193,6 +193,8 @@ class CategoryCatalog
                 return 'real_estate';
             case 'industrial_b2b':
                 return 'industrial';
+            case 'travel':
+                return 'travel';
             case 'electronics_tech':
             case 'gaming_entertainment':
             case 'home_appliances':
@@ -247,7 +249,7 @@ class CategoryCatalog
             'ai_software' => ['ai tool', 'chatgpt', 'saas', 'software', 'subscription', 'api', 'plugin', 'copilot', 'llm', 'domain', 'domen', 'domenë', 'hosting', 'hostim', 'email', 'mail', 'ssl', 'registrar', 'website', 'faqe internet'],
             'construction' => ['cement', 'concrete', 'drill', 'hammer', 'construction', 'ndërtim', 'ndertim', 'material ndertimi', 'tools', 'scaffold'],
             'online_education' => ['course', 'udemy', 'certification', 'training', 'book', 'libër', 'liber', 'librin', 'roman', 'thriller', 'psikologjik', 'papritur', 'novel', 'learn', 'edukim', 'kurs', 'tutorial', 'bestseller'],
-            'travel' => ['flight', 'hotel', 'travel', 'trip', 'vacation', 'udhëtim', 'udhetim', 'resort', 'airbnb', 'turizëm', 'turizem'],
+            'travel' => ['flight', 'flights', 'hotel', 'travel', 'trip', 'vacation', 'udhëtim', 'udhetim', 'udhetimi', 'bilet', 'bilete', 'avion', 'avioni', 'resort', 'airbnb', 'turizëm', 'turizem'],
             'pets' => ['dog', 'cat', 'pet food', 'kafshë', 'kafshe', 'qen', 'mace', 'pet', 'aquarium'],
             'sports_outdoor' => ['bike', 'bicycle', 'camping', 'hiking', 'football', 'sport', 'outdoor', 'ski', 'futboll', 'atletik'],
             'real_estate' => ['apartment', 'house', 'flat', 'bedroom', 'sqm', 'm2', 'rent', 'banes', 'banesa', 'apartament', 'patundsh', 'qira', 'blerje', 'gjykata', 'ferizaj'],

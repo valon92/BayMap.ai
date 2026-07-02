@@ -91,6 +91,10 @@ class ProductCategoryResolver
             return 'industrial_b2b';
         }
 
+        if (TravelIntentParser::isTravelQuery($query)) {
+            return 'travel';
+        }
+
         if (AutomotivePartsIntentParser::isPartsSearch([], $query)
       && ! AutomotivePartsIntentParser::isVehiclePurchaseQuery([], $query)) {
       return 'automotive_parts';

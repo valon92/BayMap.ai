@@ -182,9 +182,15 @@ class IntentDescriptionBuilder
     {
         $from = trim((string) ($parsed['origin_city'] ?? ''));
         $to = trim((string) ($parsed['destination_city'] ?? $parsed['destination'] ?? ''));
+        $date = trim((string) ($parsed['departure_date'] ?? ''));
 
         if ($from !== '' && $to !== '') {
-            return $sq ? "Udhëtim {$from} → {$to}" : "Trip {$from} → {$to}";
+            $route = $sq ? "Udhëtim {$from} → {$to}" : "Trip {$from} → {$to}";
+            if ($date !== '') {
+                $route .= $sq ? " më {$date}" : " on {$date}";
+            }
+
+            return $route;
         }
 
         return $sq ? 'Fluturim, hotel ose paketë udhëtimi' : 'Flight, hotel or travel package';
